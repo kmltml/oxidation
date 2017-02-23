@@ -1,6 +1,4 @@
-/**
-  * Created by Kamil on 22.02.2017.
-  */
+
 package object oxidation {
 
   implicit class FunctorOps[F[_], A](private val a: F[A])(implicit F: Functor[F]) {
