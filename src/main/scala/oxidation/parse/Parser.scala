@@ -3,9 +3,9 @@ package parse
 
 import fastparse.noApi._
 import fastparse.WhitespaceApi
-import oxidation.ast._
 import oxidation.FunctorOps
 import sourcecode.Name
+import oxidation.parse.ast._
 
 //noinspection ForwardReference
 class Parser {
