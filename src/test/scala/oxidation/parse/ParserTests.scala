@@ -94,24 +94,24 @@ object ParserTests extends TestSuite {
             ))
       }
       "a function call" - {
-        expr.parse("foo()").get.value ==> Apply(Var("foo"), Seq.empty)
-        expr.parse("foo(1, 2)").get.value ==> Apply(Var("foo"), Seq(IntLit(1), IntLit(2)))
-        expr.parse("foo(1)(2)").get.value ==> Apply(Apply(Var("foo"), Seq(IntLit(1))), Seq(IntLit(2)))
+        expr.parse("foo()").get.value ==> App(Var("foo"), Seq.empty)
+        expr.parse("foo(1, 2)").get.value ==> App(Var("foo"), Seq(IntLit(1), IntLit(2)))
+        expr.parse("foo(1)(2)").get.value ==> App(App(Var("foo"), Seq(IntLit(1))), Seq(IntLit(2)))
       }
       "a member access" - {
         expr.parse("foo.bar").get.value ==> Select(Var("foo"), "bar")
       }
       "an if expression" - {
         expr.parse("if(true) 1 else 0").get.value ==> If(BoolLit(true), IntLit(1), Some(IntLit(0)))
-        expr.parse("if(foo) bar()").get.value ==> If(Var("foo"), Apply(Var("bar"), Seq()), None)
+        expr.parse("if(foo) bar()").get.value ==> If(Var("foo"), App(Var("bar"), Seq()), None)
       }
       "a while loop" - {
-        expr.parse("while(foo) bar()").get.value ==> While(Var("foo"), Apply(Var("bar"), Seq.empty))
+        expr.parse("while(foo) bar()").get.value ==> While(Var("foo"), App(Var("bar"), Seq.empty))
       }
       "a variable assignment" - {
         expr.parse("foo = 42").get.value ==> Assign(Var("foo"), None, IntLit(42))
         expr.parse("foo.bar(32).baz += 6").get.value ==>
-          Assign(Select(Apply(Select(Var("foo"), "bar"), Seq(IntLit(32))), "baz"), Some(InfixOp.Add), IntLit(6))
+          Assign(Select(App(Select(Var("foo"), "bar"), Seq(IntLit(32))), "baz"), Some(InfixOp.Add), IntLit(6))
 
         expr.parse("foo = bar").get.value ==> Assign(Var("foo"), None, Var("bar"))
         expr.parse("foo += bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Add), Var("bar"))

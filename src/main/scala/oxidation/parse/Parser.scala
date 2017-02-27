@@ -3,9 +3,12 @@ package parse
 
 import fastparse.noApi._
 import fastparse.WhitespaceApi
-import oxidation.FunctorOps
 import sourcecode.Name
 import oxidation.parse.ast._
+
+import cats._
+import cats.data._
+import cats.implicits._
 
 //noinspection ForwardReference
 class Parser {
@@ -23,7 +26,7 @@ class Parser {
   import White._
 
   implicit val PFunctor: Functor[P] = new Functor[P] {
-    override def map[A, B](a: P[A], f: A => B): P[B] = parserApi(a).map(f)
+    def map[A, B](a: P[A])(f: A => B): P[B] = parserApi(a).map(f)
   }
 
   def whole[A](p: P[A]): P[A] = p ~ End
@@ -62,8 +65,8 @@ class Parser {
   type Postfix = Expression => Expression
   private val postfix: P[Postfix] =
     P(apply | select)
-  private val apply: P[Expression => Apply] =
-    P(WSNoNL ~~ "(" ~/ expression.rep(sep = ",") ~ ")").map(params => Apply(_, params))
+  private val apply: P[Expression => App] =
+    P(WSNoNL ~~ "(" ~/ expression.rep(sep = ",") ~ ")").map(params => App(_, params))
   private val select: P[Expression => Select] =
     P(WS ~~ "." ~/ id.!).map(id => Select(_, id))
 
@@ -122,8 +125,8 @@ class Parser {
       .map(Integer.parseInt(_, 16))
 
   private val boolLiteral: P[BoolLit] = P(
-    K("true").mapTo(BoolLit(true))
-  | K("false").mapTo(BoolLit(false))
+    K("true").as(BoolLit(true))
+  | K("false").as(BoolLit(false))
   )
 
   private val varacc: P[Var] =
@@ -144,47 +147,47 @@ class Parser {
     P(K("while") ~/ "(" ~ expression ~ ")" ~/ expression).map(While.tupled)
 
   private val prefixOp: P[PrefixOp] = P(
-    O("-").mapTo(PrefixOp.Neg)
-  | O("!").mapTo(PrefixOp.Not)
-  | O("~").mapTo(PrefixOp.Inv)
+    O("-").as(PrefixOp.Neg)
+  | O("!").as(PrefixOp.Not)
+  | O("~").as(PrefixOp.Inv)
   )
 
   private val assignOp: P[Option[InfixOp]] = P(
-    O("=").mapTo(None)
-  | O("+=").mapTo(Some(InfixOp.Add))
-  | O("-=").mapTo(Some(InfixOp.Sub))
-  | O("*=").mapTo(Some(InfixOp.Mul))
-  | O("/=").mapTo(Some(InfixOp.Div))
-  | O("%=").mapTo(Some(InfixOp.Mod))
-  | O("<<=").mapTo(Some(InfixOp.Shl))
-  | O(">>=").mapTo(Some(InfixOp.Shr))
-  | O("^=").mapTo(Some(InfixOp.Xor))
-  | O("&=").mapTo(Some(InfixOp.And))
-  | O("|=").mapTo(Some(InfixOp.Or))
+    O("=").as(None)
+  | O("+=").as(Some(InfixOp.Add))
+  | O("-=").as(Some(InfixOp.Sub))
+  | O("*=").as(Some(InfixOp.Mul))
+  | O("/=").as(Some(InfixOp.Div))
+  | O("%=").as(Some(InfixOp.Mod))
+  | O("<<=").as(Some(InfixOp.Shl))
+  | O(">>=").as(Some(InfixOp.Shr))
+  | O("^=").as(Some(InfixOp.Xor))
+  | O("&=").as(Some(InfixOp.And))
+  | O("|=").as(Some(InfixOp.Or))
   )
 
   private val op3: P[InfixOp] = P(
-    O("*").mapTo(InfixOp.Mul)
-  | O("/").mapTo(InfixOp.Div)
-  | O("%").mapTo(InfixOp.Mod)
+    O("*").as(InfixOp.Mul)
+  | O("/").as(InfixOp.Div)
+  | O("%").as(InfixOp.Mod)
   )
   private val op4: P[InfixOp] = P(
-    O("+").mapTo(InfixOp.Add)
-  | O("-").mapTo(InfixOp.Sub)
+    O("+").as(InfixOp.Add)
+  | O("-").as(InfixOp.Sub)
   )
   private val op5: P[InfixOp] = P(
-    O(">>").mapTo(InfixOp.Shr)
-  | O("<<").mapTo(InfixOp.Shl)
+    O(">>").as(InfixOp.Shr)
+  | O("<<").as(InfixOp.Shl)
   )
   private val op6: P[InfixOp] = P(
-    O(">=").mapTo(InfixOp.Geq)
-  | O(">") .mapTo(InfixOp.Gt)
-  | O("<=").mapTo(InfixOp.Leq)
-  | O("<") .mapTo(InfixOp.Lt)
+    O(">=").as(InfixOp.Geq)
+  | O(">") .as(InfixOp.Gt)
+  | O("<=").as(InfixOp.Leq)
+  | O("<") .as(InfixOp.Lt)
   )
   private val op7: P[InfixOp] = P(
-    O("==").mapTo(InfixOp.Eq)
-  | O("!=").mapTo(InfixOp.Neq)
+    O("==").as(InfixOp.Eq)
+  | O("!=").as(InfixOp.Neq)
   )
 
 }

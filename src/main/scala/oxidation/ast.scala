@@ -14,7 +14,7 @@ trait Ast {
   final case class PrefixAp(operator: PrefixOp, expr: Typed[Expression]) extends Expression
   final case class Var(name: String) extends Expression
   final case class Block(body: Seq[Typed[BlockStatement]]) extends Expression
-  final case class Apply(expr: Typed[Expression], params: Seq[Typed[Expression]]) extends Expression
+  final case class App(expr: Typed[Expression], params: Seq[Typed[Expression]]) extends Expression
   final case class Select(expr: Typed[Expression], member: String) extends Expression
   final case class If(cond: Typed[Expression], positive: Typed[Expression], negative: Option[Typed[Expression]]) extends Expression
   final case class While(cond: Typed[Expression], body: Typed[Expression]) extends Expression
