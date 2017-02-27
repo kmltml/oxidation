@@ -22,6 +22,10 @@ object TyperTests extends TestSuite {
         findType(P.IntLit(20), ExpectedType.Numeric, Ctxt.empty) ==> Right(I32)
         findType(P.IntLit(20), ExpectedType.Specific(U32), Ctxt.empty) ==> Right(U32)
       }
+      "bool literals" - {
+        findType(P.BoolLit(true), ExpectedType.Undefined) ==> Right(U1)
+        findType(P.BoolLit(false), ExpectedType.Specific(U1)) ==> Right(U1)
+      }
       "operator expressions" - {
         findType(P.InfixAp(InfixOp.Add, P.IntLit(5), P.IntLit(10)), ExpectedType.Undefined, Ctxt.empty) ==>
           Right(I32)

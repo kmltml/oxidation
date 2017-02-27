@@ -22,6 +22,8 @@ object Typer {
         case _ => Left(TyperError.CantMatch(expected, I32))
       }
 
+    case P.BoolLit(b) => unifyType(U1, expected).map(Typed(ast.BoolLit(b), _))
+
     case P.InfixAp(op, left, right) =>
       op match {
         case InfixOp.Add | InfixOp.Sub | InfixOp.Mul | InfixOp.Div |

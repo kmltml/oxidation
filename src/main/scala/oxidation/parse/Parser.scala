@@ -29,7 +29,7 @@ class Parser {
   def whole[A](p: P[A]): P[A] = p ~ End
 
   private val expression0: P[Expression] = P(
-    intLiteral | varacc | parexp | blockexpr | ifexp | whileexp
+    intLiteral | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
   )
   private val expression1: P[Expression] = P(
     expression0 ~~ postfix.repX
@@ -79,7 +79,7 @@ class Parser {
   private def K(p: String): P0 = p ~~ !CharPred(c => c.isLetterOrDigit || idSpecialChars.contains(c))
   private def O(p: String): P0 = p ~~ !CharIn("~!%^&*+=<>|/?")
 
-  val keyword: P0 = P(Seq("if", "else", "def", "while", "struct", "enum", "val", "var").map(K).reduce(_ | _))
+  val keyword: P0 = P(Seq("if", "else", "def", "while", "struct", "enum", "val", "var", "true", "false").map(K).reduce(_ | _))
 
   private val idSpecialChars = "$_"
   private val idStart = CharPred(c => c.isLetter || idSpecialChars.contains(c))
@@ -120,6 +120,11 @@ class Parser {
   private val hexInt: P[Int] =
     ("0x" ~/ CharsWhile(c => c.isDigit || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')).!)
       .map(Integer.parseInt(_, 16))
+
+  private val boolLiteral: P[BoolLit] = P(
+    K("true").mapTo(BoolLit(true))
+  | K("false").mapTo(BoolLit(false))
+  )
 
   private val varacc: P[Var] =
     P(id.!).map(Var)

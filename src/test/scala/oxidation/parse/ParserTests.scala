@@ -19,6 +19,10 @@ object ParserTests extends TestSuite {
         expr.parse("42").get.value ==> IntLit(42)
         expr.parse("0xdeaf").get.value ==> IntLit(0xdeaf)
       }
+      "bool literals" - {
+        expr.parse("true").get.value ==> BoolLit(true)
+        expr.parse("false").get.value ==> BoolLit(false)
+      }
       "addition" - {
         expr.parse("2 + 3").get.value ==> InfixAp(InfixOp.Add, IntLit(2), IntLit(3))
         expr.parse("2 + 3 + 4").get.value ==>
@@ -98,7 +102,7 @@ object ParserTests extends TestSuite {
         expr.parse("foo.bar").get.value ==> Select(Var("foo"), "bar")
       }
       "an if expression" - {
-        expr.parse("if(true) 1 else 0").get.value ==> If(Var("true"), IntLit(1), Some(IntLit(0)))
+        expr.parse("if(true) 1 else 0").get.value ==> If(BoolLit(true), IntLit(1), Some(IntLit(0)))
         expr.parse("if(foo) bar()").get.value ==> If(Var("foo"), Apply(Var("bar"), Seq()), None)
       }
       "a while loop" - {

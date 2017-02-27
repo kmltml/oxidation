@@ -9,6 +9,7 @@ trait Ast {
   sealed trait Expression extends BlockStatement
 
   final case class IntLit(value: Int) extends Expression
+  final case class BoolLit(value: Boolean) extends Expression
   final case class InfixAp(operator: InfixOp, left: Typed[Expression], right: Typed[Expression]) extends Expression
   final case class PrefixAp(operator: PrefixOp, expr: Typed[Expression]) extends Expression
   final case class Var(name: String) extends Expression
