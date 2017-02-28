@@ -65,6 +65,13 @@ object AstDump extends App {
 
     case ast.BoolLit(b) => b.toString
 
+    case ast.StringLit(s) => "\"" + s.flatMap {
+      case '\n' => "\\n"
+      case '"' => "\\\""
+      case '\\' => "\\\\"
+      case c => c.toString
+    } + "\""
+
     case ast.Var(v) => v
 
     case ast.If(cond, pos, neg) =>

@@ -16,4 +16,5 @@ def main(a: i32): unit = {
     while(false) {
         main()
     }
+    print("Hello, world!\n")
 }

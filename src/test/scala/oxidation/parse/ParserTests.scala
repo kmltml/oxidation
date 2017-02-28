@@ -23,6 +23,9 @@ object ParserTests extends TestSuite {
         expr.parse("true").get.value ==> BoolLit(true)
         expr.parse("false").get.value ==> BoolLit(false)
       }
+      "string literals" - {
+        expr.parse(""" "Hello, \"world\"!\n" """).get.value ==> StringLit("Hello, \"world\"!\n")
+      }
       "addition" - {
         expr.parse("2 + 3").get.value ==> InfixAp(InfixOp.Add, IntLit(2), IntLit(3))
         expr.parse("2 + 3 + 4").get.value ==>

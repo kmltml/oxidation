@@ -34,7 +34,7 @@ class Parser {
   val compilationUnit: P[Seq[Def]] = P(definition.rep ~ End)
 
   private val expression0: P[Expression] = P(
-    intLiteral | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
+    stringLiteral | intLiteral | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
   )
   private val expression1: P[Expression] = P(
     expression0 ~~ postfix.repX
@@ -130,6 +130,16 @@ class Parser {
     K("true").as(BoolLit(true))
   | K("false").as(BoolLit(false))
   )
+
+  private val stringLiteral: P[StringLit] = {
+    val escapeSequence =
+    ( LiteralStr("\\\"").as("\"")
+    | LiteralStr("\\\\").as("\\")
+    | LiteralStr("\\n").as("\n")
+    )
+    val stringChars = CharsWhile(!"\\\"".contains(_))
+    P("\"".~/ ~~ (stringChars.! | escapeSequence).repX ~~ "\"").map(strs => StringLit(strs.mkString))
+  }
 
   private val varacc: P[Var] =
     P(id.!).map(Var)
