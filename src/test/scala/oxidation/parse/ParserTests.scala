@@ -166,10 +166,20 @@ object ParserTests extends TestSuite {
             |  y: u16; z: bool
             |}
           """.stripMargin).get.value ==>
-          StructDef("foo", Seq(
+          StructDef("foo", None, Seq(
             StructMember("x", Type.Named("i32")),
             StructMember("y", Type.Named("u16")),
             StructMember("z", Type.Named("bool"))
+          ))
+        defn.parse(
+          """struct arr[x] = {
+            |  length: usize
+            |  contents: ptr[x]
+            |}
+          """.stripMargin).get.value ==>
+          StructDef("arr", Some(Seq("x")), Seq(
+            StructMember("length", Type.Named("usize")),
+            StructMember("contents", Type.App(Type.Named("ptr"), Seq(Type.Named("x"))))
           ))
       }
     }

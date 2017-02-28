@@ -63,9 +63,13 @@ object AstDump extends App {
       }
       s"DefDef($name, ".nl + (pars + ",".nl + retType + ",".nl + prettyprintExp(body)).indent + ")"
 
-    case ast.StructDef(name, members) =>
-      s"StructDef($name, ".nl + members.map {
-        case ast.StructMember(name, ast.Type.Named(tpe)) => s"Member($name, $tpe)".p
+    case ast.StructDef(name, typeParams, members) =>
+      val typeParamList = typeParams match {
+        case Some(ps) => s"[${ps mkString ", "}]"
+        case None => ""
+      }
+      s"StructDef($name$typeParamList, ".nl + members.map {
+        case ast.StructMember(name, tpe) => s"Member($name, ".p + prettyprintType(tpe) + ")"
       }.sep(", ".nl).indent + ")"
 
   }

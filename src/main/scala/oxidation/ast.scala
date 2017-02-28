@@ -26,7 +26,7 @@ trait Ast {
   final case class DefDef(name: String, params: Option[Seq[Param]], typ: Option[Type], body: Typed[Expression]) extends Def
   final case class ValDef(name: String, typ: Option[Type], value: Typed[Expression]) extends Def
   final case class VarDef(name: String, typ: Option[Type], value: Typed[Expression]) extends Def
-  final case class StructDef(name: String, members: Seq[StructMember]) extends Def
+  final case class StructDef(name: String, typeParameters: Option[Seq[String]], members: Seq[StructMember]) extends Def
 
   final case class Param(name: String, typ: Type)
   final case class StructMember(name: String, typ: Type)

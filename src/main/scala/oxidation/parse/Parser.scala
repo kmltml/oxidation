@@ -123,7 +123,8 @@ class Parser {
   private val structdef: P[StructDef] = {
     val member = (WS ~~ id.! ~~ WSNoNL ~~ ":" ~ typ).map(StructMember.tupled)
     val body = "{" ~~ member.repX(sep = semi) ~ "}"
-    P(K("struct") ~/ id.! ~ O("=") ~ body).map(StructDef.tupled)
+    val typeParams = "[" ~/ id.!.rep(sep = ",") ~ "]"
+    P(K("struct") ~/ id.! ~ typeParams.? ~ O("=") ~ body).map(StructDef.tupled)
   }
 
   private val intLiteral: P[IntLit] =
