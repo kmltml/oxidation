@@ -31,6 +31,8 @@ class Parser {
 
   def whole[A](p: P[A]): P[A] = p ~ End
 
+  val compilationUnit: P[Seq[Def]] = P(definition.rep ~ End)
+
   private val expression0: P[Expression] = P(
     intLiteral | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
   )
@@ -71,7 +73,7 @@ class Parser {
     P(WS ~~ "." ~/ id.!).map(id => Select(_, id))
 
   private val semi: P0 =
-    P(";" | "\n" | "\r" | "\r\n")
+    P((";" | "\n" | "\r" | "\r\n") ~~ WS)
 
   private def infixl(exp: => P[Expression], op: => P[InfixOp]): P[Expression] = P(
     exp ~ (op ~/ exp).rep

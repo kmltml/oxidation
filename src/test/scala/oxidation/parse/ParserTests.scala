@@ -92,6 +92,18 @@ object ParserTests extends TestSuite {
               ValDef("x", None, IntLit(10)),
               InfixAp(InfixOp.Add, Var("x"), IntLit(1))
             ))
+        expr.parse(
+          """{
+            |  val x = 10
+            |  val y = 20
+            |  x + y
+            |}
+          """.stripMargin).get.value ==>
+            Block(Seq(
+              ValDef("x", None, IntLit(10)),
+              ValDef("y", None, IntLit(20)),
+              InfixAp(InfixOp.Add, Var("x"), Var("y"))
+            ))
       }
       "a function call" - {
         expr.parse("foo()").get.value ==> App(Var("foo"), Seq.empty)
