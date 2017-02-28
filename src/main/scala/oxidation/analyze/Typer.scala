@@ -24,6 +24,24 @@ object Typer {
 
     case P.BoolLit(b) => unifyType(U1, expected).map(Typed(ast.BoolLit(b), _))
 
+    case P.PrefixAp(PrefixOp.Inv, right) =>
+      for {
+        rtyped <- solveType(right, ExpectedType.Numeric, ctxt)
+        t <- unifyType(rtyped.typ, expected)
+      } yield Typed(ast.PrefixAp(PrefixOp.Inv, rtyped), t)
+
+    case P.PrefixAp(PrefixOp.Neg, right) =>
+      for {
+        rtyped <- solveType(right, ExpectedType.Numeric, ctxt)
+        t <- unifyType(wider(rtyped.typ, I8), expected)
+      } yield Typed(ast.PrefixAp(PrefixOp.Neg, rtyped), t)
+
+    case P.PrefixAp(PrefixOp.Not, right) =>
+      for {
+        rtyped <- solveType(right, ExpectedType.Specific(U1), ctxt)
+        t <- unifyType(rtyped.typ, expected)
+      } yield Typed(ast.PrefixAp(PrefixOp.Not, rtyped), t)
+
     case P.InfixAp(op, left, right) =>
       op match {
         case InfixOp.Add | InfixOp.Sub | InfixOp.Mul | InfixOp.Div |

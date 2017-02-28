@@ -34,6 +34,11 @@ object TyperTests extends TestSuite {
 
         findType(P.InfixAp(InfixOp.Eq, P.IntLit(1), P.IntLit(2)), ExpectedType.Undefined, Ctxt.empty) ==> Right(U1)
       }
+      "unary prefix operator expressions" - {
+        findType(P.PrefixAp(PrefixOp.Inv, P.IntLit(64)), ExpectedType.Numeric) ==> Right(I32)
+        findType(P.PrefixAp(PrefixOp.Neg, P.Var("x")), ExpectedType.Undefined, Ctxt.terms("x" -> U64)) ==> Right(I64)
+        findType(P.PrefixAp(PrefixOp.Not, P.BoolLit(false)), ExpectedType.Undefined) ==> Right(U1)
+      }
       "block expression" - {
         findType(P.Block(Seq(
           P.Var("x"), P.Var("y")
