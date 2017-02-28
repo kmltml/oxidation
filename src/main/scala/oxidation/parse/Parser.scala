@@ -93,13 +93,21 @@ class Parser {
     !keyword ~ idStart ~ idRest
   }
 
-  private val typ: P[Type] = P(
-    id.!.map(Type.Named)
+  val typ: P[Type] = P(
+    (namedType ~ typeApply.rep).map {
+      case (t, paramLists) =>
+        paramLists.foldLeft(t: Type)(Type.App(_, _))
+    }
   )(Name("type"))
+
+  private val namedType: P[Type.Named] = id.!.map(Type.Named)
+
+  private val typeApply: P[Seq[Type]] =
+    P("[" ~/ typ.rep(sep = ",", min = 1) ~ "]")
 
   private val defdef: P[DefDef] = {
     val param = (id.! ~ ":" ~ typ).map(Param.tupled)
-    val paramList = "(" ~ param.rep ~ ")"
+    val paramList = "(" ~ param.rep(sep = ",") ~ ")"
 
     P(K("def") ~/ id.! ~ paramList.? ~ (":" ~/ typ).? ~ "=" ~ expression).map(DefDef.tupled)
   }

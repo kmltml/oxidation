@@ -166,11 +166,21 @@ object ParserTests extends TestSuite {
             |  y: u16; z: bool
             |}
           """.stripMargin).get.value ==>
-            StructDef("foo", Seq(
-              StructMember("x", Type.Named("i32")),
-              StructMember("y", Type.Named("u16")),
-              StructMember("z", Type.Named("bool"))
-            ))
+          StructDef("foo", Seq(
+            StructMember("x", Type.Named("i32")),
+            StructMember("y", Type.Named("u16")),
+            StructMember("z", Type.Named("bool"))
+          ))
+      }
+    }
+
+    "type should parse" - {
+      val tpe = p.whole(p.typ)
+      "a simple named type" - {
+        tpe.parse("i32").get.value ==> Type.Named("i32")
+      }
+      "a type constructor application" - {
+        tpe.parse("ptr[i8]").get.value ==> Type.App(Type.Named("ptr"), Seq(Type.Named("i8")))
       }
     }
   }

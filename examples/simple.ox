@@ -3,7 +3,7 @@ struct Point = {
     y: i32
 }
 
-def main(a: i32): unit = {
+def main(args: arr[arr[i8]], something: ptr[i64]): unit = {
     val x = 10
     var y = 20
     if(x == y) {

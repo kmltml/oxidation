@@ -51,13 +51,28 @@ object AstDump extends App {
       s"VarDef($name, $tpe,".nl + prettyprintExp(value).indent + ")"
 
     case ast.DefDef(name, params, tpe, body) =>
-      s"DefDef($name, $params, $tpe,".nl + prettyprintExp(body).indent + ")"
+      val pars = params match {
+        case Some(p) => "Params(".nl + p.map {
+            case ast.Param(n, t) => s"Param($n, ".p + prettyprintType(t) + ")"
+          }.sep(", ".nl).indent + ")"
+        case None => "None".p
+      }
+      val retType = tpe match {
+        case Some(t) => prettyprintType(t)
+        case None => "None".p
+      }
+      s"DefDef($name, ".nl + (pars + ",".nl + retType + ",".nl + prettyprintExp(body)).indent + ")"
 
     case ast.StructDef(name, members) =>
       s"StructDef($name, ".nl + members.map {
         case ast.StructMember(name, ast.Type.Named(tpe)) => s"Member($name, $tpe)".p
       }.sep(", ".nl).indent + ")"
 
+  }
+
+  def prettyprintType(t: ast.Type): P = t match {
+    case ast.Type.Named(n) => n.p
+    case ast.Type.App(t, p) => prettyprintType(t) + "[" + p.map(prettyprintType).sep(", ") + "]"
   }
 
   def prettyprintExp(e: ast.Expression): P = e match {

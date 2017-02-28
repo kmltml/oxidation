@@ -36,6 +36,7 @@ trait Ast {
   object Type {
 
     final case class Named(name: String) extends Type
+    final case class App(const: Type, params: Seq[Type]) extends Type
 
   }
 }
