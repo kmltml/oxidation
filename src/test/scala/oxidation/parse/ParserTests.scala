@@ -182,6 +182,30 @@ object ParserTests extends TestSuite {
             StructMember("contents", Type.App(Type.Named("ptr"), Seq(Type.Named("x"))))
           ))
       }
+      "an enum definition" - {
+        defn.parse(
+          """enum bool = {
+            |  True
+            |  False
+            |}
+          """.stripMargin).get.value ==>
+          EnumDef("bool", None, Seq(
+            EnumVariant("True", Seq()),
+            EnumVariant("False", Seq())
+          ))
+        defn.parse(
+          """enum Option[A] = {
+            |  Some {
+            |    value: A
+            |  }
+            |  None
+            |}
+          """.stripMargin).get.value ==>
+          EnumDef("Option", Some(Seq("A")), Seq(
+            EnumVariant("Some", Seq(StructMember("value", Type.Named("A")))),
+            EnumVariant("None", Seq())
+          ))
+      }
     }
 
     "type should parse" - {

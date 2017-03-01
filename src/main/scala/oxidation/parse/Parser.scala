@@ -61,7 +61,7 @@ class Parser {
   val expression: P[Expression] = P(expression8)
 
   val definition: P[Def] = P(
-    defdef | valdef | vardef | structdef
+    defdef | valdef | vardef | structdef | enumdef
   )
 
   type Postfix = Expression => Expression
@@ -120,11 +120,22 @@ class Parser {
   private val vardef: P[VarDef] =
     P(K("var") ~/ defBody).map(VarDef.tupled)
 
+  private val structMember = (WS ~~ id.! ~~ WSNoNL ~~ ":" ~ typ).map(StructMember.tupled)
+
   private val structdef: P[StructDef] = {
-    val member = (WS ~~ id.! ~~ WSNoNL ~~ ":" ~ typ).map(StructMember.tupled)
-    val body = "{" ~~ member.repX(sep = semi) ~ "}"
+    val body = "{" ~~ structMember.repX(sep = semi) ~ "}"
     val typeParams = "[" ~/ id.!.rep(sep = ",") ~ "]"
     P(K("struct") ~/ id.! ~ typeParams.? ~ O("=") ~ body).map(StructDef.tupled)
+  }
+
+  private val enumdef: P[EnumDef] = {
+    val typeParams = "[" ~/ id.!.rep(sep = ",") ~ "]"
+    val variantMembers = "{" ~/ structMember.repX(sep = semi) ~ "}"
+    val variant: P[EnumVariant] = (WS ~~ id.! ~ variantMembers.?).map {
+      case (n, m) => EnumVariant(n, m getOrElse Seq.empty)
+    }
+    val body = "{" ~~ variant.repX(sep = semi) ~ "}"
+    P(K("enum") ~/ id.! ~ typeParams.? ~ O("=") ~/ body).map(EnumDef.tupled)
   }
 
   private val intLiteral: P[IntLit] =
