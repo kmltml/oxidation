@@ -8,6 +8,8 @@ package object oxidation {
     def withFilter(f: A ⇒ Boolean) = fa.filter(f)
   }
 
+  type Multimap[K, V] = Map[K, Set[V]]
+
 //  implicit def rightBiasedEither[L, R](either: Either[L, R]): Either.RightProjection[L, R] = either.right
 
 }
