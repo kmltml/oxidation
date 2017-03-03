@@ -225,6 +225,11 @@ object ParserTests extends TestSuite {
       "a module specifier" - {
         tld.parse("module foo.bar").get.value ==> Module(Seq("foo", "bar"))
       }
+      "an import" - {
+        tld.parse("import foo._").get.value ==> Import(Seq("foo"), ImportSpecifier.All)
+        tld.parse("import foo.bar").get.value ==> Import(Seq("foo"), ImportSpecifier.Members(Seq("bar")))
+        tld.parse("import foo.{ bar, baz }").get.value ==> Import(Seq("foo"), ImportSpecifier.Members(Seq("bar", "baz")))
+      }
     }
   }
 

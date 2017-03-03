@@ -32,6 +32,14 @@ trait Ast {
   final case class EnumDef(name: String, typeParameters: Option[Seq[String]], variants: Seq[EnumVariant]) extends Def
 
   final case class Module(path: Seq[String]) extends TLD
+  final case class Import(path: Seq[String], names: ImportSpecifier) extends TLD
+
+  sealed trait ImportSpecifier
+
+  object ImportSpecifier {
+    case object All extends ImportSpecifier
+    final case class Members(members: Seq[String]) extends ImportSpecifier
+  }
 
   final case class Param(name: String, typ: Type)
   final case class StructMember(name: String, typ: Type)

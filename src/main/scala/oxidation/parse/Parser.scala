@@ -65,10 +65,21 @@ class Parser {
   )
 
   val tld: P[TLD] =
-    P(definition | module)
+    P(definition | module | imprt)
 
   val module: P[Module] =
     P(K("module") ~ id.!.rep(sep = ".")).map(Module)
+
+  val imprt: P[Import] = P {
+    val path = id.!.rep(sep = ".", min = 1)
+    val membersSelector = ("." ~ "{" ~/ id.!.rep(sep = ",", min = 1) ~ "}").map(ImportSpecifier.Members)
+    val selector = membersSelector
+    (K("import") ~ path ~ selector.?). map {
+      case (path, Some(s)) => Import(path, s)
+      case (path :+ "_", None) => Import(path, ImportSpecifier.All)
+      case (path :+ last, None) => Import(path, ImportSpecifier.Members(Seq(last)))
+    }
+  }
 
   type Postfix = Expression => Expression
   private val postfix: P[Postfix] =
@@ -91,7 +102,8 @@ class Parser {
   private def O(p: String): P0 = p ~~ !CharIn("~!%^&*+=<>|/?")
 
   val keyword: P0 =
-    P(Seq("if", "else", "def", "while", "struct", "enum", "val", "var", "true", "false", "module").map(K).reduce(_ | _))
+    P(Seq("if", "else", "def", "while", "struct", "enum",
+      "val", "var", "true", "false", "module", "import").map(K).reduce(_ | _))
 
   private val idSpecialChars = "$_"
   private val idStart = CharPred(c => c.isLetter || idSpecialChars.contains(c))
