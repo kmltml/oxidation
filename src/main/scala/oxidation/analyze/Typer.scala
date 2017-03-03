@@ -109,7 +109,7 @@ object Typer {
             c <- StateT.get[TyperResult, Ctxt]
             expectedType = tpe.map(t => ExpectedType.Specific(lookupType(t, c))).getOrElse(ExpectedType.Undefined)
             t <- StateT.lift(solveType(value, expectedType, c))
-            _ <- StateT.modify[TyperResult, Ctxt](_.withTerms(Map(name -> t.typ)))
+            _ <- StateT.modify[TyperResult, Ctxt](_.withTerms(Map(Symbol.Local(name) -> t.typ)))
           } yield t
 
       }.runA(ctxt).map { body =>
@@ -119,7 +119,7 @@ object Typer {
   }
 
   private def lookupType(t: P.Type, ctxt: Ctxt): Type = t match {
-    case P.Type.Named(n) => n match {
+    case P.Type.Named(Symbol.Global(Seq(n))) => n match {
       case "unit" => U0
       case "bool" => U1
       case "u8" => U8
@@ -130,8 +130,8 @@ object Typer {
       case "i16" => I16
       case "i32" => I32
       case "i64" => I64
-      case _ => ctxt.types(n)
     }
+    case P.Type.Named(s) => ctxt.types(s)
   }
 
   private def unifyType(t: Type, expected: ExpectedType): Either[TyperError, Type] = (t, expected) match {

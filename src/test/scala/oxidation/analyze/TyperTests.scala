@@ -15,6 +15,8 @@ object TyperTests extends TestSuite {
   def findType(expr: P.Expression, expectedType: ExpectedType, ctxt: Ctxt = Ctxt.empty): Either[TyperError, Type] =
     solveType(expr, expectedType, ctxt).map(_.typ)
 
+  def l(s: String): Symbol = Symbol.Local(s)
+
   val tests = apply {
     "solveType" - {
       "int literals" - {
@@ -29,29 +31,29 @@ object TyperTests extends TestSuite {
       "operator expressions" - {
         findType(P.InfixAp(InfixOp.Add, P.IntLit(5), P.IntLit(10)), ExpectedType.Undefined, Ctxt.empty) ==>
           Right(I32)
-        findType(P.InfixAp(InfixOp.Mul, P.Var("x"), P.Var("y")), ExpectedType.Numeric,
-          Ctxt.terms("x" -> U8, "y" -> U32)) ==> Right(U32)
+        findType(P.InfixAp(InfixOp.Mul, P.Var(l("x")), P.Var(l("y"))), ExpectedType.Numeric,
+          Ctxt.terms(l("x") -> U8, l("y") -> U32)) ==> Right(U32)
 
         findType(P.InfixAp(InfixOp.Eq, P.IntLit(1), P.IntLit(2)), ExpectedType.Undefined, Ctxt.empty) ==> Right(U1)
       }
       "unary prefix operator expressions" - {
         findType(P.PrefixAp(PrefixOp.Inv, P.IntLit(64)), ExpectedType.Numeric) ==> Right(I32)
-        findType(P.PrefixAp(PrefixOp.Neg, P.Var("x")), ExpectedType.Undefined, Ctxt.terms("x" -> U64)) ==> Right(I64)
+        findType(P.PrefixAp(PrefixOp.Neg, P.Var(l("x"))), ExpectedType.Undefined, Ctxt.terms(l("x") -> U64)) ==> Right(I64)
         findType(P.PrefixAp(PrefixOp.Not, P.BoolLit(false)), ExpectedType.Undefined) ==> Right(U1)
       }
       "block expression" - {
         findType(P.Block(Seq(
-          P.Var("x"), P.Var("y")
-        )), ExpectedType.Undefined, Ctxt.terms("x" -> U8, "y" -> U16)) ==> Right(U16)
+          P.Var(l("x")), P.Var(l("y"))
+        )), ExpectedType.Undefined, Ctxt.terms(l("x") -> U8, l("y") -> U16)) ==> Right(U16)
 
         findType(P.Block(Seq(
           P.ValDef("x", None, P.IntLit(10)),
-          P.InfixAp(InfixOp.Add, P.Var("x"), P.IntLit(1))
+          P.InfixAp(InfixOp.Add, P.Var(l("x")), P.IntLit(1))
         )), ExpectedType.Undefined) ==> Right(I32)
 
         findType(P.Block(Seq(
-          P.ValDef("x", Some(P.Type.Named("i64")), P.IntLit(10)),
-          P.Var("x")
+          P.ValDef("x", Some(P.Type.Named(Symbol.Global(Seq("i64")))), P.IntLit(10)),
+          P.Var(l("x"))
         )), ExpectedType.Numeric) ==> Right(I64)
       }
     }

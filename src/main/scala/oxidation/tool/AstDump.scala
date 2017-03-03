@@ -75,8 +75,14 @@ object AstDump extends App {
   }
 
   def prettyprintType(t: ast.Type): P = t match {
-    case ast.Type.Named(n) => n.p
+    case ast.Type.Named(n) => prettyprintSymbol(n)
     case ast.Type.App(t, p) => prettyprintType(t) + "[" + p.map(prettyprintType).sep(", ") + "]"
+  }
+
+  def prettyprintSymbol(s: Symbol): P = s match {
+    case Symbol.Local(n) => n
+    case Symbol.Global(path) => path.mkString(".")
+    case Symbol.Unresolved(n) => n
   }
 
   def prettyprintExp(e: ast.Expression): P = e match {
@@ -91,7 +97,7 @@ object AstDump extends App {
       case c => c.toString
     } + "\""
 
-    case ast.Var(v) => v
+    case ast.Var(v) => prettyprintSymbol(v)
 
     case ast.If(cond, pos, neg) =>
       val prefix = "If(".nl + prettyprintExp(cond).indent + ", ".nl + prettyprintExp(pos).indent

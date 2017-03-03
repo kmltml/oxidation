@@ -11,6 +11,8 @@ object ParserTests extends TestSuite {
     case _: Parsed.Failure[_, _] =>
   }
 
+  implicit def unresolvedSymbol(n: String): Symbol = Symbol.Unresolved(n)
+
   val tests = apply {
     val p = new Parser
     "expression should parse: " - {

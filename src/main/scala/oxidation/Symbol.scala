@@ -1,4 +1,4 @@
-package oxidation.analyze
+package oxidation
 
 sealed trait Symbol {
 

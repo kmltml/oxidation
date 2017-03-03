@@ -13,7 +13,7 @@ trait Ast {
   final case class StringLit(value: String) extends Expression
   final case class InfixAp(operator: InfixOp, left: Typed[Expression], right: Typed[Expression]) extends Expression
   final case class PrefixAp(operator: PrefixOp, expr: Typed[Expression]) extends Expression
-  final case class Var(name: String) extends Expression
+  final case class Var(name: Symbol) extends Expression
   final case class Block(body: Seq[Typed[BlockStatement]]) extends Expression
   final case class App(expr: Typed[Expression], params: Seq[Typed[Expression]]) extends Expression
   final case class Select(expr: Typed[Expression], member: String) extends Expression
@@ -41,7 +41,7 @@ trait Ast {
 
   object Type {
 
-    final case class Named(name: String) extends Type
+    final case class Named(name: Symbol) extends Type
     final case class App(const: Type, params: Seq[Type]) extends Type
 
   }

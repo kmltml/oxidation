@@ -107,7 +107,7 @@ class Parser {
     }
   )(Name("type"))
 
-  private val namedType: P[Type.Named] = id.!.map(Type.Named)
+  private val namedType: P[Type.Named] = id.!.map(n => Type.Named(Symbol.Unresolved(n)))
 
   private val typeApply: P[Seq[Type]] =
     P("[" ~/ typ.rep(sep = ",", min = 1) ~ "]")
@@ -169,7 +169,7 @@ class Parser {
   }
 
   private val varacc: P[Var] =
-    P(id.!).map(Var)
+    P(id.!).map(n => Var(Symbol.Unresolved(n)))
 
   private val parexp: P[Expression] =
     P("(" ~/ expression ~ ")")
