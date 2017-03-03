@@ -33,14 +33,14 @@ object SymbolSearchTests extends TestSuite {
         findSymbols(Vector(
           Module(Seq("foo", "bar")),
           DefDef("main", None, None, Block(Seq()))
-        )) ==> Right(Symbols.terms("main" -> g("foo", "bar", "main")))
+        )) ==> Right(Symbols.terms(g("foo", "bar", "main")))
       }
       "nested modules" - {
         findSymbols(Vector(
           Module(Seq("foo")),
           Module(Seq("bar")),
           DefDef("main", None, None, Block(Seq()))
-        )) ==> Right(Symbols.terms("main" -> g("foo", "bar", "main")))
+        )) ==> Right(Symbols.terms(g("foo", "bar", "main")))
       }
     }
   }

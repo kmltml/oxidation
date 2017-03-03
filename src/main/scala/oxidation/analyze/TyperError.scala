@@ -1,7 +1,7 @@
 package oxidation
 package analyze
 
-sealed trait TyperError
+sealed trait TyperError extends AnalysisError
 
 object TyperError {
 
