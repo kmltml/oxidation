@@ -13,9 +13,7 @@ def main(args: arr[arr[i8]], something: ptr[i64]): unit = {
     var y = 20
     if(x == y) {
         foo(x, y)
-    }
-
-    else {
+    } else {
         bar = -baz.x
     }
     while(false) {

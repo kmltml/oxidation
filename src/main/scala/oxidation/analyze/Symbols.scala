@@ -5,16 +5,16 @@ import cats._
 import cats.data._
 import cats.implicits._
 
-class Symbols(val types: Multimap[String, Symbol], val terms: Multimap[String, Symbol]) {
+case class Symbols(types: Multimap[String, Symbol], terms: Multimap[String, Symbol]) {
 
   def withTypes(t: (String, Symbol)*): Symbols =
-    new Symbols(types = types |+| t.toMap.mapValues(Set(_)), terms = terms)
+    Symbols(types = types |+| t.toMap.mapValues(Set(_)), terms = terms)
 
   def withTerms(t: (String, Symbol)*): Symbols =
-    new Symbols(terms = terms |+| t.toMap.mapValues(Set(_)), types = types)
+    Symbols(terms = terms |+| t.toMap.mapValues(Set(_)), types = types)
 
   def |+|(b: Symbols): Symbols =
-    new Symbols(terms = terms |+| b.terms, types = types |+| b.types)
+    Symbols(terms = terms |+| b.terms, types = types |+| b.types)
 
 }
 

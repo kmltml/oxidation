@@ -1,6 +1,10 @@
 package oxidation.analyze
 
-sealed trait Symbol
+sealed trait Symbol {
+
+  def name: String
+
+}
 
 object Symbol {
 
