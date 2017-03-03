@@ -21,13 +21,17 @@ trait Ast {
   final case class While(cond: Typed[Expression], body: Typed[Expression]) extends Expression
   final case class Assign(lval: Typed[Expression], op: Option[InfixOp], rval: Typed[Expression]) extends Expression
 
-  sealed trait Def extends BlockStatement
+  sealed trait TLD
+
+  sealed trait Def extends BlockStatement with TLD
 
   final case class DefDef(name: String, params: Option[Seq[Param]], typ: Option[Type], body: Typed[Expression]) extends Def
   final case class ValDef(name: String, typ: Option[Type], value: Typed[Expression]) extends Def
   final case class VarDef(name: String, typ: Option[Type], value: Typed[Expression]) extends Def
   final case class StructDef(name: String, typeParameters: Option[Seq[String]], members: Seq[StructMember]) extends Def
   final case class EnumDef(name: String, typeParameters: Option[Seq[String]], variants: Seq[EnumVariant]) extends Def
+
+  final case class Module(path: Seq[String]) extends TLD
 
   final case class Param(name: String, typ: Type)
   final case class StructMember(name: String, typ: Type)

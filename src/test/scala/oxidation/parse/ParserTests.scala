@@ -217,6 +217,13 @@ object ParserTests extends TestSuite {
         tpe.parse("ptr[i8]").get.value ==> Type.App(Type.Named("ptr"), Seq(Type.Named("i8")))
       }
     }
+
+    "top-level definition should parse" - {
+      val tld = p.whole(p.tld)
+      "a module specifier" - {
+        tld.parse("module foo.bar").get.value ==> Module(Seq("foo", "bar"))
+      }
+    }
   }
 
 }

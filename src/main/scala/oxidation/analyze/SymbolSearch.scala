@@ -11,6 +11,7 @@ object SymbolSearch {
     val pathPrefix = Seq()
     compilationUnit.foldMap {
       case parse.ast.StructDef(name, _, _) => Symbols.types(name -> Symbol.Global(pathPrefix :+ name))
+      case parse.ast.EnumDef(name, _, _) => Symbols.types(name -> Symbol.Global(pathPrefix :+ name))
       case parse.ast.ValDef(name, _, _) => Symbols.terms(name -> Symbol.Global(pathPrefix :+ name))
       case parse.ast.VarDef(name, _, _) => Symbols.terms(name -> Symbol.Global(pathPrefix :+ name))
       case parse.ast.DefDef(name, _, _, _) => Symbols.terms(name -> Symbol.Global(pathPrefix :+ name))

@@ -64,6 +64,12 @@ class Parser {
     defdef | valdef | vardef | structdef | enumdef
   )
 
+  val tld: P[TLD] =
+    P(definition | module)
+
+  val module: P[Module] =
+    P(K("module") ~ id.!.rep(sep = ".")).map(Module)
+
   type Postfix = Expression => Expression
   private val postfix: P[Postfix] =
     P(apply | select)
@@ -84,7 +90,8 @@ class Parser {
   private def K(p: String): P0 = p ~~ !CharPred(c => c.isLetterOrDigit || idSpecialChars.contains(c))
   private def O(p: String): P0 = p ~~ !CharIn("~!%^&*+=<>|/?")
 
-  val keyword: P0 = P(Seq("if", "else", "def", "while", "struct", "enum", "val", "var", "true", "false").map(K).reduce(_ | _))
+  val keyword: P0 =
+    P(Seq("if", "else", "def", "while", "struct", "enum", "val", "var", "true", "false", "module").map(K).reduce(_ | _))
 
   private val idSpecialChars = "$_"
   private val idStart = CharPred(c => c.isLetter || idSpecialChars.contains(c))
