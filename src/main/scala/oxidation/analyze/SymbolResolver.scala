@@ -69,6 +69,11 @@ object SymbolResolver {
       members.toVector.traverseU {
         case parse.ast.StructMember(name, tpe) => solveType(tpe, localScope).map(parse.ast.StructMember(name, _))
       }.map(parse.ast.StructDef(name, params, _))
+    case parse.ast.TypeDef(name, params, body) =>
+      val localScope = params.getOrElse(Seq.empty).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
+      for {
+        newBody <- solveType(body, localScope)
+      } yield parse.ast.TypeDef(name, params, body)
   }
 
   private def solveExpr(e: parse.ast.Expression, scope: Scope): Either[Error, parse.ast.Expression] = e match {

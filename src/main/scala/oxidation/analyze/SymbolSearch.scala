@@ -13,6 +13,7 @@ object SymbolSearch {
     def unapply(d: parse.ast.Def): Option[String] = d match {
       case parse.ast.StructDef(name, _, _) => Some(name)
       case parse.ast.EnumDef(name, _, _) => Some(name)
+      case parse.ast.TypeDef(name, _, _) => Some(name)
       case _ => None
     }
   }
