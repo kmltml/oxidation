@@ -5,15 +5,15 @@ import parse.Parser
 import parse.ast
 import java.io.File
 
+import oxidation.analyze.{BuiltinSymbols, SymbolResolver, SymbolSearch, Symbols}
+
 import scala.io.Source
 
+import cats._
+import cats.data._
+import cats.implicits._
+
 object AstDump extends App {
-
-  val inFile = new File(args(0))
-
-  val parser = new Parser
-
-  val res = parser.compilationUnit.parseIterator(Source.fromFile(inFile).getLines().map(_ + "\n"))
 
   sealed trait P {
     def +(p: P): P = this match {
@@ -43,9 +43,22 @@ object AstDump extends App {
   implicit def stringToP(string: String): P = P.Just(string)
   implicit def pseqToP(seq: Seq[P]): P = P.Sequence(seq)
 
+  def prettyprintTLD(d: ast.TLD): P = d match {
+    case ast.Import(path, names) =>
+      val n = names match {
+        case ast.ImportSpecifier.All => "All"
+        case ast.ImportSpecifier.Members(Seq(one)) => one
+        case ast.ImportSpecifier.Members(more) => s"{ ${more mkString ", "} }"
+      }
+      s"Import(${path mkString "."}, $n)"
+    case ast.Module(path) =>
+      s"Module(${path mkString "."})"
+    case d: ast.Def => prettyprintDef(d)
+  }
+
   def prettyprintDef(d: ast.Def): P = d match {
     case ast.ValDef(name, tpe, value) =>
-      s"ValDef($name, $tpe,".nl + prettyprintExp(value).indent + ")"
+      s"ValDef($name, ${tpe.map(prettyprintType)},".nl + prettyprintExp(value).indent + ")"
 
     case ast.VarDef(name, tpe, value) =>
       s"VarDef($name, $tpe,".nl + prettyprintExp(value).indent + ")"
@@ -59,7 +72,7 @@ object AstDump extends App {
       }
       val retType = tpe match {
         case Some(t) => prettyprintType(t)
-        case None => "None".p
+        case None => "None"
       }
       s"DefDef($name, ".nl + (pars + ",".nl + retType + ",".nl + prettyprintExp(body)).indent + ")"
 
@@ -74,15 +87,15 @@ object AstDump extends App {
 
   }
 
-  def prettyprintType(t: ast.Type): P = t match {
+  def prettyprintType(t: ast.Type): String = t match {
     case ast.Type.Named(n) => prettyprintSymbol(n)
-    case ast.Type.App(t, p) => prettyprintType(t) + "[" + p.map(prettyprintType).sep(", ") + "]"
+    case ast.Type.App(t, p) => prettyprintType(t) + "[" + p.map(prettyprintType).mkString(", ") + "]"
   }
 
-  def prettyprintSymbol(s: Symbol): P = s match {
-    case Symbol.Local(n) => n
-    case Symbol.Global(path) => path.mkString(".")
-    case Symbol.Unresolved(n) => n
+  def prettyprintSymbol(s: Symbol): String = s match {
+    case Symbol.Local(n) => s"$$$n"
+    case Symbol.Global(path) => s"@${path.mkString(".")}"
+    case Symbol.Unresolved(n) => s"?$n"
   }
 
   def prettyprintExp(e: ast.Expression): P = e match {
@@ -161,12 +174,56 @@ object AstDump extends App {
     builder.toString()
   }
 
-  res.fold(
-    onFailure = (_, _, _) => Console.err.println(res),
-    onSuccess = (ast, _) => {
-      println("Success!")
-      ast.foreach(d => println(stringify(prettyprintDef(d))))
+  case class Options(infiles: Seq[File] = Seq.empty, resolveSymbols: Boolean = false)
+
+  val optParser = new scopt.OptionParser[Options]("astdump") {
+
+    head("astdump", "Parses an oxidation source file and pretty-prints the resulting ast")
+
+    opt[Unit]('s', "resolveSymbols")
+      .action((_, o) => o.copy(resolveSymbols = true))
+
+    arg[File]("infiles")
+      .required().unbounded()
+      .action((f, o) => o.copy(infiles = o.infiles :+ f))
+
+  }
+
+  val parser = new Parser
+
+  val options = optParser.parse(args, Options()).foreach { options =>
+    val res = options.infiles.map { f =>
+      val parsed = parser.compilationUnit.parse(Source.fromFile(f).mkString)
+      (f, parsed.get.value)
     }
-  )
+    val res2 = if(options.resolveSymbols) {
+      val allSymbols = res.toVector.foldMap {
+        case (_, tlds) =>
+          SymbolSearch.findSymbols(tlds.toVector).fold({
+            case SymbolSearch.DuplicatedSymbolError(s, d) =>
+              Console.err.println(s"Symbol $s is already defined!\nin $d")
+              sys.exit(1)
+          }, identity)
+      }
+      println("type symbols:")
+      allSymbols.types.values.flatten.foreach(s => println(" - " + prettyprintSymbol(s)))
+      println("term symbols:")
+      allSymbols.terms.values.flatten.foreach(s => println(" - " + prettyprintSymbol(s)))
+      val scope = BuiltinSymbols.symbols |+| allSymbols
+      res.toVector.traverseU {
+        case (f, tlds) => SymbolResolver.resolveSymbols(tlds.toVector, scope).map(f -> _)
+      }.fold(err => { Console.err.println(err); sys.exit() }, identity)
+    } else res
+    for((f, defs) <- res2) {
+      println(s"${f.getName}:")
+      defs.foreach(d => println(stringify(prettyprintTLD(d))))
+    }
+     /* onFailure = (_, _, _) => Console.err.println(res),
+      onSuccess = (ast, _) => {
+        ast.foreach(d => println(stringify(prettyprintDef(d))))
+      }
+    )*/
+  }
+
 
 }

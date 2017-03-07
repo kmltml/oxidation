@@ -39,9 +39,21 @@ object SymbolResolver {
 
   private def solveDef(d: parse.ast.Def, scope: Scope): Either[Error, parse.ast.Def] = d match {
     case parse.ast.ValDef(name, tpe, value) =>
-      solveExpr(value, scope).map(parse.ast.ValDef(name, tpe, _))
+      for {
+        newTpe <- tpe match {
+          case None => Right(None)
+          case Some(t) => solveType(t, scope).map(Some(_))
+        }
+        newValue <- solveExpr(value, scope)
+      } yield parse.ast.ValDef(name, newTpe, newValue)
     case parse.ast.VarDef(name, tpe, value) =>
-      solveExpr(value, scope).map(parse.ast.VarDef(name, tpe, _))
+      for {
+        newTpe <- tpe match {
+          case None => Right(None)
+          case Some(t) => solveType(t, scope).map(Some(_))
+        }
+        newValue <- solveExpr(value, scope)
+      } yield parse.ast.VarDef(name, newTpe, newValue)
     case parse.ast.DefDef(name, params, tpe, value) =>
       val newScope = params.getOrElse(Seq.empty)
         .foldLeft(scope)((s, p) => s.shadowTerm(Symbol.Local(p.name)))

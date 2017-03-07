@@ -134,6 +134,24 @@ object SymbolResolverTests extends TestSuite {
           ))
         ))
       }
+      "solve a val definition" - {
+        resolveSymbols(Vector(
+          Import(Seq("x", "y"), ImportSpecifier.All),
+          ValDef("foo", Some(parse.ast.Type.Named('z)), IntLit(0))
+        ), BuiltinSymbols.symbols.withTypes(g('x, 'y, 'z))) ==> Right(Vector(
+          Import(Seq("x", "y"), ImportSpecifier.All),
+          ValDef("foo", Some(parse.ast.Type.Named(g('x, 'y, 'z))), IntLit(0))
+        ))
+      }
+      "solve a var definition" - {
+        resolveSymbols(Vector(
+          Import(Seq("x", "y"), ImportSpecifier.All),
+          VarDef("foo", Some(parse.ast.Type.Named('z)), IntLit(0))
+        ), BuiltinSymbols.symbols.withTypes(g('x, 'y, 'z))) ==> Right(Vector(
+          Import(Seq("x", "y"), ImportSpecifier.All),
+          VarDef("foo", Some(parse.ast.Type.Named(g('x, 'y, 'z))), IntLit(0))
+        ))
+      }
     }
   }
 

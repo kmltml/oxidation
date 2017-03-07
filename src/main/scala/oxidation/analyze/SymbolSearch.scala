@@ -38,6 +38,7 @@ object SymbolSearch {
           types = types.map(s => s.name -> Set(s)).toMap,
           terms = terms.map(s => s.name -> Set(s)).toMap).asRight
       case parse.ast.Module(_) :: rest => rec(rest, types, terms)
+      case parse.ast.Import(_, _) :: rest => rec(rest, types, terms)
       case (d @ TypeDef(name)) :: rest =>
         val sym = Symbol.Global(pathPrefix :+ name)
         insertOnly(sym, types)

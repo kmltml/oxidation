@@ -31,7 +31,7 @@ class Parser {
 
   def whole[A](p: P[A]): P[A] = p ~ End
 
-  val compilationUnit: P[Seq[Def]] = P(definition.rep ~ End)
+  val compilationUnit: P[Seq[TLD]] = P((WS ~~ tld).repX(sep = semi) ~~ End)
 
   private val expression0: P[Expression] = P(
     stringLiteral | intLiteral | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
@@ -74,7 +74,7 @@ class Parser {
     val path = id.!.rep(sep = ".", min = 1)
     val membersSelector = ("." ~ "{" ~/ id.!.rep(sep = ",", min = 1) ~ "}").map(ImportSpecifier.Members)
     val selector = membersSelector
-    (K("import") ~ path ~ selector.?). map {
+    (K("import") ~ path ~ selector.?).map {
       case (path, Some(s)) => Import(path, s)
       case (path :+ "_", None) => Import(path, ImportSpecifier.All)
       case (path :+ last, None) => Import(path, ImportSpecifier.Members(Seq(last)))
@@ -109,7 +109,7 @@ class Parser {
   private val idStart = CharPred(c => c.isLetter || idSpecialChars.contains(c))
   private val id: P0 = {
     val idRest  = CharsWhile(c => c.isLetterOrDigit || idSpecialChars.contains(c), min = 0)
-    !keyword ~ idStart ~ idRest
+    !keyword ~ idStart ~~ idRest
   }
 
   val typ: P[Type] = P(
