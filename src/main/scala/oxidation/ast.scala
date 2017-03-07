@@ -30,6 +30,7 @@ trait Ast {
   final case class VarDef(name: String, typ: Option[Type], value: Typed[Expression]) extends Def
   final case class StructDef(name: String, typeParameters: Option[Seq[String]], members: Seq[StructMember]) extends Def
   final case class EnumDef(name: String, typeParameters: Option[Seq[String]], variants: Seq[EnumVariant]) extends Def
+  final case class TypeDef(name: String, typeParameters: Option[Seq[String]], body: Type) extends Def
 
   final case class Module(path: Seq[String]) extends TLD
   final case class Import(path: Seq[String], names: ImportSpecifier) extends TLD

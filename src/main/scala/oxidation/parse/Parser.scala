@@ -61,7 +61,7 @@ class Parser {
   val expression: P[Expression] = P(expression8)
 
   val definition: P[Def] = P(
-    defdef | valdef | vardef | structdef | enumdef
+    defdef | valdef | vardef | structdef | enumdef | typedef
   )
 
   val tld: P[TLD] =
@@ -103,7 +103,7 @@ class Parser {
 
   val keyword: P0 =
     P(Seq("if", "else", "def", "while", "struct", "enum",
-      "val", "var", "true", "false", "module", "import").map(K).reduce(_ | _))
+      "val", "var", "true", "false", "module", "import", "type").map(K).reduce(_ | _))
 
   private val idSpecialChars = "$_"
   private val idStart = CharPred(c => c.isLetter || idSpecialChars.contains(c))
@@ -155,6 +155,11 @@ class Parser {
     }
     val body = "{" ~~ variant.repX(sep = semi) ~ "}"
     P(K("enum") ~/ id.! ~ typeParams.? ~ O("=") ~/ body).map(EnumDef.tupled)
+  }
+
+  private val typedef: P[TypeDef] = {
+    val params = "[" ~/ id.!.rep(sep = ",") ~ "]"
+    P(K("type") ~ id.! ~ params.? ~ "=" ~/ typ).map(TypeDef.tupled)
   }
 
   private val intLiteral: P[IntLit] =

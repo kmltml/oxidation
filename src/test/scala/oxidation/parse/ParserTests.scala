@@ -208,6 +208,10 @@ object ParserTests extends TestSuite {
             EnumVariant("None", Seq())
           ))
       }
+      "a type alias" - {
+        defn.parse("type unit = u0").get.value ==> TypeDef("unit", None, Type.Named(Symbol.Unresolved("u0")))
+        defn.parse("type id[a] = a").get.value ==> TypeDef("id", Some(Seq("a")), Type.Named(Symbol.Unresolved("a")))
+      }
     }
 
     "type should parse" - {
