@@ -9,12 +9,14 @@ object SymbolResolver {
 
   type Scope = Symbols
 
+  type Res[A] = Either[Error, A]
+
   sealed trait Error extends AnalysisError
   final case class SymbolNotFound(name: String) extends Error
   final case class AmbiguousSymbolReference(name: String, candidates: Set[Symbol]) extends Error
   final case class SymbolNotFoundInImport(path: Seq[String]) extends Error
 
-  def resolveSymbols(compilationUnit: Vector[parse.ast.TLD], global: Symbols): Either[Error, Vector[parse.ast.TLD]] = {
+  def resolveSymbols(compilationUnit: Vector[parse.ast.TLD], global: Symbols): Res[Vector[parse.ast.TLD]] = {
     val moduleImports = compilationUnit.collect {
       case parse.ast.Module(path) => path
     } .scanLeft(Vector.empty[String])(_ ++ _)
@@ -23,97 +25,80 @@ object SymbolResolver {
       explicitImports <- compilationUnit.collect {
         case parse.ast.Import(path, parse.ast.ImportSpecifier.All) => Right(global.findPrefixed(path))
         case parse.ast.Import(path, parse.ast.ImportSpecifier.Members(members)) =>
-          members.toVector.traverseU { n =>
+          members.toVector.traverse { n =>
             val syms = global.findExact(path :+ n)
             if(syms.isEmpty) Left(SymbolNotFoundInImport(path :+ n)) else Right(syms)
           }.map(_.reduce(_ |+| _))
-      }.sequenceU
+      }.sequence
       imports = explicitImports.foldLeft(moduleImports)(_ |+| _)
       values <- compilationUnit.map {
         case m: parse.ast.Module => m.asRight
         case i: parse.ast.Import => i.asRight
         case d: parse.ast.Def => solveDef(d, imports)
-      }.sequenceU
+      }.sequence
     } yield values
   }
 
-  private def solveDef(d: parse.ast.Def, scope: Scope): Either[Error, parse.ast.Def] = d match {
+  private def solveDef(d: parse.ast.Def, scope: Scope): Res[parse.ast.Def] = d match {
     case parse.ast.ValDef(name, tpe, value) =>
-      for {
-        newTpe <- tpe match {
-          case None => Right(None)
-          case Some(t) => solveType(t, scope).map(Some(_))
-        }
-        newValue <- solveExpr(value, scope)
-      } yield parse.ast.ValDef(name, newTpe, newValue)
+      (tpe.traverse(solveType(_, scope)), solveExpr(value, scope))
+        .map2(parse.ast.ValDef(name, _, _))
+
     case parse.ast.VarDef(name, tpe, value) =>
-      for {
-        newTpe <- tpe match {
-          case None => Right(None)
-          case Some(t) => solveType(t, scope).map(Some(_))
-        }
-        newValue <- solveExpr(value, scope)
-      } yield parse.ast.VarDef(name, newTpe, newValue)
+      (tpe.traverse(solveType(_, scope)), solveExpr(value, scope))
+        .map2(parse.ast.VarDef(name, _, _))
+
     case parse.ast.DefDef(name, params, tpe, value) =>
+//      def f[F[_], G](x: F[G]): F[G] = x
+//      val x = f(solveExpr(value, scope): Either[Error, parse.ast.Expression])
       val newScope = params.getOrElse(Seq.empty)
         .foldLeft(scope)((s, p) => s.shadowTerm(Symbol.Local(p.name)))
-      for {
-        newParams <- params.traverseU(_.toVector.traverseU {
-          case parse.ast.Param(name, tpe) => solveType(tpe, scope).map(parse.ast.Param(name, _))
-        })
-        newType <- tpe.traverseU(solveType(_, scope))
-        newValue <- solveExpr(value, newScope)
-      } yield parse.ast.DefDef(name, newParams, newType, newValue)
+      (params.traverse(_.toVector.traverse {
+        case parse.ast.Param(name, tpe) => solveType(tpe, scope).map(parse.ast.Param(name, _))
+      }), tpe.traverse(solveType(_, scope)), solveExpr(value, newScope))
+        .map3(parse.ast.DefDef(name, _, _, _))
+
     case parse.ast.StructDef(name, params, members) =>
       val localScope = params.getOrElse(Seq.empty).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
-      members.toVector.traverseU {
+      members.toVector.traverse {
         case parse.ast.StructMember(name, tpe) => solveType(tpe, localScope).map(parse.ast.StructMember(name, _))
       }.map(parse.ast.StructDef(name, params, _))
+
     case parse.ast.TypeDef(name, params, body) =>
       val localScope = params.getOrElse(Seq.empty).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
-      for {
-        newBody <- solveType(body, localScope)
-      } yield parse.ast.TypeDef(name, params, body)
+      solveType(body, localScope).map(parse.ast.TypeDef(name, params, _))
   }
 
-  private def solveExpr(e: parse.ast.Expression, scope: Scope): Either[Error, parse.ast.Expression] = e match {
+  private def solveExpr(e: parse.ast.Expression, scope: Scope): Res[parse.ast.Expression] = e match {
     case parse.ast.Var(Symbol.Unresolved(n)) =>
       getOnlyOneSymbol(n, scope.terms).map(parse.ast.Var)
+
     case parse.ast.InfixAp(op, left, right) =>
-      for {
-        newLeft <- solveExpr(left, scope)
-        newRight <- solveExpr(right, scope)
-      } yield parse.ast.InfixAp(op, newLeft, newRight)
+      (solveExpr(left, scope), solveExpr(right, scope))
+        .map2(parse.ast.InfixAp(op, _, _))
 
     case parse.ast.PrefixAp(op, exp) =>
-      for {
-        newExp <- solveExpr(exp, scope)
-      } yield parse.ast.PrefixAp(op, newExp)
+      SymbolResolver.solveExpr(exp, scope)
+        .map(parse.ast.PrefixAp.apply(op, _))
+
     case parse.ast.App(expr, params) =>
-      for {
-        newExpr <- solveExpr(expr, scope)
-        newParams <- params.toVector.traverseU(solveExpr(_, scope))
-      } yield parse.ast.App(newExpr, newParams)
+      (solveExpr(expr, scope), params.toVector.traverse(solveExpr(_, scope)))
+        .map2(parse.ast.App(_, _))
+
     case parse.ast.Select(expr, member) =>
-      for {
-        newExpr <- solveExpr(expr, scope)
-      } yield parse.ast.Select(newExpr, member)
+      solveExpr(expr, scope).map(parse.ast.Select(_, member))
+
     case parse.ast.If(cond, pos, neg) =>
-      for {
-        newCond <- solveExpr(cond, scope)
-        newPos <- solveExpr(pos, scope)
-        newNeg <- neg.traverseU(solveExpr(_, scope))
-      } yield parse.ast.If(newCond, newPos, newNeg)
+      (solveExpr(cond, scope), solveExpr(pos, scope), neg.traverse(solveExpr(_, scope)))
+        .map3(parse.ast.If)
+
     case parse.ast.While(cond, body) =>
-      for {
-        newCond <- solveExpr(cond, scope)
-        newBody <- solveExpr(body, scope)
-      } yield parse.ast.While(newCond, newBody)
+      (solveExpr(cond, scope), solveExpr(body, scope))
+        .map2(parse.ast.While)
+
     case parse.ast.Assign(left, op, right) =>
-      for {
-        newLeft <- solveExpr(left, scope)
-        newRight <- solveExpr(right, scope)
-      } yield parse.ast.Assign(newLeft, op, newRight)
+      (solveExpr(left, scope), solveExpr(right, scope))
+        .map2(parse.ast.Assign(_, op, _))
 
     case parse.ast.Block(stmnts) =>
       // TODO should forward references be reported here, or should a later pass take care of them?
@@ -122,7 +107,7 @@ object SymbolResolver {
         case parse.ast.VarDef(name, _, _) => name
       }
       val interiorScope = locals.foldLeft(scope)((s, l) => s.shadowTerm(Symbol.Local(l)))
-      stmnts.toVector.traverseU {
+      stmnts.toVector.traverse {
         case d: parse.ast.Def => solveDef(d, interiorScope)
         case e: parse.ast.Expression => solveExpr(e, interiorScope)
       }.map(parse.ast.Block)
@@ -130,17 +115,17 @@ object SymbolResolver {
     case _: parse.ast.IntLit | _: parse.ast.BoolLit | _: parse.ast.StringLit => Right(e)
   }
 
-  private def solveType(t: parse.ast.Type, scope: Scope): Either[Error, parse.ast.Type] = t match {
+  private def solveType(t: parse.ast.Type, scope: Scope): Res[parse.ast.Type] = t match {
     case parse.ast.Type.Named(Symbol.Unresolved(sym)) =>
       getOnlyOneSymbol(sym, scope.types).map(parse.ast.Type.Named)
+
     case parse.ast.Type.App(const, params) =>
-      for {
-        newConst <- solveType(const, scope)
-        newParams <- params.toVector.traverseU(solveType(_, scope))
-      } yield parse.ast.Type.App(newConst, newParams)
+      (solveType(const, scope), params.toVector.traverse(solveType(_, scope)))
+        .map2(parse.ast.Type.App)
+
   }
 
-  private def getOnlyOneSymbol(s: String, scope: Multimap[String, Symbol]): Either[Error, Symbol] =
+  private def getOnlyOneSymbol(s: String, scope: Multimap[String, Symbol]): Res[Symbol] =
     scope.get(s)
       .toRight(SymbolNotFound(s))
       .flatMap {

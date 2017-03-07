@@ -216,7 +216,7 @@ object AstDump extends App {
       println("term symbols:")
       allSymbols.terms.values.flatten.foreach(s => println(" - " + prettyprintSymbol(s)))
       val scope = BuiltinSymbols.symbols |+| allSymbols
-      res.toVector.traverseU {
+      res.toVector.traverse {
         case (f, tlds) => SymbolResolver.resolveSymbols(tlds.toVector, scope).map(f -> _)
       }.fold(err => { Console.err.println(err); sys.exit() }, identity)
     } else res

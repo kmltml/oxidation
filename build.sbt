@@ -16,3 +16,5 @@ libraryDependencies ++=
   Nil
 
 testFrameworks += new TestFramework("utest.runner.Framework")
+
+scalacOptions += "-Ypartial-unification"
