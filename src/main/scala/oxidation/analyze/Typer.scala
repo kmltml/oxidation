@@ -109,7 +109,7 @@ object Typer {
             c <- StateT.get[TyperResult, Ctxt]
             expectedType = tpe.map(t => ExpectedType.Specific(lookupType(t, c))).getOrElse(ExpectedType.Undefined)
             t <- StateT.lift(solveType(value, expectedType, c))
-            _ <- StateT.modify[TyperResult, Ctxt](_.withTerms(Map(Symbol.Local(name) -> t.typ)))
+            _ <- StateT.modify[TyperResult, Ctxt](_.withTerms(Map(name -> t.typ)))
           } yield t
 
       }.runA(ctxt).map { body =>

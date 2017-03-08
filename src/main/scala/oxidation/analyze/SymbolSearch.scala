@@ -11,18 +11,18 @@ object SymbolSearch {
 
   object TypeDef {
     def unapply(d: parse.ast.Def): Option[String] = d match {
-      case parse.ast.StructDef(name, _, _) => Some(name)
-      case parse.ast.EnumDef(name, _, _) => Some(name)
-      case parse.ast.TypeDef(name, _, _) => Some(name)
+      case parse.ast.StructDef(Symbol.Unresolved(name), _, _) => Some(name)
+      case parse.ast.EnumDef(Symbol.Unresolved(name), _, _) => Some(name)
+      case parse.ast.TypeAliasDef(Symbol.Unresolved(name), _, _) => Some(name)
       case _ => None
     }
   }
 
   object TermDef {
     def unapply(d: parse.ast.Def): Option[String] = d match {
-      case parse.ast.DefDef(name, _, _, _) => Some(name)
-      case parse.ast.ValDef(name, _, _) => Some(name)
-      case parse.ast.VarDef(name, _, _) => Some(name)
+      case parse.ast.DefDef(Symbol.Unresolved(name), _, _, _) => Some(name)
+      case parse.ast.ValDef(Symbol.Unresolved(name), _, _) => Some(name)
+      case parse.ast.VarDef(Symbol.Unresolved(name), _, _) => Some(name)
       case _ => None
     }
   }

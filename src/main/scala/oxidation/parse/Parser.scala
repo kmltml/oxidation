@@ -112,6 +112,8 @@ class Parser {
     !keyword ~ idStart ~~ idRest
   }
 
+  private val sym: P[Symbol] = P(id.!).map(Symbol.Unresolved)
+
   val typ: P[Type] = P(
     (namedType ~ typeApply.rep).map {
       case (t, paramLists) =>
@@ -119,7 +121,7 @@ class Parser {
     }
   )(Name("type"))
 
-  private val namedType: P[Type.Named] = id.!.map(n => Type.Named(Symbol.Unresolved(n)))
+  private val namedType: P[Type.Named] = sym.map(Type.Named)
 
   private val typeApply: P[Seq[Type]] =
     P("[" ~/ typ.rep(sep = ",", min = 1) ~ "]")
@@ -128,11 +130,11 @@ class Parser {
     val param = (id.! ~ ":" ~ typ).map(Param.tupled)
     val paramList = "(" ~ param.rep(sep = ",") ~ ")"
 
-    P(K("def") ~/ id.! ~ paramList.? ~ (":" ~/ typ).? ~ "=" ~ expression).map(DefDef.tupled)
+    P(K("def") ~/ sym ~ paramList.? ~ (":" ~/ typ).? ~ "=" ~ expression).map(DefDef.tupled)
   }
 
-  private val defBody: P[(String, Option[Type], Expression)] =
-    id.! ~ (":" ~ typ).? ~ O("=") ~/ expression
+  private val defBody: P[(Symbol, Option[Type], Expression)] =
+    sym ~ (":" ~ typ).? ~ O("=") ~/ expression
 
   private val valdef: P[ValDef] =
     P(K("val") ~/ defBody).map(ValDef.tupled)
@@ -144,7 +146,7 @@ class Parser {
   private val structdef: P[StructDef] = {
     val body = "{" ~~ structMember.repX(sep = semi) ~ "}"
     val typeParams = "[" ~/ id.!.rep(sep = ",") ~ "]"
-    P(K("struct") ~/ id.! ~ typeParams.? ~ O("=") ~ body).map(StructDef.tupled)
+    P(K("struct") ~/ sym ~ typeParams.? ~ O("=") ~ body).map(StructDef.tupled)
   }
 
   private val enumdef: P[EnumDef] = {
@@ -154,12 +156,12 @@ class Parser {
       case (n, m) => EnumVariant(n, m getOrElse Seq.empty)
     }
     val body = "{" ~~ variant.repX(sep = semi) ~ "}"
-    P(K("enum") ~/ id.! ~ typeParams.? ~ O("=") ~/ body).map(EnumDef.tupled)
+    P(K("enum") ~/ sym ~ typeParams.? ~ O("=") ~/ body).map(EnumDef.tupled)
   }
 
-  private val typedef: P[TypeDef] = {
+  private val typedef: P[TypeAliasDef] = {
     val params = "[" ~/ id.!.rep(sep = ",") ~ "]"
-    P(K("type") ~ id.! ~ params.? ~ "=" ~/ typ).map(TypeDef.tupled)
+    P(K("type") ~ sym ~ params.? ~ "=" ~/ typ).map(TypeAliasDef.tupled)
   }
 
   private val intLiteral: P[IntLit] =
@@ -186,7 +188,7 @@ class Parser {
   }
 
   private val varacc: P[Var] =
-    P(id.!).map(n => Var(Symbol.Unresolved(n)))
+    P(sym).map(Var)
 
   private val parexp: P[Expression] =
     P("(" ~/ expression ~ ")")

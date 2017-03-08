@@ -16,11 +16,18 @@ object SymbolResolver {
   final case class AmbiguousSymbolReference(name: String, candidates: Set[Symbol]) extends Error
   final case class SymbolNotFoundInImport(path: Seq[String]) extends Error
 
+  sealed trait DefContext
+  final case class TopLevel(module: Seq[String]) extends DefContext
+  case object Local extends DefContext
+
   def resolveSymbols(compilationUnit: Vector[parse.ast.TLD], global: Symbols): Res[Vector[parse.ast.TLD]] = {
-    val moduleImports = compilationUnit.collect {
+    val modulePaths = compilationUnit.collect {
       case parse.ast.Module(path) => path
-    } .scanLeft(Vector.empty[String])(_ ++ _)
+    }
+    val moduleImports = modulePaths
+      .scanLeft(Vector.empty[String])(_ ++ _)
       .foldMap(prefix => global.findPrefixed(prefix))
+    val modulePath = modulePaths.flatten
     for {
       explicitImports <- compilationUnit.collect {
         case parse.ast.Import(path, parse.ast.ImportSpecifier.All) => Right(global.findPrefixed(path))
@@ -34,19 +41,19 @@ object SymbolResolver {
       values <- compilationUnit.map {
         case m: parse.ast.Module => m.asRight
         case i: parse.ast.Import => i.asRight
-        case d: parse.ast.Def => solveDef(d, imports)
+        case d: parse.ast.Def => solveDef(d, imports, TopLevel(modulePath))
       }.sequence
     } yield values
   }
 
-  private def solveDef(d: parse.ast.Def, scope: Scope): Res[parse.ast.Def] = d match {
+  private def solveDef(d: parse.ast.Def, scope: Scope, ctxt: DefContext): Res[parse.ast.Def] = d match {
     case parse.ast.ValDef(name, tpe, value) =>
       (tpe.traverse(solveType(_, scope)), solveExpr(value, scope))
-        .map2(parse.ast.ValDef(name, _, _))
+        .map2(parse.ast.ValDef(solveDefName(name, ctxt), _, _))
 
     case parse.ast.VarDef(name, tpe, value) =>
       (tpe.traverse(solveType(_, scope)), solveExpr(value, scope))
-        .map2(parse.ast.VarDef(name, _, _))
+        .map2(parse.ast.VarDef(solveDefName(name, ctxt), _, _))
 
     case parse.ast.DefDef(name, params, tpe, value) =>
 //      def f[F[_], G](x: F[G]): F[G] = x
@@ -56,17 +63,23 @@ object SymbolResolver {
       (params.traverse(_.toVector.traverse {
         case parse.ast.Param(name, tpe) => solveType(tpe, scope).map(parse.ast.Param(name, _))
       }), tpe.traverse(solveType(_, scope)), solveExpr(value, newScope))
-        .map3(parse.ast.DefDef(name, _, _, _))
+        .map3(parse.ast.DefDef(solveDefName(name, ctxt), _, _, _))
 
     case parse.ast.StructDef(name, params, members) =>
       val localScope = params.getOrElse(Seq.empty).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
       members.toVector.traverse {
         case parse.ast.StructMember(name, tpe) => solveType(tpe, localScope).map(parse.ast.StructMember(name, _))
-      }.map(parse.ast.StructDef(name, params, _))
+      }.map(parse.ast.StructDef(solveDefName(name, ctxt), params, _))
 
-    case parse.ast.TypeDef(name, params, body) =>
+    case parse.ast.TypeAliasDef(name, params, body) =>
       val localScope = params.getOrElse(Seq.empty).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
-      solveType(body, localScope).map(parse.ast.TypeDef(name, params, _))
+      solveType(body, localScope).map(parse.ast.TypeAliasDef(solveDefName(name, ctxt), params, _))
+  }
+
+  private def solveDefName(name: Symbol, ctxt: DefContext): Symbol = (name, ctxt) match {
+    case (Symbol.Unresolved(n), TopLevel(module)) => Symbol.Global(module :+ n)
+    case (Symbol.Unresolved(n), Local) => Symbol.Local(n)
+    case (s, _) => s
   }
 
   private def solveExpr(e: parse.ast.Expression, scope: Scope): Res[parse.ast.Expression] = e match {
@@ -103,12 +116,12 @@ object SymbolResolver {
     case parse.ast.Block(stmnts) =>
       // TODO should forward references be reported here, or should a later pass take care of them?
       val locals = stmnts.collect {
-        case parse.ast.ValDef(name, _, _) => name
-        case parse.ast.VarDef(name, _, _) => name
+        case parse.ast.ValDef(Symbol.Unresolved(name), _, _) => name
+        case parse.ast.VarDef(Symbol.Unresolved(name), _, _) => name
       }
       val interiorScope = locals.foldLeft(scope)((s, l) => s.shadowTerm(Symbol.Local(l)))
       stmnts.toVector.traverse {
-        case d: parse.ast.Def => solveDef(d, interiorScope)
+        case d: parse.ast.Def => solveDef(d, interiorScope, Local)
         case e: parse.ast.Expression => solveExpr(e, interiorScope)
       }.map(parse.ast.Block)
 

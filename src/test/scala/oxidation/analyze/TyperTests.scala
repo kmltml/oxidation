@@ -47,12 +47,12 @@ object TyperTests extends TestSuite {
         )), ExpectedType.Undefined, Ctxt.terms(l("x") -> U8, l("y") -> U16)) ==> Right(U16)
 
         findType(P.Block(Seq(
-          P.ValDef("x", None, P.IntLit(10)),
+          P.ValDef(l("x"), None, P.IntLit(10)),
           P.InfixAp(InfixOp.Add, P.Var(l("x")), P.IntLit(1))
         )), ExpectedType.Undefined) ==> Right(I32)
 
         findType(P.Block(Seq(
-          P.ValDef("x", Some(P.Type.Named(Symbol.Global(Seq("i64")))), P.IntLit(10)),
+          P.ValDef(l("x"), Some(P.Type.Named(Symbol.Global(Seq("i64")))), P.IntLit(10)),
           P.Var(l("x"))
         )), ExpectedType.Numeric) ==> Right(I64)
       }

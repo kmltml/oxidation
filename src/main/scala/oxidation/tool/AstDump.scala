@@ -85,7 +85,7 @@ object AstDump extends App {
         case ast.StructMember(name, tpe) => s"Member($name, ".p + prettyprintType(tpe) + ")"
       }.sep(", ".nl).indent + ")"
 
-    case ast.TypeDef(name, typeParams, body) =>
+    case ast.TypeAliasDef(name, typeParams, body) =>
       val typeParamList = typeParams match {
         case Some(ps) => s"[${ps mkString ", "}]"
         case None => ""

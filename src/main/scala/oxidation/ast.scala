@@ -1,8 +1,13 @@
 package oxidation
 
+
+import cats._
+import cats.data._
+import cats.implicits._
+
 trait Ast {
 
-  type Typed[_]
+  type Typed[+_]
 
   sealed trait BlockStatement
 
@@ -23,14 +28,21 @@ trait Ast {
 
   sealed trait TLD
 
-  sealed trait Def extends BlockStatement with TLD
+  sealed trait Def extends BlockStatement with TLD {
+    def name: Symbol
+  }
 
-  final case class DefDef(name: String, params: Option[Seq[Param]], typ: Option[Type], body: Typed[Expression]) extends Def
-  final case class ValDef(name: String, typ: Option[Type], value: Typed[Expression]) extends Def
-  final case class VarDef(name: String, typ: Option[Type], value: Typed[Expression]) extends Def
-  final case class StructDef(name: String, typeParameters: Option[Seq[String]], members: Seq[StructMember]) extends Def
-  final case class EnumDef(name: String, typeParameters: Option[Seq[String]], variants: Seq[EnumVariant]) extends Def
-  final case class TypeDef(name: String, typeParameters: Option[Seq[String]], body: Type) extends Def
+  sealed trait TermDef extends Def
+
+  final case class DefDef(name: Symbol, params: Option[Seq[Param]], typ: Option[Type], body: Typed[Expression]) extends TermDef
+  final case class ValDef(name: Symbol, typ: Option[Type], value: Typed[Expression]) extends TermDef
+  final case class VarDef(name: Symbol, typ: Option[Type], value: Typed[Expression]) extends TermDef
+
+  sealed trait TypeDef extends Def
+
+  final case class StructDef(name: Symbol, typeParameters: Option[Seq[String]], members: Seq[StructMember]) extends TypeDef
+  final case class EnumDef(name: Symbol, typeParameters: Option[Seq[String]], variants: Seq[EnumVariant]) extends TypeDef
+  final case class TypeAliasDef(name: Symbol, typeParameters: Option[Seq[String]], body: Type) extends TypeDef
 
   final case class Module(path: Seq[String]) extends TLD
   final case class Import(path: Seq[String], names: ImportSpecifier) extends TLD
@@ -54,4 +66,31 @@ trait Ast {
     final case class App(const: Type, params: Seq[Type]) extends Type
 
   }
+
+  def traverse[A](stmnt: Typed[BlockStatement])(f: PartialFunction[Typed[BlockStatement], A]): Vector[A] = {
+    val result = f.lift(stmnt)
+    val more = stmnt match {
+      case _: IntLit | _: StringLit | _: BoolLit | _: Var |
+           _: TypeAliasDef | _: StructDef | _: EnumDef => Vector.empty[A]
+      case InfixAp(_, left, right) => traverse(left)(f) ++ traverse(right)(f)
+      case PrefixAp(_, e) => traverse(e)(f)
+      case Block(stmnts) => stmnts.toList.foldMap(traverse(_)(f))
+      case App(e, params) => traverse(e)(f) ++ params.toList.foldMap(traverse(_)(f))
+      case Select(e, _) => traverse(e)(f)
+      case If(c, p, n) =>
+        traverse(c)(f) ++ traverse(p)(f) ++ n.map(traverse(_)(f)).orEmpty
+      case While(c, b) => traverse(c)(f) ++ traverse(b)(f)
+      case Assign(l, _, r) => traverse(l)(f) ++ traverse(r)(f)
+
+      case DefDef(_, _, _, b) => traverse(b)(f)
+      case ValDef(_, _, v) => traverse(v)(f)
+      case VarDef(_, _, v) => traverse(v)(f)
+    }
+    (result ++ more).toVector
+  }
+
+  def listTermSymbols(stmnt: Typed[BlockStatement]): Seq[Symbol] = traverse(stmnt) {
+    case Var(s) => s
+  }
+
 }

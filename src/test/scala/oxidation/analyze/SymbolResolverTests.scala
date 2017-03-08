@@ -16,12 +16,12 @@ object SymbolResolverTests extends TestSuite {
     "resolveSymbols" - {
       "mark def's parameters as local, shadowing external bindings" - {
         resolveSymbols(Vector(
-          DefDef("foo",
+          DefDef('foo,
             Some(Seq(Param("bar", parse.ast.Type.Named('i64)))),
             Some(parse.ast.Type.Named('i32)),
             Var('bar))
         ), BuiltinSymbols.symbols.withTerms('bar)) ==> Right(Vector(
-          DefDef("foo",
+          DefDef(g('foo),
             Some(Seq(Param("bar", parse.ast.Type.Named(g('i64))))),
             Some(parse.ast.Type.Named(g('i32))),
             Var(l('bar)))
@@ -36,81 +36,81 @@ object SymbolResolverTests extends TestSuite {
         "InfixAp" - {
           resolveSymbols(Vector(
             importAB_,
-            ValDef("a", None, InfixAp(InfixOp.Add, Var('foo), Var('bar)))
+            ValDef('a, None, InfixAp(InfixOp.Add, Var('foo), Var('bar)))
           ), scope) ==> Right(Vector(
             importAB_,
-            ValDef("a", None, InfixAp(InfixOp.Add, Var(foo), Var(bar)))
+            ValDef(g('a), None, InfixAp(InfixOp.Add, Var(foo), Var(bar)))
           ))
         }
         "PrefixAp" - {
           resolveSymbols(Vector(
             importAB_,
-            ValDef("a", None, PrefixAp(PrefixOp.Neg, Var('foo)))
+            ValDef('a, None, PrefixAp(PrefixOp.Neg, Var('foo)))
           ), scope) ==> Right(Vector(
             importAB_,
-            ValDef("a", None, PrefixAp(PrefixOp.Neg, Var(foo)))
+            ValDef(g('a), None, PrefixAp(PrefixOp.Neg, Var(foo)))
           ))
         }
         "App" - {
           resolveSymbols(Vector(
             importAB_,
-            ValDef("a", None, App(Var('foo), Seq(Var('bar), Var('baz))))
+            ValDef('a, None, App(Var('foo), Seq(Var('bar), Var('baz))))
           ), scope) ==> Right(Vector(
             importAB_,
-            ValDef("a", None, App(Var(foo), Seq(Var(bar), Var(baz))))
+            ValDef(g('a), None, App(Var(foo), Seq(Var(bar), Var(baz))))
           ))
         }
         "Select" - {
           resolveSymbols(Vector(
             importAB_,
-            ValDef("a", None, Select(Var('foo), "bar"))
+            ValDef('a, None, Select(Var('foo), "bar"))
           ), scope) ==> Right(Vector(
             importAB_,
-            ValDef("a", None, Select(Var(foo), "bar"))
+            ValDef(g('a), None, Select(Var(foo), "bar"))
           ))
         }
         "If" - {
           resolveSymbols(Vector(
             importAB_,
-            ValDef("a", None, If(Var('foo), Var('bar), Some(Var('baz))))
+            ValDef('a, None, If(Var('foo), Var('bar), Some(Var('baz))))
           ), scope) ==> Right(Vector(
             importAB_,
-            ValDef("a", None, If(Var(foo), Var(bar), Some(Var(baz))))
+            ValDef(g('a), None, If(Var(foo), Var(bar), Some(Var(baz))))
           ))
         }
         "While" - {
           resolveSymbols(Vector(
             importAB_,
-            ValDef("a", None, While(Var('foo), Var('bar)))
+            ValDef('a, None, While(Var('foo), Var('bar)))
           ), scope) ==> Right(Vector(
             importAB_,
-            ValDef("a", None, While(Var(foo), Var(bar)))
+            ValDef(g('a), None, While(Var(foo), Var(bar)))
           ))
         }
         "Assign" - {
           resolveSymbols(Vector(
             importAB_,
-            ValDef("a", None, Assign(Var('foo), None, Var('bar)))
+            ValDef('a, None, Assign(Var('foo), None, Var('bar)))
           ), scope) ==> Right(Vector(
             importAB_,
-            ValDef("a", None, Assign(Var(foo), None, Var(bar)))
+            ValDef(g('a), None, Assign(Var(foo), None, Var(bar)))
           ))
         }
       }
       "solve a block expression" - {
         resolveSymbols(Vector(
           Import(Seq("a", "b"), ImportSpecifier.All),
-          DefDef("a", None, None, Block(Seq(
-            ValDef("foo", None, Var('baz)),
-            VarDef("bar", None, IntLit(2)),
+          DefDef('a, None, None, Block(Seq(
+            ValDef('foo, None, Var('baz)),
+            VarDef('bar, None, IntLit(2)),
             InfixAp(InfixOp.Add, Var('foo), Var('bar))
           )))
         ), BuiltinSymbols.symbols.withTerms(g('a, 'b, 'foo), g('a, 'b, 'bar), g('a, 'b, 'baz))) ==>
           Right(Vector(
             Import(Seq("a", "b"), ImportSpecifier.All),
-            DefDef("a", None, None, Block(Seq(
-              ValDef("foo", None, Var(g('a, 'b, 'baz))),
-              VarDef("bar", None, IntLit(2)),
+            DefDef(g('a), None, None, Block(Seq(
+              ValDef(l('foo), None, Var(g('a, 'b, 'baz))),
+              VarDef(l('bar), None, IntLit(2)),
               InfixAp(InfixOp.Add, Var(l('foo)), Var(l('bar)))
             )))
           ))
@@ -118,7 +118,7 @@ object SymbolResolverTests extends TestSuite {
       "solve a struct definition" - {
         resolveSymbols(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
-          StructDef("foo", Some(Seq("A", "B")), Seq(
+          StructDef('foo, Some(Seq("A", "B")), Seq(
             StructMember("a", parse.ast.Type.Named('A)),
             StructMember("int", parse.ast.Type.Named('i32)),
             StructMember("pointer", parse.ast.Type.App(parse.ast.Type.Named('ptr), Seq(parse.ast.Type.Named('B)))),
@@ -126,7 +126,7 @@ object SymbolResolverTests extends TestSuite {
           ))
         ), BuiltinSymbols.symbols.withTypes(g('A), g('x, 'y, 'B), g('x, 'y, 'bar))) ==> Right(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
-          StructDef("foo", Some(Seq("A", "B")), Seq(
+          StructDef(g('foo), Some(Seq("A", "B")), Seq(
             StructMember("a", parse.ast.Type.Named(l('A))),
             StructMember("int", parse.ast.Type.Named(g('i32))),
             StructMember("pointer", parse.ast.Type.App(parse.ast.Type.Named(g('ptr)), Seq(parse.ast.Type.Named(l('B))))),
@@ -137,19 +137,19 @@ object SymbolResolverTests extends TestSuite {
       "solve a val definition" - {
         resolveSymbols(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
-          ValDef("foo", Some(parse.ast.Type.Named('z)), IntLit(0))
+          ValDef('foo, Some(parse.ast.Type.Named('z)), IntLit(0))
         ), BuiltinSymbols.symbols.withTypes(g('x, 'y, 'z))) ==> Right(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
-          ValDef("foo", Some(parse.ast.Type.Named(g('x, 'y, 'z))), IntLit(0))
+          ValDef(g('foo), Some(parse.ast.Type.Named(g('x, 'y, 'z))), IntLit(0))
         ))
       }
       "solve a var definition" - {
         resolveSymbols(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
-          VarDef("foo", Some(parse.ast.Type.Named('z)), IntLit(0))
+          VarDef('foo, Some(parse.ast.Type.Named('z)), IntLit(0))
         ), BuiltinSymbols.symbols.withTypes(g('x, 'y, 'z))) ==> Right(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
-          VarDef("foo", Some(parse.ast.Type.Named(g('x, 'y, 'z))), IntLit(0))
+          VarDef(g('foo), Some(parse.ast.Type.Named(g('x, 'y, 'z))), IntLit(0))
         ))
       }
     }

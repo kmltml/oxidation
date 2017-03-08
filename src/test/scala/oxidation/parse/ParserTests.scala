@@ -209,8 +209,8 @@ object ParserTests extends TestSuite {
           ))
       }
       "a type alias" - {
-        defn.parse("type unit = u0").get.value ==> TypeDef("unit", None, Type.Named(Symbol.Unresolved("u0")))
-        defn.parse("type id[a] = a").get.value ==> TypeDef("id", Some(Seq("a")), Type.Named(Symbol.Unresolved("a")))
+        defn.parse("type unit = u0").get.value ==> TypeAliasDef("unit", None, Type.Named(Symbol.Unresolved("u0")))
+        defn.parse("type id[a] = a").get.value ==> TypeAliasDef("id", Some(Seq("a")), Type.Named(Symbol.Unresolved("a")))
       }
     }
 
