@@ -52,7 +52,7 @@ object TyperTests extends TestSuite {
         )), ExpectedType.Undefined) ==> Right(I32)
 
         findType(P.Block(Seq(
-          P.ValDef(l("x"), Some(P.Type.Named(Symbol.Global(Seq("i64")))), P.IntLit(10)),
+          P.ValDef(l("x"), Some(TypeName.Named(Symbol.Global(Seq("i64")))), P.IntLit(10)),
           P.Var(l("x"))
         )), ExpectedType.Numeric) ==> Right(I64)
       }

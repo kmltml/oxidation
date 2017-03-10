@@ -118,8 +118,8 @@ object Typer {
       }
   }
 
-  private def lookupType(t: P.Type, ctxt: Ctxt): Type = t match {
-    case P.Type.Named(Symbol.Global(Seq(n))) => n match {
+  def lookupType(t: TypeName, ctxt: Ctxt): Type = t match {
+    case TypeName.Named(Symbol.Global(Seq(n))) => n match {
       case "unit" => U0
       case "bool" => U1
       case "u8" => U8
@@ -131,7 +131,29 @@ object Typer {
       case "i32" => I32
       case "i64" => I64
     }
-    case P.Type.Named(s) => ctxt.types(s)
+    case TypeName.Named(s) => ctxt.types(s)
+  }
+
+  def solveTermDef(d: P.TermDef, ctxt: Ctxt): TyperResult[ast.TermDef] = {
+    val expectedType = d.typ.map(ExpectedType.Specific compose (lookupType(_, ctxt)))
+      .getOrElse(ExpectedType.Undefined)
+    d match {
+      case P.DefDef(name, params, tpe, body) =>
+        val paramTypes = params.getOrElse(Seq.empty) map {
+          case Param(name, tpe) => Symbol.Local(name) -> lookupType(tpe, ctxt)
+        }
+        val localCtxt = ctxt.withTerms(paramTypes.toMap)
+        solveType(body, expectedType, localCtxt)
+          .map(ast.DefDef(name, params, tpe, _))
+
+      case P.ValDef(name, tpe, value) =>
+        solveType(value, expectedType, ctxt)
+          .map(ast.ValDef(name, tpe, _))
+
+      case P.VarDef(name, tpe, value) =>
+        solveType(value, expectedType, ctxt)
+          .map(ast.ValDef(name, tpe, _))
+    }
   }
 
   private def unifyType(t: Type, expected: ExpectedType): Either[TyperError, Type] = (t, expected) match {

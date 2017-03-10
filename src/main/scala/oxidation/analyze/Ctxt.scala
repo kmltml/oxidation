@@ -1,7 +1,7 @@
 package oxidation
 package analyze
 
-class Ctxt(val terms: Map[Symbol, Type], val types: Map[Symbol, Type]) {
+case class Ctxt(terms: Map[Symbol, Type], types: Map[Symbol, Type]) {
 
   def withTerms(ts: Map[Symbol, Type]): Ctxt = new Ctxt(terms ++ ts, types)
 

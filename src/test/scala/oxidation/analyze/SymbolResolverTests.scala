@@ -17,13 +17,13 @@ object SymbolResolverTests extends TestSuite {
       "mark def's parameters as local, shadowing external bindings" - {
         resolveSymbols(Vector(
           DefDef('foo,
-            Some(Seq(Param("bar", parse.ast.Type.Named('i64)))),
-            Some(parse.ast.Type.Named('i32)),
+            Some(Seq(Param("bar", TypeName.Named('i64)))),
+            Some(TypeName.Named('i32)),
             Var('bar))
         ), BuiltinSymbols.symbols.withTerms('bar)) ==> Right(Vector(
           DefDef(g('foo),
-            Some(Seq(Param("bar", parse.ast.Type.Named(g('i64))))),
-            Some(parse.ast.Type.Named(g('i32))),
+            Some(Seq(Param("bar", TypeName.Named(g('i64))))),
+            Some(TypeName.Named(g('i32))),
             Var(l('bar)))
         ))
       }
@@ -119,37 +119,37 @@ object SymbolResolverTests extends TestSuite {
         resolveSymbols(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
           StructDef('foo, Some(Seq("A", "B")), Seq(
-            StructMember("a", parse.ast.Type.Named('A)),
-            StructMember("int", parse.ast.Type.Named('i32)),
-            StructMember("pointer", parse.ast.Type.App(parse.ast.Type.Named('ptr), Seq(parse.ast.Type.Named('B)))),
-            StructMember("custom", parse.ast.Type.Named('bar))
+            StructMember("a", TypeName.Named('A)),
+            StructMember("int", TypeName.Named('i32)),
+            StructMember("pointer", TypeName.App(TypeName.Named('ptr), Seq(TypeName.Named('B)))),
+            StructMember("custom", TypeName.Named('bar))
           ))
         ), BuiltinSymbols.symbols.withTypes(g('A), g('x, 'y, 'B), g('x, 'y, 'bar))) ==> Right(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
           StructDef(g('foo), Some(Seq("A", "B")), Seq(
-            StructMember("a", parse.ast.Type.Named(l('A))),
-            StructMember("int", parse.ast.Type.Named(g('i32))),
-            StructMember("pointer", parse.ast.Type.App(parse.ast.Type.Named(g('ptr)), Seq(parse.ast.Type.Named(l('B))))),
-            StructMember("custom", parse.ast.Type.Named(g('x, 'y, 'bar)))
+            StructMember("a", TypeName.Named(l('A))),
+            StructMember("int", TypeName.Named(g('i32))),
+            StructMember("pointer", TypeName.App(TypeName.Named(g('ptr)), Seq(TypeName.Named(l('B))))),
+            StructMember("custom", TypeName.Named(g('x, 'y, 'bar)))
           ))
         ))
       }
       "solve a val definition" - {
         resolveSymbols(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
-          ValDef('foo, Some(parse.ast.Type.Named('z)), IntLit(0))
+          ValDef('foo, Some(TypeName.Named('z)), IntLit(0))
         ), BuiltinSymbols.symbols.withTypes(g('x, 'y, 'z))) ==> Right(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
-          ValDef(g('foo), Some(parse.ast.Type.Named(g('x, 'y, 'z))), IntLit(0))
+          ValDef(g('foo), Some(TypeName.Named(g('x, 'y, 'z))), IntLit(0))
         ))
       }
       "solve a var definition" - {
         resolveSymbols(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
-          VarDef('foo, Some(parse.ast.Type.Named('z)), IntLit(0))
+          VarDef('foo, Some(TypeName.Named('z)), IntLit(0))
         ), BuiltinSymbols.symbols.withTypes(g('x, 'y, 'z))) ==> Right(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
-          VarDef(g('foo), Some(parse.ast.Type.Named(g('x, 'y, 'z))), IntLit(0))
+          VarDef(g('foo), Some(TypeName.Named(g('x, 'y, 'z))), IntLit(0))
         ))
       }
     }

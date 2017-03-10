@@ -30,8 +30,8 @@ object SymbolResolver {
     val modulePath = modulePaths.flatten
     for {
       explicitImports <- compilationUnit.collect {
-        case parse.ast.Import(path, parse.ast.ImportSpecifier.All) => Right(global.findPrefixed(path))
-        case parse.ast.Import(path, parse.ast.ImportSpecifier.Members(members)) =>
+        case parse.ast.Import(path, ImportSpecifier.All) => Right(global.findPrefixed(path))
+        case parse.ast.Import(path, ImportSpecifier.Members(members)) =>
           members.toVector.traverse { n =>
             val syms = global.findExact(path :+ n)
             if(syms.isEmpty) Left(SymbolNotFoundInImport(path :+ n)) else Right(syms)
@@ -61,14 +61,14 @@ object SymbolResolver {
       val newScope = params.getOrElse(Seq.empty)
         .foldLeft(scope)((s, p) => s.shadowTerm(Symbol.Local(p.name)))
       (params.traverse(_.toVector.traverse {
-        case parse.ast.Param(name, tpe) => solveType(tpe, scope).map(parse.ast.Param(name, _))
+        case Param(name, tpe) => solveType(tpe, scope).map(Param(name, _))
       }), tpe.traverse(solveType(_, scope)), solveExpr(value, newScope))
         .map3(parse.ast.DefDef(solveDefName(name, ctxt), _, _, _))
 
     case parse.ast.StructDef(name, params, members) =>
       val localScope = params.getOrElse(Seq.empty).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
       members.toVector.traverse {
-        case parse.ast.StructMember(name, tpe) => solveType(tpe, localScope).map(parse.ast.StructMember(name, _))
+        case StructMember(name, tpe) => solveType(tpe, localScope).map(StructMember(name, _))
       }.map(parse.ast.StructDef(solveDefName(name, ctxt), params, _))
 
     case parse.ast.TypeAliasDef(name, params, body) =>
@@ -128,13 +128,13 @@ object SymbolResolver {
     case _: parse.ast.IntLit | _: parse.ast.BoolLit | _: parse.ast.StringLit => Right(e)
   }
 
-  private def solveType(t: parse.ast.Type, scope: Scope): Res[parse.ast.Type] = t match {
-    case parse.ast.Type.Named(Symbol.Unresolved(sym)) =>
-      getOnlyOneSymbol(sym, scope.types).map(parse.ast.Type.Named)
+  private def solveType(t: TypeName, scope: Scope): Res[TypeName] = t match {
+    case TypeName.Named(Symbol.Unresolved(sym)) =>
+      getOnlyOneSymbol(sym, scope.types).map(TypeName.Named)
 
-    case parse.ast.Type.App(const, params) =>
+    case TypeName.App(const, params) =>
       (solveType(const, scope), params.toVector.traverse(solveType(_, scope)))
-        .map2(parse.ast.Type.App)
+        .map2(TypeName.App)
 
   }
 

@@ -2,7 +2,8 @@ package oxidation
 package analyze
 
 import utest._
-import parse.ast.{Type => T, _}
+import oxidation.{ TypeName => T }
+import parse.ast._
 
 object DependencyGraphTests extends TestSuite with SymbolSyntax {
 

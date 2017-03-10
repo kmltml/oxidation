@@ -149,17 +149,17 @@ object ParserTests extends TestSuite {
       "a function definition" - {
         defn.parse("def foo(i: i32): i32 = i + 2").get.value ==>
           DefDef("foo",
-            Some(List(Param("i", Type.Named("i32")))),
-            Some(Type.Named("i32")),
+            Some(List(Param("i", TypeName.Named("i32")))),
+            Some(TypeName.Named("i32")),
             InfixAp(InfixOp.Add, Var("i"), IntLit(2)))
       }
       "a variable definition" - {
         defn.parse("var foo = 10").get.value ==> VarDef("foo", None, IntLit(10))
-        defn.parse("var foo: i32 = 10").get.value ==> VarDef("foo", Some(Type.Named("i32")), IntLit(10))
+        defn.parse("var foo: i32 = 10").get.value ==> VarDef("foo", Some(TypeName.Named("i32")), IntLit(10))
       }
       "a value binding" - {
         defn.parse("val foo = 10").get.value ==> ValDef("foo", None, IntLit(10))
-        defn.parse("val foo: i32 = 10").get.value ==> ValDef("foo", Some(Type.Named("i32")), IntLit(10))
+        defn.parse("val foo: i32 = 10").get.value ==> ValDef("foo", Some(TypeName.Named("i32")), IntLit(10))
       }
       "a struct definition" - {
         defn.parse(
@@ -169,9 +169,9 @@ object ParserTests extends TestSuite {
             |}
           """.stripMargin).get.value ==>
           StructDef("foo", None, Seq(
-            StructMember("x", Type.Named("i32")),
-            StructMember("y", Type.Named("u16")),
-            StructMember("z", Type.Named("bool"))
+            StructMember("x", TypeName.Named("i32")),
+            StructMember("y", TypeName.Named("u16")),
+            StructMember("z", TypeName.Named("bool"))
           ))
         defn.parse(
           """struct arr[x] = {
@@ -180,8 +180,8 @@ object ParserTests extends TestSuite {
             |}
           """.stripMargin).get.value ==>
           StructDef("arr", Some(Seq("x")), Seq(
-            StructMember("length", Type.Named("usize")),
-            StructMember("contents", Type.App(Type.Named("ptr"), Seq(Type.Named("x"))))
+            StructMember("length", TypeName.Named("usize")),
+            StructMember("contents", TypeName.App(TypeName.Named("ptr"), Seq(TypeName.Named("x"))))
           ))
       }
       "an enum definition" - {
@@ -204,23 +204,23 @@ object ParserTests extends TestSuite {
             |}
           """.stripMargin).get.value ==>
           EnumDef("Option", Some(Seq("A")), Seq(
-            EnumVariant("Some", Seq(StructMember("value", Type.Named("A")))),
+            EnumVariant("Some", Seq(StructMember("value", TypeName.Named("A")))),
             EnumVariant("None", Seq())
           ))
       }
       "a type alias" - {
-        defn.parse("type unit = u0").get.value ==> TypeAliasDef("unit", None, Type.Named(Symbol.Unresolved("u0")))
-        defn.parse("type id[a] = a").get.value ==> TypeAliasDef("id", Some(Seq("a")), Type.Named(Symbol.Unresolved("a")))
+        defn.parse("type unit = u0").get.value ==> TypeAliasDef("unit", None, TypeName.Named(Symbol.Unresolved("u0")))
+        defn.parse("type id[a] = a").get.value ==> TypeAliasDef("id", Some(Seq("a")), TypeName.Named(Symbol.Unresolved("a")))
       }
     }
 
     "type should parse" - {
       val tpe = p.whole(p.typ)
       "a simple named type" - {
-        tpe.parse("i32").get.value ==> Type.Named("i32")
+        tpe.parse("i32").get.value ==> TypeName.Named("i32")
       }
       "a type constructor application" - {
-        tpe.parse("ptr[i8]").get.value ==> Type.App(Type.Named("ptr"), Seq(Type.Named("i8")))
+        tpe.parse("ptr[i8]").get.value ==> TypeName.App(TypeName.Named("ptr"), Seq(TypeName.Named("i8")))
       }
     }
 

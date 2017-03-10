@@ -114,16 +114,16 @@ class Parser {
 
   private val sym: P[Symbol] = P(id.!).map(Symbol.Unresolved)
 
-  val typ: P[Type] = P(
+  val typ: P[TypeName] = P(
     (namedType ~ typeApply.rep).map {
       case (t, paramLists) =>
-        paramLists.foldLeft(t: Type)(Type.App(_, _))
+        paramLists.foldLeft(t: TypeName)(TypeName.App(_, _))
     }
   )(Name("type"))
 
-  private val namedType: P[Type.Named] = sym.map(Type.Named)
+  private val namedType: P[TypeName.Named] = sym.map(TypeName.Named)
 
-  private val typeApply: P[Seq[Type]] =
+  private val typeApply: P[Seq[TypeName]] =
     P("[" ~/ typ.rep(sep = ",", min = 1) ~ "]")
 
   private val defdef: P[DefDef] = {
@@ -133,7 +133,7 @@ class Parser {
     P(K("def") ~/ sym ~ paramList.? ~ (":" ~/ typ).? ~ "=" ~ expression).map(DefDef.tupled)
   }
 
-  private val defBody: P[(Symbol, Option[Type], Expression)] =
+  private val defBody: P[(Symbol, Option[TypeName], Expression)] =
     sym ~ (":" ~ typ).? ~ O("=") ~/ expression
 
   private val valdef: P[ValDef] =

@@ -24,7 +24,7 @@ object DependencyGraph {
 
 }
 
-case class DependencyEntry(dependencies: Set[Symbol], declaredType: Option[parse.ast.Type])
+case class DependencyEntry(dependencies: Set[Symbol], declaredType: Option[TypeName])
 
 object DependencyEntry {
 

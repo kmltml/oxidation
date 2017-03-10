@@ -46,9 +46,9 @@ object AstDump extends App {
   def prettyprintTLD(d: ast.TLD): P = d match {
     case ast.Import(path, names) =>
       val n = names match {
-        case ast.ImportSpecifier.All => "All"
-        case ast.ImportSpecifier.Members(Seq(one)) => one
-        case ast.ImportSpecifier.Members(more) => s"{ ${more mkString ", "} }"
+        case ImportSpecifier.All => "All"
+        case ImportSpecifier.Members(Seq(one)) => one
+        case ImportSpecifier.Members(more) => s"{ ${more mkString ", "} }"
       }
       s"Import(${path mkString "."}, $n)"
     case ast.Module(path) =>
@@ -66,7 +66,7 @@ object AstDump extends App {
     case ast.DefDef(name, params, tpe, body) =>
       val pars = params match {
         case Some(p) => "Params(".nl + p.map {
-            case ast.Param(n, t) => s"Param($n, ".p + prettyprintType(t) + ")"
+            case Param(n, t) => s"Param($n, ".p + prettyprintType(t) + ")"
           }.sep(", ".nl).indent + ")"
         case None => "None".p
       }
@@ -82,7 +82,7 @@ object AstDump extends App {
         case None => ""
       }
       s"StructDef($name$typeParamList, ".nl + members.map {
-        case ast.StructMember(name, tpe) => s"Member($name, ".p + prettyprintType(tpe) + ")"
+        case StructMember(name, tpe) => s"Member($name, ".p + prettyprintType(tpe) + ")"
       }.sep(", ".nl).indent + ")"
 
     case ast.TypeAliasDef(name, typeParams, body) =>
@@ -93,9 +93,9 @@ object AstDump extends App {
       s"TypeDef($name$typeParamList, ${prettyprintType(body)})"
   }
 
-  def prettyprintType(t: ast.Type): String = t match {
-    case ast.Type.Named(n) => prettyprintSymbol(n)
-    case ast.Type.App(t, p) => prettyprintType(t) + "[" + p.map(prettyprintType).mkString(", ") + "]"
+  def prettyprintType(t: TypeName): String = t match {
+    case TypeName.Named(n) => prettyprintSymbol(n)
+    case TypeName.App(t, p) => prettyprintType(t) + "[" + p.map(prettyprintType).mkString(", ") + "]"
   }
 
   def prettyprintSymbol(s: Symbol): String = s match {
