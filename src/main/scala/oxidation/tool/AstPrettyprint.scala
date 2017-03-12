@@ -49,10 +49,10 @@ trait AstPrettyprint {
 
   def prettyprintDef(d: ast.Def): P = d match {
     case ast.ValDef(name, tpe, value) =>
-      s"ValDef($name, ${tpe.map(prettyprintType)},".nl + prettyprintTypedExp(value).indent + ")"
+      s"ValDef(${prettyprintSymbol(name)}, ${tpe.map(prettyprintType)},".nl + prettyprintTypedExp(value).indent + ")"
 
     case ast.VarDef(name, tpe, value) =>
-      s"VarDef($name, $tpe,".nl + prettyprintTypedExp(value).indent + ")"
+      s"VarDef(${prettyprintSymbol(name)}, $tpe,".nl + prettyprintTypedExp(value).indent + ")"
 
     case ast.DefDef(name, params, tpe, body) =>
       val pars = params match {
@@ -65,14 +65,14 @@ trait AstPrettyprint {
         case Some(t) => prettyprintType(t)
         case None => "None"
       }
-      s"DefDef($name, ".nl + (pars + ",".nl + retType + ",".nl + prettyprintTypedExp(body)).indent + ")"
+      s"DefDef(${prettyprintSymbol(name)}, ".nl + (pars + ",".nl + retType + ",".nl + prettyprintTypedExp(body)).indent + ")"
 
     case ast.StructDef(name, typeParams, members) =>
       val typeParamList = typeParams match {
         case Some(ps) => s"[${ps mkString ", "}]"
         case None => ""
       }
-      s"StructDef($name$typeParamList, ".nl + members.map {
+      s"StructDef(${prettyprintSymbol(name)}$typeParamList, ".nl + members.map {
         case StructMember(name, tpe) => s"Member($name, ".p + prettyprintType(tpe) + ")"
       }.sep(", ".nl).indent + ")"
 
@@ -81,7 +81,7 @@ trait AstPrettyprint {
         case Some(ps) => s"[${ps mkString ", "}]"
         case None => ""
       }
-      s"TypeDef($name$typeParamList, ${prettyprintType(body)})"
+      s"TypeDef(${prettyprintSymbol(name)}$typeParamList, ${prettyprintType(body)})"
   }
 
   def prettyprintType(t: TypeName): String = t match {
