@@ -37,6 +37,17 @@ object TypeTraverseTests extends TestSuite
           ast.ValDef(g('b), None, ast.Var(g('a)) :: Fun(Seq(I32), I32))
         ))
       }
+      "a recursive def with type annotation" - {
+        TypeTraverse.solveTree(DependencyGraph(Map(
+          g('factorial) -> DependencyEntry(Set(), Some(TypeName.Named(g('i64))))
+        )), Vector(
+          untyped.DefDef(g('factorial), Some(Seq(Param("i", TypeName.Named(g('i64))))), Some(TypeName.Named(g('i64))),
+            untyped.App(untyped.Var(g('factorial)), Seq(untyped.Var(l('i)))))
+        ), Ctxt.default) ==> Right(Set(
+          ast.DefDef(g('factorial), Some(Seq(Param("i", TypeName.Named(g('i64))))), Some(TypeName.Named(g('i64))),
+            ast.App(ast.Var(g('factorial)) :: Fun(Seq(I64), I64), Seq(ast.Var(l('i)) :: I64)) :: I64)
+        ))
+      }
     }
   }
 

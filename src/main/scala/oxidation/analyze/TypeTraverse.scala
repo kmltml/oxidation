@@ -19,10 +19,18 @@ object TypeTraverse {
     val defsByName = defs.collect {
       case d: untyped.TermDef => d.name -> d
     }.toMap
+    val explicitDefs = defs.collect {
+      case untyped.DefDef(name, Some(params), Some(retName), _) =>
+        val paramTypes = params.map(p => Typer.lookupType(p.typ, ctxt))
+        val ret = Typer.lookupType(retName, ctxt)
+        name -> Type.Fun(paramTypes, ret)
+      case (d: untyped.TermDef) if (d.typ.isDefined) =>
+        d.name -> Typer.lookupType(d.typ.get, ctxt)
+    }.toMap
     defs.collect {
       case d: untyped.TermDef => d
     }.traverse(solveTermDef(deps, Set.empty, defsByName, _))
-      .runS(SolutionContext(ctxt, Map.empty))
+      .runS(SolutionContext(ctxt.withTerms(explicitDefs), Map.empty))
       .map(_.solved.values.toSet)
   }
 
