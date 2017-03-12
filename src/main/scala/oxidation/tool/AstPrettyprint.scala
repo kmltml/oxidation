@@ -97,6 +97,8 @@ trait AstPrettyprint {
 
   def prettyprintTypedExp(e: ast.Typed[ast.Expression]): P
 
+  def prettyprintTypedBlockStatement(e: ast.Typed[ast.BlockStatement]): P
+
   def prettyprintExp(e: ast.Expression, typeInfo: String): P = e match {
     case ast.IntLit(i) => i.toString
 
@@ -120,10 +122,7 @@ trait AstPrettyprint {
       s"InfixAp$typeInfo($op, ".nl + prettyprintTypedExp(left).indent + ", ".nl + prettyprintTypedExp(right).indent + ")"
 
     case ast.Block(body) =>
-      s"Block$typeInfo(".nl + body.map {
-        case d: ast.Def => prettyprintDef(d)
-        case e: ast.Typed[ast.Expression] => prettyprintTypedExp(e)
-      }.sep(",".nl).indent + ")"
+      s"Block$typeInfo(".nl + body.map(prettyprintTypedBlockStatement).sep(",".nl).indent + ")"
 
     case ast.App(e, ps) =>
       s"App$typeInfo(".nl + (prettyprintTypedExp(e) + ",".nl + "Params(".nl + ps.map {
@@ -197,9 +196,19 @@ object TypedAstPrettyprint extends AstPrettyprint {
 
     case _ => prettyprintExp(e.expr, s"[${e.typ}]")
   }
+
+  override def prettyprintTypedBlockStatement(e: Typed[ast.BlockStatement]): P = e match {
+    case Typed(d: ast.Def, _) => prettyprintDef(d)
+    case Typed(expr: ast.Expression, typ) => prettyprintTypedExp(Typed(expr, typ))
+  }
 }
 object ParseAstPrettyprint extends AstPrettyprint {
   val ast = parse.ast
 
   override def prettyprintTypedExp(e: ast.Expression): P = prettyprintExp(e, "")
+
+  override def prettyprintTypedBlockStatement(e: ast.BlockStatement): P = e match {
+    case d: ast.Def => prettyprintDef(d)
+    case e: ast.Expression => prettyprintExp(e, "")
+  }
 }

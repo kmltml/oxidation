@@ -10,7 +10,7 @@ import cats._
 import cats.data._
 import cats.implicits._
 
-object TyperTests extends TestSuite with SymbolSyntax {
+object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
 
   def findType(expr: P.Expression, expectedType: ExpectedType, ctxt: Ctxt = Ctxt.empty): Either[TyperError, Type] =
     solveType(expr, expectedType, ctxt).map(_.typ)
@@ -44,10 +44,13 @@ object TyperTests extends TestSuite with SymbolSyntax {
           P.Var(l('x)), P.Var(l('y))
         )), ExpectedType.Undefined, Ctxt.terms(l('x) -> U8, l('y) -> U16)) ==> Right(U16)
 
-        findType(P.Block(Seq(
+        solveType(P.Block(Seq(
           P.ValDef(l('x), None, P.IntLit(10)),
           P.InfixAp(InfixOp.Add, P.Var(l('x)), P.IntLit(1))
-        )), ExpectedType.Undefined) ==> Right(I32)
+        )), ExpectedType.Undefined, Ctxt.empty) ==> Right(ast.Block(Seq(
+          ast.ValDef(l('x), None, ast.IntLit(10) :: I32) :: U0,
+          ast.InfixAp(InfixOp.Add, ast.Var(l('x)) :: I32, ast.IntLit(1) :: I32) :: I32
+        )) :: I32)
 
         findType(P.Block(Seq(
           P.ValDef(l('x), Some(TypeName.Named(g('i64))), P.IntLit(10)),

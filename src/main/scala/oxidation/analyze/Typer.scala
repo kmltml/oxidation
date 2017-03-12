@@ -114,7 +114,7 @@ object Typer {
 
     case P.Block(stmnts) =>
       type S[A] = StateT[TyperResult, Ctxt, A]
-      stmnts.toList.traverse[S, Typed[ast.Expression]] {
+      stmnts.toList.traverse[S, Typed[ast.BlockStatement]] {
         case e: P.Expression =>
           for {
             c <- StateT.get[TyperResult, Ctxt]
@@ -127,7 +127,7 @@ object Typer {
             expectedType = tpe.map(t => ExpectedType.Specific(lookupType(t, c))).getOrElse(ExpectedType.Undefined)
             t <- StateT.lift(solveType(value, expectedType, c))
             _ <- StateT.modify[TyperResult, Ctxt](_.withTerms(Map(name -> t.typ)))
-          } yield t
+          } yield Typed(ast.ValDef(name, tpe, t): ast.BlockStatement, U0)
 
       }.runA(ctxt).map { body =>
         val lastType = body.lastOption.map(_.typ).getOrElse(U0)
@@ -176,6 +176,10 @@ object Typer {
   private def unifyType(t: Type, expected: ExpectedType): Either[TyperError, Type] = (t, expected) match {
     case (I8 | I16 | I32 | I64 | U8 | U16 | U32 | U64, ExpectedType.Numeric) => Right(t)
     case (t, ExpectedType.Numeric) => Left(TyperError.CantMatch(expected, t))
+
+    case (f: Fun, ExpectedType.Appliable) => Right(f)
+    case (_, ExpectedType.Appliable) => Left(TyperError.CantMatch(expected, t))
+
     case (t, ExpectedType.Specific(u)) =>
       if(t == u) Right(t) else Left(TyperError.CantMatch(expected, t))
     case (t, ExpectedType.Undefined) => Right(t)
