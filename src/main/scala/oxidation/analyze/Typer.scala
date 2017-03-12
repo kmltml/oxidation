@@ -136,18 +136,6 @@ object Typer {
   }
 
   def lookupType(t: TypeName, ctxt: Ctxt): Type = t match {
-    case TypeName.Named(Symbol.Global(Seq(n))) => n match {
-      case "unit" => U0
-      case "bool" => U1
-      case "u8" => U8
-      case "u16" => U16
-      case "u32" => U32
-      case "u64" => U64
-      case "i8" => I8
-      case "i16" => I16
-      case "i32" => I32
-      case "i64" => I64
-    }
     case TypeName.Named(s) => ctxt.types(s)
   }
 

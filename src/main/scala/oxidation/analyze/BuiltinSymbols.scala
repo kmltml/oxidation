@@ -1,11 +1,16 @@
 package oxidation
 package analyze
 
+import Type._
+
 object BuiltinSymbols {
 
-  val typeNames = Set("i8", "i16", "i32", "i64", "u0", "u1", "u8", "u16", "u32", "u64", "ptr", "arr", "str")
-  val types: Set[Symbol] = typeNames.map(s => Symbol.Global(Seq(s)))
+  val typeNames: Map[String, Type] = Map(
+    "i8" -> I8, "i16" -> I16, "i32" -> I32, "i64" -> I64,
+    "u0" -> U0, "u1" -> U1, "u8" -> U8, "u16" -> U16, "u32" -> U32, "u64" -> U64,
+    "ptr" -> U64, "arr" -> U64, "str" -> U64)
+  val types: Map[Symbol, Type] = typeNames.map { case (s, v) => Symbol.Global(Seq(s)) -> v }
 
-  val symbols: Symbols = Symbols.types(types.toSeq: _*)
+  val symbols: Symbols = Symbols.types(types.keys.toSeq: _*)
 
 }

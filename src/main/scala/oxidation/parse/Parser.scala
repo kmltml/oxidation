@@ -141,7 +141,7 @@ class Parser {
   private val vardef: P[VarDef] =
     P(K("var") ~/ defBody).map(VarDef.tupled)
 
-  private val structMember = (WS ~~ id.! ~~ WSNoNL ~~ ":" ~ typ).map(StructMember.tupled)
+  private val structMember = (WS ~~ id.! ~~ WSNoNL ~~ ":" ~ typ).map(StructMemberDef.tupled)
 
   private val structdef: P[StructDef] = {
     val body = "{" ~~ structMember.repX(sep = semi) ~ "}"

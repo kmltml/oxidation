@@ -13,6 +13,8 @@ object Ctxt {
 
   val empty = new Ctxt(Map.empty, Map.empty)
 
+  val default = types(BuiltinSymbols.types.toSeq: _*)
+
   def terms(ts: (Symbol, Type)*): Ctxt = empty.withTerms(Map(ts: _*))
   def types(ts: (Symbol, Type)*): Ctxt = empty.withTypes(Map(ts: _*))
 

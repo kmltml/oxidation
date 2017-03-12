@@ -12,7 +12,7 @@ import cats.implicits._
 
 object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
 
-  def findType(expr: P.Expression, expectedType: ExpectedType, ctxt: Ctxt = Ctxt.empty): Either[TyperError, Type] =
+  def findType(expr: P.Expression, expectedType: ExpectedType, ctxt: Ctxt = Ctxt.default): Either[TyperError, Type] =
     solveType(expr, expectedType, ctxt).map(_.typ)
 
   val tests = apply {

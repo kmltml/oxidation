@@ -1,8 +1,8 @@
-type bool = u1
+struct Product = {
+    value: i32
+}
 
-def f = id(true)
-
-def id(x: bool) = {
+def id(x: Product) = {
     val y = x
     y
 }

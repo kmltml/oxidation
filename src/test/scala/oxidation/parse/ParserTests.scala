@@ -169,9 +169,9 @@ object ParserTests extends TestSuite {
             |}
           """.stripMargin).get.value ==>
           StructDef("foo", None, Seq(
-            StructMember("x", TypeName.Named("i32")),
-            StructMember("y", TypeName.Named("u16")),
-            StructMember("z", TypeName.Named("bool"))
+            StructMemberDef("x", TypeName.Named("i32")),
+            StructMemberDef("y", TypeName.Named("u16")),
+            StructMemberDef("z", TypeName.Named("bool"))
           ))
         defn.parse(
           """struct arr[x] = {
@@ -180,8 +180,8 @@ object ParserTests extends TestSuite {
             |}
           """.stripMargin).get.value ==>
           StructDef("arr", Some(Seq("x")), Seq(
-            StructMember("length", TypeName.Named("usize")),
-            StructMember("contents", TypeName.App(TypeName.Named("ptr"), Seq(TypeName.Named("x"))))
+            StructMemberDef("length", TypeName.Named("usize")),
+            StructMemberDef("contents", TypeName.App(TypeName.Named("ptr"), Seq(TypeName.Named("x"))))
           ))
       }
       "an enum definition" - {
@@ -204,7 +204,7 @@ object ParserTests extends TestSuite {
             |}
           """.stripMargin).get.value ==>
           EnumDef("Option", Some(Seq("A")), Seq(
-            EnumVariant("Some", Seq(StructMember("value", TypeName.Named("A")))),
+            EnumVariant("Some", Seq(StructMemberDef("value", TypeName.Named("A")))),
             EnumVariant("None", Seq())
           ))
       }

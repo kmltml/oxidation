@@ -119,18 +119,18 @@ object SymbolResolverTests extends TestSuite {
         resolveSymbols(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
           StructDef('foo, Some(Seq("A", "B")), Seq(
-            StructMember("a", TypeName.Named('A)),
-            StructMember("int", TypeName.Named('i32)),
-            StructMember("pointer", TypeName.App(TypeName.Named('ptr), Seq(TypeName.Named('B)))),
-            StructMember("custom", TypeName.Named('bar))
+            StructMemberDef("a", TypeName.Named('A)),
+            StructMemberDef("int", TypeName.Named('i32)),
+            StructMemberDef("pointer", TypeName.App(TypeName.Named('ptr), Seq(TypeName.Named('B)))),
+            StructMemberDef("custom", TypeName.Named('bar))
           ))
         ), BuiltinSymbols.symbols.withTypes(g('A), g('x, 'y, 'B), g('x, 'y, 'bar))) ==> Right(Vector(
           Import(Seq("x", "y"), ImportSpecifier.All),
           StructDef(g('foo), Some(Seq("A", "B")), Seq(
-            StructMember("a", TypeName.Named(l('A))),
-            StructMember("int", TypeName.Named(g('i32))),
-            StructMember("pointer", TypeName.App(TypeName.Named(g('ptr)), Seq(TypeName.Named(l('B))))),
-            StructMember("custom", TypeName.Named(g('x, 'y, 'bar)))
+            StructMemberDef("a", TypeName.Named(l('A))),
+            StructMemberDef("int", TypeName.Named(g('i32))),
+            StructMemberDef("pointer", TypeName.App(TypeName.Named(g('ptr)), Seq(TypeName.Named(l('B))))),
+            StructMemberDef("custom", TypeName.Named(g('x, 'y, 'bar)))
           ))
         ))
       }

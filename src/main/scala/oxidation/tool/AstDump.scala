@@ -51,11 +51,19 @@ object AstDump extends App {
         show(ParseAstPrettyprint)(resolveSymbols(res))
       case Types =>
         val files = resolveSymbols(res)
+        val allTypeDefs = files.flatMap(_._2).collect {
+          case d: parse.ast.TypeDef => d
+        }
+        val ctxt = TypeInterpreter.solveTree(allTypeDefs.toVector, Ctxt.default)
+          .fold(error => {
+            Console.err.println(error)
+            sys.exit(1)
+          }, identity)
         val allTermDefs = files.flatMap(_._2).collect {
           case d: parse.ast.TermDef => d
         }.toVector
         val deps = DependencyGraph.build(allTermDefs)
-        val typed = TypeTraverse.solveTree(deps, allTermDefs).fold(error => {
+        val typed = TypeTraverse.solveTree(deps, allTermDefs, ctxt).fold(error => {
           Console.err.println(error)
           sys.exit(1)
         }, identity)

@@ -73,7 +73,7 @@ trait AstPrettyprint {
         case None => ""
       }
       s"StructDef(${prettyprintSymbol(name)}$typeParamList, ".nl + members.map {
-        case StructMember(name, tpe) => s"Member($name, ".p + prettyprintType(tpe) + ")"
+        case StructMemberDef(name, tpe) => s"Member($name, ".p + prettyprintType(tpe) + ")"
       }.sep(", ".nl).indent + ")"
 
     case ast.TypeAliasDef(name, typeParams, body) =>

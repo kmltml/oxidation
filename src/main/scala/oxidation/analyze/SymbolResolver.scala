@@ -68,7 +68,7 @@ object SymbolResolver {
     case parse.ast.StructDef(name, params, members) =>
       val localScope = params.getOrElse(Seq.empty).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
       members.toVector.traverse {
-        case StructMember(name, tpe) => solveType(tpe, localScope).map(StructMember(name, _))
+        case StructMemberDef(name, tpe) => solveType(tpe, localScope).map(StructMemberDef(name, _))
       }.map(parse.ast.StructDef(solveDefName(name, ctxt), params, _))
 
     case parse.ast.TypeAliasDef(name, params, body) =>

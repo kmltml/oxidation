@@ -43,7 +43,7 @@ trait Ast {
 
   sealed trait TypeDef extends Def
 
-  final case class StructDef(name: Symbol, typeParameters: Option[Seq[String]], members: Seq[StructMember]) extends TypeDef
+  final case class StructDef(name: Symbol, typeParameters: Option[Seq[String]], members: Seq[StructMemberDef]) extends TypeDef
   final case class EnumDef(name: Symbol, typeParameters: Option[Seq[String]], variants: Seq[EnumVariant]) extends TypeDef
   final case class TypeAliasDef(name: Symbol, typeParameters: Option[Seq[String]], body: TypeName) extends TypeDef
 
@@ -79,5 +79,5 @@ trait Ast {
 }
 
 final case class Param(name: String, typ: TypeName)
-final case class StructMember(name: String, typ: TypeName)
-final case class EnumVariant(name: String, members: Seq[StructMember])
+final case class StructMemberDef(name: String, typ: TypeName)
+final case class EnumVariant(name: String, members: Seq[StructMemberDef])

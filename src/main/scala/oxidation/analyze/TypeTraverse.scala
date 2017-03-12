@@ -15,14 +15,14 @@ object TypeTraverse {
   private type S[A] = StateT[Either[AnalysisError, ?], SolutionContext, A]
   private val S = MonadState[S, SolutionContext]
 
-  def solveTree(deps: DependencyGraph, defs: Vector[untyped.Def]): Either[AnalysisError, Set[ast.Def]] = {
+  def solveTree(deps: DependencyGraph, defs: Vector[untyped.Def], ctxt: Ctxt): Either[AnalysisError, Set[ast.Def]] = {
     val defsByName = defs.collect {
       case d: untyped.TermDef => d.name -> d
     }.toMap
     defs.collect {
       case d: untyped.TermDef => d
     }.traverse(solveTermDef(deps, Set.empty, defsByName, _))
-      .runS(SolutionContext(Ctxt.empty, Map.empty))
+      .runS(SolutionContext(ctxt, Map.empty))
       .map(_.solved.values.toSet)
   }
 

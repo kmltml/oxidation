@@ -19,7 +19,7 @@ object TypeTraverseTests extends TestSuite
           untyped.DefDef(g('a), Some(Seq(Param("x", TypeName.Named(g('i32))))), None,
             untyped.InfixAp(InfixOp.Eq, untyped.Var(l('x)), untyped.Var(g('b)))),
           untyped.ValDef(g('b), None, untyped.IntLit(32))
-        )) ==> Right(Set(
+        ), Ctxt.default) ==> Right(Set(
           ast.DefDef(g('a), Some(Seq(Param("x", TypeName.Named(g('i32))))), None,
             ast.InfixAp(InfixOp.Eq, ast.Var(l('x)) :: I32, ast.Var(g('b)) :: I32) :: U1),
           ast.ValDef(g('b), None, ast.IntLit(32) :: I32)
@@ -32,7 +32,7 @@ object TypeTraverseTests extends TestSuite
         )), Vector(
           untyped.DefDef(g('a), Some(Seq(Param("x", TypeName.Named(g('i32))))), None, untyped.Var(l('x))),
           untyped.ValDef(g('b), None, untyped.Var(g('a)))
-        )) ==> Right(Set(
+        ), Ctxt.default) ==> Right(Set(
           ast.DefDef(g('a), Some(Seq(Param("x", TypeName.Named(g('i32))))), None, ast.Var(l('x)) :: I32),
           ast.ValDef(g('b), None, ast.Var(g('a)) :: Fun(Seq(I32), I32))
         ))
