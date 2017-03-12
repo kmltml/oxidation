@@ -25,6 +25,18 @@ object TypeTraverseTests extends TestSuite
           ast.ValDef(g('b), None, ast.IntLit(32) :: I32)
         ))
       }
+      "type a def as a function type" - {
+        TypeTraverse.solveTree(DependencyGraph(Map(
+          g('a) -> DependencyEntry(Set(), None),
+          g('b) -> DependencyEntry(Set(g('a)), None)
+        )), Vector(
+          untyped.DefDef(g('a), Some(Seq(Param("x", TypeName.Named(g('i32))))), None, untyped.Var(l('x))),
+          untyped.ValDef(g('b), None, untyped.Var(g('a)))
+        )) ==> Right(Set(
+          ast.DefDef(g('a), Some(Seq(Param("x", TypeName.Named(g('i32))))), None, ast.Var(l('x)) :: I32),
+          ast.ValDef(g('b), None, ast.Var(g('a)) :: Fun(Seq(I32), I32))
+        ))
+      }
     }
   }
 

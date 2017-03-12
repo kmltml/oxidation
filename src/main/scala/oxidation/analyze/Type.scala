@@ -16,4 +16,7 @@ object Type {
   case object U1 extends Type
   case object U0 extends Type
 
+
+  final case class Fun(params: Seq[Type], ret: Type) extends Type
+
 }

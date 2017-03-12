@@ -44,9 +44,17 @@ object TypeTraverse {
   private def solved(d: ast.TermDef): S[Unit] =
     S.modify {
       case SolutionContext(types, solved) =>
-        SolutionContext(
-          types.withTerms(Map(d.name -> d.body.typ)),
-          solved.updated(d.name, d))
+        d match {
+          case ast.DefDef(name, Some(params), _, body) =>
+            val paramTypes = params.map(p => Typer.lookupType(p.typ, types))
+            SolutionContext(
+              types.withTerms(Map(name -> Type.Fun(paramTypes, body.typ))),
+              solved.updated(name, d))
+          case _: ast.ValDef | _: ast.VarDef | ast.DefDef(_, None, _, _) =>
+            SolutionContext(
+              types.withTerms(Map(d.name -> d.body.typ)),
+              solved.updated(d.name, d))
+        }
     }
 
 }
