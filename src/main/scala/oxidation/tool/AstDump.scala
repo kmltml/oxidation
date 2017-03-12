@@ -90,7 +90,7 @@ object AstDump extends App {
     val files = res.toVector.traverse {
       case (f, tlds) => SymbolResolver.resolveSymbols(tlds.toVector, scope).map(f -> _)
     }.fold(err => {
-      Console.err.println(err);
+      Console.err.println(err)
       sys.exit()
     }, identity)
     files

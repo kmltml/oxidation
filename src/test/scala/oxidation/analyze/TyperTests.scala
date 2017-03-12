@@ -69,6 +69,11 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         findType(P.If(P.BoolLit(true), P.Var(l('x)), Some(P.Var(l('y)))),
           ExpectedType.Numeric, Ctxt.default.withTerms(Map(l('x) -> I32, l('y) -> I64))) ==> Right(I64)
       }
+      "struct member select" - {
+        findType(P.Select(P.Var(l('x)), "x"), ExpectedType.Undefined,
+          Ctxt.default.withTerms(Map(l('x) -> Struct(g('s), Seq(StructMember("x", I32), StructMember("x", I64)))))) ==>
+          Right(I32)
+      }
     }
   }
 

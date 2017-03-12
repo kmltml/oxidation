@@ -1,3 +1,9 @@
-def factorial(i: i64): i64 =
-    if(i == 1) 1 else i * factorial(i - 1)
+struct Vec2 = {
+    x: i32
+    y: i32
+}
+
+def length(v: Vec2) = dot(v, v)
+
+def dot(a: Vec2, b: Vec2) = a.x * b.x + a.y * b.y
 

@@ -112,6 +112,18 @@ object Typer {
         .map(Typed(ast.Var(name): ast.Expression, _))
         .toRight(TyperError.SymbolNotFound(name))
 
+    case P.Select(expr, member) =>
+      for {
+        exprTyped <- solveType(expr, ExpectedType.Undefined, ctxt)
+        memberType <- exprTyped.typ match {
+          case t @ Struct(_, ms) =>
+            ms.find(_.name == member).map(_.typ).toRight(TyperError.MemberNotFound(member, t))
+          case t =>
+            Left(TyperError.MemberNotFound(member, t))
+        }
+        t <- unifyType(memberType, expected)
+      } yield Typed(ast.Select(exprTyped, member), t)
+
     case P.If(cond, pos, None) =>
       for {
         condTyped <- solveType(cond, ExpectedType.Specific(U1), ctxt)
