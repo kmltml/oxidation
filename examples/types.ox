@@ -2,8 +2,7 @@ struct Product = {
     value: i32
 }
 
-def id(x: Product) = {
-    val y = x
-    y
-}
+val f = id
+
+def id(x: Product): Product = x
 

@@ -1,6 +1,6 @@
 package oxidation
 package tool
-import oxidation.analyze.Typed
+import oxidation.analyze.{Type, Typed}
 
 trait AstPrettyprint {
 
@@ -49,7 +49,7 @@ trait AstPrettyprint {
 
   def prettyprintDef(d: ast.Def): P = d match {
     case ast.ValDef(name, tpe, value) =>
-      s"ValDef(${prettyprintSymbol(name)}, ${tpe.map(prettyprintType)},".nl + prettyprintTypedExp(value).indent + ")"
+      s"ValDef(${prettyprintSymbol(name)}, ${tpe.map(prettyprintTypeName)},".nl + prettyprintTypedExp(value).indent + ")"
 
     case ast.VarDef(name, tpe, value) =>
       s"VarDef(${prettyprintSymbol(name)}, $tpe,".nl + prettyprintTypedExp(value).indent + ")"
@@ -57,12 +57,12 @@ trait AstPrettyprint {
     case ast.DefDef(name, params, tpe, body) =>
       val pars = params match {
         case Some(p) => "Params(".nl + p.map {
-          case Param(n, t) => s"Param($n, ".p + prettyprintType(t) + ")"
+          case Param(n, t) => s"Param($n, ".p + prettyprintTypeName(t) + ")"
         }.sep(", ".nl).indent + ")"
         case None => "None".p
       }
       val retType = tpe match {
-        case Some(t) => prettyprintType(t)
+        case Some(t) => prettyprintTypeName(t)
         case None => "None"
       }
       s"DefDef(${prettyprintSymbol(name)}, ".nl + (pars + ",".nl + retType + ",".nl + prettyprintTypedExp(body)).indent + ")"
@@ -73,7 +73,7 @@ trait AstPrettyprint {
         case None => ""
       }
       s"StructDef(${prettyprintSymbol(name)}$typeParamList, ".nl + members.map {
-        case StructMemberDef(name, tpe) => s"Member($name, ".p + prettyprintType(tpe) + ")"
+        case StructMemberDef(name, tpe) => s"Member($name, ".p + prettyprintTypeName(tpe) + ")"
       }.sep(", ".nl).indent + ")"
 
     case ast.TypeAliasDef(name, typeParams, body) =>
@@ -81,12 +81,12 @@ trait AstPrettyprint {
         case Some(ps) => s"[${ps mkString ", "}]"
         case None => ""
       }
-      s"TypeDef(${prettyprintSymbol(name)}$typeParamList, ${prettyprintType(body)})"
+      s"TypeDef(${prettyprintSymbol(name)}$typeParamList, ${prettyprintTypeName(body)})"
   }
 
-  def prettyprintType(t: TypeName): String = t match {
+  def prettyprintTypeName(t: TypeName): String = t match {
     case TypeName.Named(n) => prettyprintSymbol(n)
-    case TypeName.App(t, p) => prettyprintType(t) + "[" + p.map(prettyprintType).mkString(", ") + "]"
+    case TypeName.App(t, p) => prettyprintTypeName(t) + "[" + p.map(prettyprintTypeName).mkString(", ") + "]"
   }
 
   def prettyprintSymbol(s: Symbol): String = s match {
@@ -177,29 +177,46 @@ trait AstPrettyprint {
 object TypedAstPrettyprint extends AstPrettyprint {
   val ast = analyze.ast
 
-  override def prettyprintTypedExp(e: Typed[ast.Expression]): P = e.expr match {
+  override def prettyprintTypedExp(e: Typed[ast.Expression]): P = {
+    val typ = prettyPrintType(e.typ)
+    e.expr match {
 
-    case ast.IntLit(i) => s"[${e.typ}]($i)"
+      case ast.IntLit(i) => s"[$typ]($i)"
 
-    case ast.BoolLit(b) => s"[${e.typ}]($b)"
+      case ast.BoolLit(b) => s"[$typ]($b)"
 
-    case ast.StringLit(s) =>
-      val str = "\"" + s.flatMap {
-        case '\n' => "\\n"
-        case '"' => "\\\""
-        case '\\' => "\\\\"
-        case c => c.toString
-      } + "\""
-      s"[${e.typ}]($str)"
+      case ast.StringLit(s) =>
+        val str = "\"" + s.flatMap {
+          case '\n' => "\\n"
+          case '"' => "\\\""
+          case '\\' => "\\\\"
+          case c => c.toString
+        } + "\""
+        s"[$typ]($str)"
 
-    case ast.Var(v) => s"[${e.typ}](${prettyprintSymbol(v)})"
+      case ast.Var(v) => s"[$typ](${prettyprintSymbol(v)})"
 
-    case _ => prettyprintExp(e.expr, s"[${e.typ}]")
+      case _ => prettyprintExp(e.expr, s"[$typ]")
+    }
   }
 
   override def prettyprintTypedBlockStatement(e: Typed[ast.BlockStatement]): P = e match {
     case Typed(d: ast.Def, _) => prettyprintDef(d)
     case Typed(expr: ast.Expression, typ) => prettyprintTypedExp(Typed(expr, typ))
+  }
+
+  private def prettyPrintType(t: Type): String = t match {
+    case Type.Fun(params, ret) =>
+      val p = params.map(prettyPrintType).mkString("(", ", ", ")")
+      val r = prettyPrintType(ret)
+      s"$p => $r"
+    case Type.Struct(name, members) =>
+      val n = prettyprintSymbol(name)
+      val m = members.map {
+        case Type.StructMember(name, typ) => s"$name: ${prettyPrintType(typ)}"
+      }.mkString("{", ", ", "}")
+      s"$n$m"
+    case _ => t.toString
   }
 }
 object ParseAstPrettyprint extends AstPrettyprint {
