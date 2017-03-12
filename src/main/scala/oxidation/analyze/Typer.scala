@@ -90,6 +90,23 @@ object Typer {
           } yield Typed(ast.InfixAp(op, ltyped, rtyped): ast.Expression, t)
       }
 
+    case P.App(fn, pars) =>
+      for {
+        fnTyped <- solveType(fn, ExpectedType.Appliable, ctxt)
+        typedParams <- fnTyped.typ match {
+          case Fun(paramTypes, _) =>
+            if (paramTypes.size != pars.size) Left(TyperError.WrongNumberOfArguments(paramTypes.size, pars.size))
+            else (pars zip paramTypes).toVector.traverse {
+              case (e, t) => solveType(e, ExpectedType.Specific(t), ctxt)
+            }
+        }
+        valType <- fnTyped.typ match {
+          case Fun(_, retType) => Right(retType)
+        }
+        t <- unifyType(valType, expected)
+      } yield Typed(ast.App(fnTyped, typedParams), t)
+
+
     case P.Var(name) =>
       ctxt.terms.get(name)
         .map(Typed(ast.Var(name): ast.Expression, _))

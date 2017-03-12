@@ -1,4 +1,6 @@
-def f = id
+type bool = u1
 
-def id(x: i64) = x
+def f = id(true)
+
+def id(x: bool) = x
 
