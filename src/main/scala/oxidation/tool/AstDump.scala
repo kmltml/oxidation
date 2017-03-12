@@ -62,7 +62,7 @@ object AstDump extends App {
         val allTermDefs = files.flatMap(_._2).collect {
           case d: parse.ast.TermDef => d
         }.toVector
-        val deps = DependencyGraph.build(allTermDefs)
+        val deps = DependencyGraph.build(allTermDefs).prune
         val typed = TypeTraverse.solveTree(deps, allTermDefs, ctxt).fold(error => {
           Console.err.println(error)
           sys.exit(1)

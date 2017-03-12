@@ -47,7 +47,7 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         solveType(P.Block(Seq(
           P.ValDef(l('x), None, P.IntLit(10)),
           P.InfixAp(InfixOp.Add, P.Var(l('x)), P.IntLit(1))
-        )), ExpectedType.Undefined, Ctxt.empty) ==> Right(ast.Block(Seq(
+        )), ExpectedType.Undefined, Ctxt.default) ==> Right(ast.Block(Seq(
           ast.ValDef(l('x), None, ast.IntLit(10) :: I32) :: U0,
           ast.InfixAp(InfixOp.Add, ast.Var(l('x)) :: I32, ast.IntLit(1) :: I32) :: I32
         )) :: I32)
@@ -57,8 +57,18 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
           P.Var(l('x))
         )), ExpectedType.Numeric) ==> Right(I64)
       }
-      findType(P.App(P.Var(g('foo)), Seq(P.IntLit(32))), ExpectedType.Undefined,
-        Ctxt.terms(g('foo) -> Fun(Seq(I64), U1))) ==> Right(U1)
+      "function application" - {
+        findType(P.App(P.Var(g('foo)), Seq(P.IntLit(32))), ExpectedType.Undefined,
+          Ctxt.terms(g('foo) -> Fun(Seq(I64), U1))) ==> Right(U1)
+      }
+      "if expression" - {
+        solveType(P.If(P.BoolLit(true), P.IntLit(10), Some(P.IntLit(20))),
+          ExpectedType.Specific(I64), Ctxt.default) ==>
+          Right(ast.If(ast.BoolLit(true) :: U1, ast.IntLit(10) :: I64, Some(ast.IntLit(20) :: I64)) :: I64)
+        findType(P.If(P.BoolLit(true), P.IntLit(42), None), ExpectedType.Undefined) ==> Right(U0)
+        findType(P.If(P.BoolLit(true), P.Var(l('x)), Some(P.Var(l('y)))),
+          ExpectedType.Numeric, Ctxt.default.withTerms(Map(l('x) -> I32, l('y) -> I64))) ==> Right(I64)
+      }
     }
   }
 

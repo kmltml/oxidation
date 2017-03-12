@@ -112,6 +112,31 @@ object Typer {
         .map(Typed(ast.Var(name): ast.Expression, _))
         .toRight(TyperError.SymbolNotFound(name))
 
+    case P.If(cond, pos, None) =>
+      for {
+        condTyped <- solveType(cond, ExpectedType.Specific(U1), ctxt)
+        posTyped <- solveType(pos, ExpectedType.Undefined, ctxt)
+        t <- unifyType(U0, expected)
+      } yield Typed(ast.If(condTyped, posTyped, None), t)
+
+    case P.If(cond, pos, Some(neg)) =>
+      for {
+        condTyped <- solveType(cond, ExpectedType.Specific(U1), ctxt)
+        posTyped <- solveType(pos, expected, ctxt)
+        negExpected = (expected, posTyped.typ) match {
+          case (ExpectedType.Specific(t), _) => expected
+          case (ExpectedType.Numeric, _) => ExpectedType.Numeric
+          case (ExpectedType.Appliable, t) => ExpectedType.Specific(t)
+          case (ExpectedType.Undefined, t) => ExpectedType.Specific(t)
+        }
+        negTyped <- solveType(neg, negExpected, ctxt)
+        t = (posTyped.typ, negTyped.typ) match {
+          case (a, b) if a == b => a
+          case (a, b) => wider(a, b) // TODO case this for numeric types only
+        }
+        typ <- unifyType(t, expected)
+      } yield Typed(ast.If(condTyped, posTyped, Some(negTyped)), typ)
+
     case P.Block(stmnts) =>
       type S[A] = StateT[TyperResult, Ctxt, A]
       stmnts.toList.traverse[S, Typed[ast.BlockStatement]] {
