@@ -111,6 +111,13 @@ trait AstPrettyprint {
       case c => c.toString
     } + "\""
 
+    case ast.StructLit(name, members) =>
+      val memberpp = members.map {
+        case (name, exp) => s"($name, ".nl + (prettyprintTypedExp(exp) + ")").indent
+      }.sep(",".nl)
+      s"StructLit$typeInfo(".p + prettyprintSymbol(name) + ",".nl +
+        ("Members(".nl + memberpp.indent + ")").indent
+
     case ast.Var(v) => prettyprintSymbol(v)
 
     case ast.If(cond, pos, neg) =>
