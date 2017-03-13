@@ -26,6 +26,17 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         findType(P.BoolLit(true), ExpectedType.Undefined) ==> Right(U1)
         findType(P.BoolLit(false), ExpectedType.Specific(U1)) ==> Right(U1)
       }
+      "struct literals" - {
+        val Vec2 = Struct(g('Vec2), Seq(
+          StructMember("x", I32), StructMember("y", I64)
+        ))
+        solveType(P.StructLit(g('Vec2), Seq(
+          "x" -> P.IntLit(10), "y" -> P.IntLit(20)
+        )), ExpectedType.Undefined, Ctxt.default.withTypes(Map(g('Vec2) -> Vec2))) ==>
+          Right(ast.StructLit(g('Vec2), Seq(
+            "x" -> (ast.IntLit(10) :: I32), "y" -> (ast.IntLit(20) :: I64)
+          )) :: Vec2)
+      }
       "operator expressions" - {
         findType(P.InfixAp(InfixOp.Add, P.IntLit(5), P.IntLit(10)), ExpectedType.Undefined, Ctxt.empty) ==>
           Right(I32)

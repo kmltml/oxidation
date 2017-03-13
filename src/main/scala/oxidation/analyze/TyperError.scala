@@ -9,5 +9,7 @@ object TyperError {
   final case class SymbolNotFound(symbol: Symbol) extends TyperError
   final case class WrongNumberOfArguments(expected: Int, found: Int) extends TyperError
   final case class MemberNotFound(name: String, in: Type) extends TyperError
+  final case class NotAStruct(typ: Type) extends TyperError
+  final case class WrongStructMembers(expected: Set[String], found: Set[String]) extends TyperError
 
 }

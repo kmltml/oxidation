@@ -24,6 +24,22 @@ object Typer {
 
     case P.BoolLit(b) => unifyType(U1, expected).map(Typed(ast.BoolLit(b), _))
 
+    case P.StructLit(name, members) =>
+      for {
+        struct <- lookupType(TypeName.Named(name), ctxt) match {
+          case s: Struct => Right(s)
+          case t => Left(TyperError.NotAStruct(t))
+        }
+        _ <- Either.cond(members.map(_._1).toSet == struct.members.map(_.name).toSet, (),
+                          TyperError.WrongStructMembers(expected = struct.members.map(_.name).toSet, found = members.map(_._1).toSet))
+        typesMap = struct.members.map(m => m.name -> m.typ).toMap
+        typedMembers <- members.toVector.traverse {
+          case (name, expr) =>
+            val expectedType = ExpectedType.Specific(typesMap(name))
+            solveType(expr, expectedType, ctxt).map(name -> _)
+        }
+      } yield Typed(ast.StructLit(name, typedMembers), struct)
+
     case P.PrefixAp(PrefixOp.Inv, right) =>
       for {
         rtyped <- solveType(right, ExpectedType.Numeric, ctxt)

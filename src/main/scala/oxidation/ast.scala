@@ -65,6 +65,7 @@ trait Ast {
         traverse(c)(f) ++ traverse(p)(f) ++ n.map(traverse(_)(f)).orEmpty
       case While(c, b) => traverse(c)(f) ++ traverse(b)(f)
       case Assign(l, _, r) => traverse(l)(f) ++ traverse(r)(f)
+      case StructLit(_, members) => members.map(_._2).toVector.foldMap(traverse(_)(f))
 
       case DefDef(_, _, _, b) => traverse(b)(f)
       case ValDef(_, _, v) => traverse(v)(f)

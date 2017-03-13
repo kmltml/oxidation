@@ -96,6 +96,19 @@ object SymbolResolverTests extends TestSuite {
             ValDef(g('a), None, Assign(Var(foo), None, Var(bar)))
           ))
         }
+        "StructLit" - {
+          resolveSymbols(Vector(
+            importAB_,
+            ValDef('a, None, StructLit('Vec2, Seq(
+              "x" -> Var('foo), "y" -> Var('bar)
+            )))
+          ), scope.withTypes(g('a, 'b, 'Vec2))) ==> Right(Vector(
+            importAB_,
+            ValDef(g('a), None, StructLit(g('a, 'b, 'Vec2), Seq(
+              "x" -> Var(foo), "y" -> Var(bar)
+            )))
+          ))
+        }
       }
       "solve a block expression" - {
         resolveSymbols(Vector(

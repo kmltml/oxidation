@@ -86,6 +86,11 @@ object SymbolResolver {
     case parse.ast.Var(Symbol.Unresolved(n)) =>
       getOnlyOneSymbol(n, scope.terms).map(parse.ast.Var)
 
+    case parse.ast.StructLit(Symbol.Unresolved(name), members) =>
+      (getOnlyOneSymbol(name, scope.types), members.toVector.traverse {
+        case (n, e) => solveExpr(e, scope).map(n -> _)
+      }).map2(parse.ast.StructLit(_, _))
+
     case parse.ast.InfixAp(op, left, right) =>
       (solveExpr(left, scope), solveExpr(right, scope))
         .map2(parse.ast.InfixAp(op, _, _))
