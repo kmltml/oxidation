@@ -34,7 +34,7 @@ class Parser {
   val compilationUnit: P[Seq[TLD]] = P((WS ~~ tld).repX(sep = semi) ~~ End)
 
   private val expression0: P[Expression] = P(
-    stringLiteral | intLiteral | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
+    stringLiteral | intLiteral | structLit | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
   )
   private val expression1: P[Expression] = P(
     expression0 ~~ postfix.repX
@@ -91,6 +91,9 @@ class Parser {
 
   private val semi: P0 =
     P((";" | "\n" | "\r" | "\r\n") ~~ WS)
+
+  private val semiOrComa: P0 =
+    P((";" | "," | "\n" | "\r" | "\r\n") ~~ WS)
 
   private def infixl(exp: => P[Expression], op: => P[InfixOp]): P[Expression] = P(
     exp ~ (op ~/ exp).rep
@@ -185,6 +188,11 @@ class Parser {
     )
     val stringChars = CharsWhile(!"\\\"".contains(_))
     P("\"".~/ ~~ (stringChars.! | escapeSequence).repX ~~ "\"").map(strs => StringLit(strs.mkString))
+  }
+
+  private val structLit: P[StructLit] = {
+    val member = P(id.! ~ "=" ~ expression)
+    P(sym ~ "{" ~/ member.repX(sep = semiOrComa) ~ "}").map(StructLit.tupled)
   }
 
   private val varacc: P[Var] =

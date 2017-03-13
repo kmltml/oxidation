@@ -28,6 +28,22 @@ object ParserTests extends TestSuite {
       "string literals" - {
         expr.parse(""" "Hello, \"world\"!\n" """).get.value ==> StringLit("Hello, \"world\"!\n")
       }
+      "struct literals" - {
+        expr.parse(
+          """Vector {
+            |  x = 10
+            |  y = 20
+            |}
+          """.stripMargin).get.value ==> StructLit("Vector", Seq(
+            "x" -> IntLit(10),
+            "y" -> IntLit(20)
+          ))
+        expr.parse(
+          "Vector { x = 10, y = 20 }").get.value ==> StructLit("Vector", Seq(
+            "x" -> IntLit(10),
+            "y" -> IntLit(20)
+          ))
+      }
       "addition" - {
         expr.parse("2 + 3").get.value ==> InfixAp(InfixOp.Add, IntLit(2), IntLit(3))
         expr.parse("2 + 3 + 4").get.value ==>

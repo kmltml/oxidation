@@ -16,6 +16,7 @@ trait Ast {
   final case class IntLit(value: Int) extends Expression
   final case class BoolLit(value: Boolean) extends Expression
   final case class StringLit(value: String) extends Expression
+  final case class StructLit(name: Symbol, members: Seq[(String, Typed[Expression])]) extends Expression
   final case class InfixAp(operator: InfixOp, left: Typed[Expression], right: Typed[Expression]) extends Expression
   final case class PrefixAp(operator: PrefixOp, expr: Typed[Expression]) extends Expression
   final case class Var(name: Symbol) extends Expression
