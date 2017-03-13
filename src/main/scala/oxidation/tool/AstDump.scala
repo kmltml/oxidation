@@ -39,7 +39,7 @@ object AstDump extends App {
 
   val parser = new Parser
 
-  val options = optParser.parse(args, Options()).foreach { options =>
+  optParser.parse(args, Options()).foreach { options =>
     val res = options.infiles.map { f =>
       val parsed = parser.compilationUnit.parse(Source.fromFile(f).mkString)
       (f, parsed.get.value)

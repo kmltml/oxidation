@@ -1,5 +1,9 @@
 package oxidation
 
+import cats._
+import cats.data._
+import cats.implicits._
+
 sealed trait InfixOp
 
 object InfixOp {
@@ -22,5 +26,26 @@ object InfixOp {
   case object Geq extends InfixOp
   case object Leq extends InfixOp
   case object Neq extends InfixOp
+
+  implicit val show: Show[InfixOp] = {
+    case Add => "+"
+    case Sub => "-"
+    case Div => "/"
+    case Mod => "%"
+    case Mul => "*"
+    case Shl => "<<"
+    case Shr => ">>"
+    case BitAnd => "&"
+    case BitOr => "|"
+    case Xor => "^"
+    case And => "&&"
+    case Or => "||"
+    case Eq => "=="
+    case Lt => "<"
+    case Gt => ">"
+    case Geq => ">="
+    case Leq => "<="
+    case Neq => "!="
+  }
 
 }
