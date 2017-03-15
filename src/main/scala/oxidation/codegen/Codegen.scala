@@ -28,14 +28,14 @@ object Codegen {
   }
 
   def compileDef(d: ast.Def): Def = d match {
-    case ast.DefDef(name, params, _, body) =>
+    case ast.DefDef(Symbol.Global(name), params, _, body) =>
       val s: Res[(List[Register], Val)] = for {
         paramRegs <- params.getOrElse(Seq.empty).toList.traverse(p => genReg.map(Symbol.Local(p.name) -> _))
         _ <- withBindings(paramRegs: _*)
         v <- compileExpr(body)
       } yield (paramRegs.map(_._2), v)
       val (instrs, (paramRegs, v)) = s.run.runA(CodegenState()).value
-      Def.Fun(name.toString, paramRegs, Vector(Block(Name("", 0), instrs, FlowControl.Return(v))))
+      Def.Fun(Name.Global(name.toList), paramRegs, Vector(Block(Name.Local("body", 0), instrs, FlowControl.Return(v))))
   }
 
   private[codegen] def genReg: Res[Register] =

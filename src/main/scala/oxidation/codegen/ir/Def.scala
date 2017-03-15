@@ -6,6 +6,6 @@ sealed trait Def
 
 object Def {
 
-  final case class Fun(name: String, params: List[Register], body: Vector[Block]) extends Def
+  final case class Fun(name: Name, params: List[Register], body: Vector[Block]) extends Def
 
 }

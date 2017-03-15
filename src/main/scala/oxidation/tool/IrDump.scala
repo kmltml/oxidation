@@ -7,6 +7,7 @@ import oxidation.analyze._
 import oxidation.parse.Parser
 
 import scala.io.Source
+
 import cats._
 import cats.data._
 import cats.implicits._
@@ -53,7 +54,7 @@ object IrDump extends App {
     }
     irDefs.foreach {
       case ir.Def.Fun(name, params, body) =>
-        println(s"def $name(${params.map(_.show).mkString(", ")}) {")
+        println(show"def $name(${params.map(_.show).mkString(", ")}) {")
         body.foreach { block =>
           println(show"  ${block.name} {")
           block.instructions.foreach { instr =>
