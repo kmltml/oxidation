@@ -57,7 +57,7 @@ trait AstPrettyprint {
     case ast.DefDef(name, params, tpe, body) =>
       val pars = params match {
         case Some(p) => "Params(".nl + p.map {
-          case Param(n, t) => s"Param($n, ".p + prettyprintTypeName(t) + ")"
+          case ast.Param(n, t) => s"Param($n, ".p + prettyprintTypeInfo(t) + ")"
         }.sep(", ".nl).indent + ")"
         case None => "None".p
       }
@@ -83,6 +83,8 @@ trait AstPrettyprint {
       }
       s"TypeDef(${prettyprintSymbol(name)}$typeParamList, ${prettyprintTypeName(body)})"
   }
+
+  def prettyprintTypeInfo(t: ast.TypeInfo): P
 
   def prettyprintTypeName(t: TypeName): String = t match {
     case TypeName.Named(n) => prettyprintSymbol(n)
@@ -225,6 +227,8 @@ object TypedAstPrettyprint extends AstPrettyprint {
       s"$n$m"
     case _ => t.toString
   }
+
+  override def prettyprintTypeInfo(t: Type): P = prettyPrintType(t)
 }
 object ParseAstPrettyprint extends AstPrettyprint {
   val ast = parse.ast
@@ -235,4 +239,6 @@ object ParseAstPrettyprint extends AstPrettyprint {
     case d: ast.Def => prettyprintDef(d)
     case e: ast.Expression => prettyprintExp(e, "")
   }
+
+  override def prettyprintTypeInfo(t: TypeName): P = prettyprintTypeName(t)
 }

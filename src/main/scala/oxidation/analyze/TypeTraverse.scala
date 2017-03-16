@@ -54,7 +54,7 @@ object TypeTraverse {
       case SolutionContext(types, solved) =>
         d match {
           case ast.DefDef(name, Some(params), _, body) =>
-            val paramTypes = params.map(p => Typer.lookupType(p.typ, types))
+            val paramTypes = params.map(_.typ)
             SolutionContext(
               types.withTerms(Map(name -> Type.Fun(paramTypes, body.typ))),
               solved.updated(name, d))

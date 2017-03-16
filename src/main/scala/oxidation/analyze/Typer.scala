@@ -197,12 +197,15 @@ object Typer {
       .getOrElse(ExpectedType.Undefined)
     d match {
       case P.DefDef(name, params, tpe, body) =>
-        val paramTypes = params.getOrElse(Seq.empty) map {
-          case Param(name, tpe) => Symbol.Local(name) -> lookupType(tpe, ctxt)
+        val newParams = params.map(_.map {
+          case P.Param(name, tpe) => ast.Param(name, lookupType(tpe, ctxt))
+        })
+        val paramTypes = newParams.getOrElse(Seq.empty) map {
+          case ast.Param(name, tpe) => Symbol.Local(name) -> tpe
         }
         val localCtxt = ctxt.withTerms(paramTypes.toMap)
         solveType(body, expectedType, localCtxt)
-          .map(ast.DefDef(name, params, tpe, _))
+          .map(ast.DefDef(name, newParams, tpe, _))
 
       case P.ValDef(name, tpe, value) =>
         solveType(value, expectedType, ctxt)

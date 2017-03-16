@@ -7,12 +7,12 @@ import cats._
 import cats.data._
 import cats.implicits._
 
-final case class Register(index: Int)
+final case class Register(index: Int, typ: Type)
 
 object Register {
 
   implicit val show: Show[Register] = {
-    case Register(i) => show"r$i"
+    case Register(i, typ) => show"r$i[$typ]"
   }
 
 }

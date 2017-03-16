@@ -12,12 +12,15 @@ object Inst {
 
   final case class Eval(dest: Option[Register], op: Op) extends Inst
   final case class Label(name: Name) extends Inst
+  final case class Flow(flowControl: FlowControl) extends Inst
 
   implicit val show: Show[Inst] = {
     case Eval(None, op) => op.show
     case Eval(Some(reg), op) => show"$reg = $op"
 
     case Label(name) => show"$name:"
+
+    case Flow(f) => f.show
   }
 
 }

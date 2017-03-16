@@ -8,6 +8,7 @@ import cats.implicits._
 trait Ast {
 
   type Typed[+_]
+  type TypeInfo
 
   sealed trait BlockStatement
 
@@ -39,6 +40,9 @@ trait Ast {
   }
 
   final case class DefDef(name: Symbol, params: Option[Seq[Param]], typ: Option[TypeName], body: Typed[Expression]) extends TermDef
+
+  final case class Param(name: String, typ: TypeInfo)
+
   final case class ValDef(name: Symbol, typ: Option[TypeName], body: Typed[Expression]) extends TermDef
   final case class VarDef(name: Symbol, typ: Option[TypeName], body: Typed[Expression]) extends TermDef
 
@@ -80,6 +84,5 @@ trait Ast {
 
 }
 
-final case class Param(name: String, typ: TypeName)
 final case class StructMemberDef(name: String, typ: TypeName)
 final case class EnumVariant(name: String, members: Seq[StructMemberDef])

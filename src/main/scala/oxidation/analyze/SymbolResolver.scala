@@ -61,7 +61,7 @@ object SymbolResolver {
       val newScope = params.getOrElse(Seq.empty)
         .foldLeft(scope)((s, p) => s.shadowTerm(Symbol.Local(p.name)))
       (params.traverse(_.toVector.traverse {
-        case Param(name, tpe) => solveType(tpe, scope).map(Param(name, _))
+        case parse.ast.Param(name, tpe) => solveType(tpe, scope).map(parse.ast.Param(name, _))
       }), tpe.traverse(solveType(_, scope)), solveExpr(value, newScope))
         .map3(parse.ast.DefDef(solveDefName(name, ctxt), _, _, _))
 
