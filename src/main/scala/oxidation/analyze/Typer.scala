@@ -125,7 +125,7 @@ object Typer {
 
     case P.Var(name) =>
       ctxt.terms.get(name)
-        .map(Typed(ast.Var(name): ast.Expression, _))
+        .map(t => Typed(ast.Var(name): ast.Expression, t.typ))
         .toRight(TyperError.SymbolNotFound(name))
 
     case P.Select(expr, member) =>
@@ -179,13 +179,37 @@ object Typer {
             c <- StateT.get[TyperResult, Ctxt]
             expectedType = tpe.map(t => ExpectedType.Specific(lookupType(t, c))).getOrElse(ExpectedType.Undefined)
             t <- StateT.lift(solveType(value, expectedType, c))
-            _ <- StateT.modify[TyperResult, Ctxt](_.withTerms(Map(name -> t.typ)))
+            _ <- StateT.modify[TyperResult, Ctxt](_.withTerms(Map(name -> Ctxt.Immutable(t.typ))))
           } yield Typed(ast.ValDef(name, tpe, t): ast.BlockStatement, U0)
+
+        case P.VarDef(name, tpe, value) => // TODO remove this ugly duplication
+          for {
+            c <- StateT.get[TyperResult, Ctxt]
+            expectedType = tpe.map(t => ExpectedType.Specific(lookupType(t, c))).getOrElse(ExpectedType.Undefined)
+            t <- StateT.lift(solveType(value, expectedType, c))
+            _ <- StateT.modify[TyperResult, Ctxt](_.withTerms(Map(name -> Ctxt.Mutable(t.typ))))
+          } yield Typed(ast.VarDef(name, tpe, t): ast.BlockStatement, U0)
 
       }.runA(ctxt).map { body =>
         val lastType = body.lastOption.map(_.typ).getOrElse(U0)
         Typed(ast.Block(body), lastType)
       }
+
+    case P.Assign(l, Some(op), r) =>
+      solveType(P.Assign(l, None, P.InfixAp(op, l, r)), expected, ctxt)
+
+    case P.Assign(lval, None, rval) =>
+      for {
+        ltyped <- lval match {
+          case P.Var(s) => ctxt.terms(s) match {
+            case Ctxt.Mutable(t) => Right(Typed(ast.Var(s), t))
+            case Ctxt.Immutable(_) => Left(TyperError.ImmutableAssign(s))
+          }
+          case e => Left(TyperError.NotAnLVal(e))
+        }
+        rtyped <- solveType(rval, ExpectedType.Specific(ltyped.typ), ctxt)
+        t <- unifyType(U0, expected)
+      } yield Typed(ast.Assign(ltyped, None, rtyped), t)
   }
 
   def lookupType(t: TypeName, ctxt: Ctxt): Type = t match {
@@ -200,8 +224,8 @@ object Typer {
         val newParams = params.map(_.map {
           case P.Param(name, tpe) => ast.Param(name, lookupType(tpe, ctxt))
         })
-        val paramTypes = newParams.getOrElse(Seq.empty) map {
-          case ast.Param(name, tpe) => Symbol.Local(name) -> tpe
+        val paramTypes: Seq[(Symbol, Ctxt.Term)] = newParams.getOrElse(Seq.empty) map {
+          case ast.Param(name, tpe) => Symbol.Local(name) -> Ctxt.Immutable(tpe)
         }
         val localCtxt = ctxt.withTerms(paramTypes.toMap)
         solveType(body, expectedType, localCtxt)
@@ -213,7 +237,7 @@ object Typer {
 
       case P.VarDef(name, tpe, value) =>
         solveType(value, expectedType, ctxt)
-          .map(ast.ValDef(name, tpe, _))
+          .map(ast.VarDef(name, tpe, _))
     }
   }
 

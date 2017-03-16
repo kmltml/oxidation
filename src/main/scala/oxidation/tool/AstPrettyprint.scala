@@ -52,7 +52,7 @@ trait AstPrettyprint {
       s"ValDef(${prettyprintSymbol(name)}, ${tpe.map(prettyprintTypeName)},".nl + prettyprintTypedExp(value).indent + ")"
 
     case ast.VarDef(name, tpe, value) =>
-      s"VarDef(${prettyprintSymbol(name)}, $tpe,".nl + prettyprintTypedExp(value).indent + ")"
+      s"VarDef(${prettyprintSymbol(name)}, ${tpe.map(prettyprintTypeName)},".nl + prettyprintTypedExp(value).indent + ")"
 
     case ast.DefDef(name, params, tpe, body) =>
       val pars = params match {

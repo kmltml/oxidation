@@ -23,9 +23,13 @@ object TypeTraverse {
       case untyped.DefDef(name, Some(params), Some(retName), _) =>
         val paramTypes = params.map(p => Typer.lookupType(p.typ, ctxt))
         val ret = Typer.lookupType(retName, ctxt)
-        name -> Type.Fun(paramTypes, ret)
+        name -> Ctxt.Immutable(Type.Fun(paramTypes, ret))
       case (d: untyped.TermDef) if (d.typ.isDefined) =>
-        d.name -> Typer.lookupType(d.typ.get, ctxt)
+        val typ = Typer.lookupType(d.typ.get, ctxt)
+        d.name -> (d match {
+          case _: untyped.DefDef | _: untyped.ValDef => Ctxt.Immutable(typ)
+          case _: untyped.VarDef => Ctxt.Mutable(typ)
+        })
     }.toMap
     defs.collect {
       case d: untyped.TermDef => d
@@ -56,11 +60,15 @@ object TypeTraverse {
           case ast.DefDef(name, Some(params), _, body) =>
             val paramTypes = params.map(_.typ)
             SolutionContext(
-              types.withTerms(Map(name -> Type.Fun(paramTypes, body.typ))),
+              types.withTerms(Map(name -> Ctxt.Immutable(Type.Fun(paramTypes, body.typ)))),
               solved.updated(name, d))
-          case _: ast.ValDef | _: ast.VarDef | ast.DefDef(_, None, _, _) =>
+          case _: ast.ValDef | ast.DefDef(_, None, _, _) =>
             SolutionContext(
-              types.withTerms(Map(d.name -> d.body.typ)),
+              types.withTerms(Map(d.name -> Ctxt.Immutable(d.body.typ))),
+              solved.updated(d.name, d))
+          case _: ast.VarDef =>
+            SolutionContext(
+              types.withTerms(Map(d.name -> Ctxt.Mutable(d.body.typ))),
               solved.updated(d.name, d))
         }
     }
