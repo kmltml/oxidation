@@ -90,6 +90,32 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
             ), Val.R(r(1, _.U0)))
         }
       }
+      "While" - {
+        compileExpr(ast.While(
+          ast.InfixAp(InfixOp.Lt, ast.Var(l('x)) :: I32, ast.IntLit(10) :: I32) :: U1,
+          ast.Assign(ast.Var(l('x)) :: I32, None,
+            ast.InfixAp(InfixOp.Add, ast.Var(l('x)) :: I32, ast.IntLit(1) :: I32) :: I32) :: U0
+        ) :: U0).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)), nextReg = 1)).value ==>
+          (Vector(
+            Inst.Label(Name.Local("whilecond", 0)),
+            Inst.Eval(Some(r(1, _.U1)), Op.Arith(InfixOp.Lt, r(0, _.I32), 10)),
+            Inst.Flow(FlowControl.Branch(r(1, _.U1), Name.Local("while", 0), Name.Local("whileafter", 0))),
+
+            Inst.Label(Name.Local("while", 0)),
+            Inst.Eval(Some(r(2, _.I32)), Op.Arith(InfixOp.Add, r(0, _.I32), 1)),
+            Inst.Eval(Some(r(0, _.I32)), Op.Copy(r(2, _.I32))),
+            Inst.Flow(FlowControl.Goto(Name.Local("whilecond", 0))),
+
+            Inst.Label(Name.Local("whileafter", 0))
+          ), Val.I(0))
+      }
+      "Assign" - {
+        compileExpr(ast.Assign(ast.Var(l('x)) :: I32, None, ast.IntLit(20) :: I32) :: U0)
+          .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)), nextReg = 1)).value ==>
+          (Vector(
+            Inst.Eval(Some(r(0, _.I32)), Op.Copy(20))
+          ), Val.I(0))
+      }
       "App" - {
         "function" - {
           compileExpr(ast.App(ast.Var(g('f)) :: Fun(Seq(I32), U1), Seq(ast.IntLit(10) :: I32)) :: I32)

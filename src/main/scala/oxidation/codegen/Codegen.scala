@@ -92,6 +92,27 @@ object Codegen {
         ))
       } yield Val.R(res)
 
+    case Typed(ast.While(cond, body), _) =>
+      for {
+        lbli <- genLocalIndex
+        condLbl = Name.Local("whilecond", lbli)
+        bodyLbl = Name.Local("while", lbli)
+        afterLbl = Name.Local("whileafter", lbli)
+        _ <- Res.tell(Vector(
+          Inst.Label(condLbl)
+        ))
+        condVal <- compileExpr(cond)
+        _ <- Res.tell(Vector(
+          Inst.Flow(FlowControl.Branch(condVal, bodyLbl, afterLbl)),
+          Inst.Label(bodyLbl)
+        ))
+        _ <- compileExpr(body)
+        _ <- Res.tell(Vector(
+          Inst.Flow(FlowControl.Goto(condLbl)),
+          Inst.Label(afterLbl)
+        ))
+      } yield Val.I(0)
+
     case Typed(ast.App(Typed(fn, fnType: analyze.Type.Fun), params), t) =>
       for {
         fnVal <- fn match {
@@ -104,6 +125,15 @@ object Codegen {
           Inst.Eval(Some(r), Op.Call(fnVal, paramVals))
         ))
       } yield Val.R(r)
+
+    case Typed(ast.Assign(Typed(ast.Var(n), _), None, rval), _) =>
+      for {
+        right <- compileExpr(rval)
+        dest <- WriterT.lift(CodegenState.inspect(_.registerBindings(n))): Res[Register]
+        _ <- Res.tell(Vector(
+          Inst.Eval(Some(dest), Op.Copy(right))
+        ))
+      } yield Val.I(0)
   }
 
   def compileDef(d: ast.Def): Def = d match {
