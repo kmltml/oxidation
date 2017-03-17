@@ -27,7 +27,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
         compileExpr(ast.BoolLit(false) :: U1).run.runA(CodegenState()).value ==>
           (Vector.empty, Val.I(0))
       }
-      "InfixOp" - {
+      "InfixAp" - {
         compileExpr(ast.InfixAp(InfixOp.Add, ast.IntLit(1) :: I32, ast.IntLit(2) :: I32) :: I32)
           .run.runA(CodegenState()).value ==> (Vector(
             Inst.Eval(Some(r(0, _.I32)), Op.Arith(InfixOp.Add, 1, 2))
@@ -39,6 +39,13 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
             Inst.Eval(Some(r(0, _.I32)), Op.Arith(InfixOp.Sub, 3, 2)),
             Inst.Eval(Some(r(1, _.I32)), Op.Arith(InfixOp.Add, r(0, _.I32), 1))
           ), Val.R(r(1, _.I32)))
+      }
+      "PrefixAp" - {
+        compileExpr(ast.PrefixAp(PrefixOp.Neg, ast.IntLit(20) :: I32) :: I32)
+          .run.runA(CodegenState()).value ==>
+          (Vector(
+            Inst.Eval(Some(r(0, _.I32)), Op.Unary(PrefixOp.Neg, 20))
+          ), Val.R(r(0, _.I32)))
       }
       "Var" - {
         compileExpr(ast.Var(l('x)) :: I32).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)))).value ==>

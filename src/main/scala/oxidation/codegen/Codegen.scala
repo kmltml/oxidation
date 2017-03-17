@@ -32,6 +32,15 @@ object Codegen {
         ))
       } yield Val.R(res)
 
+    case Typed(ast.PrefixAp(op, expr), valType) =>
+      for {
+        v <- compileExpr(expr)
+        r <- genReg(translateType(valType))
+        _ <- Res.tell(Vector(
+          Inst.Eval(Some(r), Op.Unary(op, v))
+        ))
+      } yield Val.R(r)
+
     case Typed(ast.Block(stmnts), typ) =>
       for {
         bindings <- storeBindings

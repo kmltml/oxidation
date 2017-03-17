@@ -7,3 +7,5 @@ def main(x: i32): i32 = {
 }
 
 def square(x: i32): i32 = x * x
+
+def abs(x: i32) = if(x < 0) -x else x
