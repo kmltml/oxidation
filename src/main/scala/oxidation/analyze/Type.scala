@@ -17,6 +17,8 @@ object Type {
   case object U1 extends Type
   case object U0 extends Type
 
+  // pointee is an unresolved type, to allow for self-referencing structs (eg. `enum List[A] = { Cons { head: A; tail: ptr[List[A]] }; Nil }`)
+  final case class Ptr(pointee: TypeName) extends Type
 
   final case class Fun(params: Seq[Type], ret: Type) extends Type
 

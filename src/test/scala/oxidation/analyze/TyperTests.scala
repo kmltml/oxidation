@@ -81,9 +81,23 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
           ast.Var(l('x)) :: I32
         )) :: I32)
       }
-      "function application" - {
-        findType(P.App(P.Var(g('foo)), Seq(P.IntLit(32))), ExpectedType.Undefined,
-          Ctxt.terms(g('foo) -> imm(Fun(Seq(I64), U1)))) ==> Right(U1)
+      "App" - {
+        "Fun" - {
+          findType(P.App(P.Var(g('foo)), Seq(P.IntLit(32))), ExpectedType.Undefined,
+            Ctxt.terms(g('foo) -> imm(Fun(Seq(I64), U1)))) ==> Right(U1)
+        }
+        "Ptr" - {
+          "without offset" - {
+            solveType(P.App(P.Var(l('foo)), Seq()), ExpectedType.Undefined,
+              Ctxt.default.withTerms(Map(l('foo) -> Ctxt.Immutable(Ptr(TypeName.Named(g('i32))))))) ==>
+              Right(ast.App(ast.Var(l('foo)) :: Ptr(TypeName.Named(g('i32))), Seq()) :: I32)
+          }
+          "with offset" - {
+            solveType(P.App(P.Var(l('foo)), Seq(P.IntLit(20))), ExpectedType.Undefined,
+              Ctxt.default.withTerms(Map(l('foo) -> Ctxt.Immutable(Ptr(TypeName.Named(g('i32))))))) ==>
+              Right(ast.App(ast.Var(l('foo)) :: Ptr(TypeName.Named(g('i32))), Seq(ast.IntLit(20) :: I32)) :: I32)
+          }
+        }
       }
       "if expression" - {
         solveType(P.If(P.BoolLit(true), P.IntLit(10), Some(P.IntLit(20))),
@@ -109,20 +123,34 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
           Ctxt.default.withTerms(Map(l('x) -> imm(Struct(g('s), Seq(StructMember("x", I32), StructMember("x", I64))))))) ==>
           Right(I32)
       }
-      "assign to mutable location" - {
-        solveType(P.Assign(P.Var(l('x)), None, P.IntLit(20)), ExpectedType.Undefined,
-          Ctxt.default.withTerms(Map(l('x) -> Ctxt.Mutable(I64)))) ==>
-          Right(ast.Assign(ast.Var(l('x)) :: I64, None, ast.IntLit(20) :: I64) :: U0)
-      }
-      "assign to immutable location" - {
-        solveType(P.Assign(P.Var(l('x)), None, P.IntLit(20)), ExpectedType.Undefined,
-          Ctxt.default.withTerms(Map(l('x) -> Ctxt.Immutable(I64)))) ==>
-          Left(TyperError.ImmutableAssign(l('x)))
-      }
-      "composite assign" - {
-        solveType(P.Assign(P.Var(l('x)), Some(InfixOp.Add), P.IntLit(20)), ExpectedType.Undefined,
-          Ctxt.default.withTerms(Map(l('x) -> Ctxt.Mutable(I64)))) ==>
-          Right(ast.Assign(ast.Var(l('x)) :: I64, None, ast.InfixAp(InfixOp.Add, ast.Var(l('x)) :: I64, ast.IntLit(20) :: I32) :: I64) :: U0)
+      "Assign" - {
+        "Var" - {
+          "mutable" - {
+            solveType(P.Assign(P.Var(l('x)), None, P.IntLit(20)), ExpectedType.Undefined,
+              Ctxt.default.withTerms(Map(l('x) -> Ctxt.Mutable(I64)))) ==>
+              Right(ast.Assign(ast.Var(l('x)) :: I64, None, ast.IntLit(20) :: I64) :: U0)
+          }
+          "immutable" - {
+            solveType(P.Assign(P.Var(l('x)), None, P.IntLit(20)), ExpectedType.Undefined,
+              Ctxt.default.withTerms(Map(l('x) -> Ctxt.Immutable(I64)))) ==>
+              Left(TyperError.ImmutableAssign(l('x)))
+          }
+        }
+        "Ptr" - {
+          val intptr = Ptr(TypeName.Named(g('i32)))
+          solveType(P.Assign(P.App(P.Var(l('foo)), Seq()), None, P.IntLit(20)), ExpectedType.Undefined,
+            Ctxt.default.withTerms(Map(l('foo) -> Ctxt.Mutable(intptr)))) ==>
+            Right(ast.Assign(ast.App(ast.Var(l('foo)) :: intptr, Seq()) :: I32, None, ast.IntLit(20) :: I32) :: U0)
+        }
+        "composite" - {
+          solveType(P.Assign(P.Var(l('x)), Some(InfixOp.Add), P.IntLit(20)), ExpectedType.Undefined,
+            Ctxt.default.withTerms(Map(l('x) -> Ctxt.Mutable(I64)))) ==>
+            Right(ast.Assign(ast.Var(l('x)) :: I64, None, ast.InfixAp(InfixOp.Add, ast.Var(l('x)) :: I64, ast.IntLit(20) :: I32) :: I64) :: U0)
+        }
+        "An rval" - {
+          solveType(P.Assign(P.IntLit(2), Some(InfixOp.Add), P.IntLit(1)), ExpectedType.Undefined, Ctxt.default) ==>
+            Left(TyperError.NotAnLVal(ast.IntLit(2) :: I32))
+        }
       }
     }
   }

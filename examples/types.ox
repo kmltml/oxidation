@@ -1,8 +1,6 @@
-type int = i32
-type uint = u32
-type bool = u1
-type unit = u0
 
-def x: u0 = {
-
+def deref(p: ptr[u8]) = {
+    p() = 32
+    p(1) = 80
+    p(1)
 }

@@ -225,6 +225,7 @@ object TypedAstPrettyprint extends AstPrettyprint {
         case Type.StructMember(name, typ) => s"$name: ${prettyPrintType(typ)}"
       }.mkString("{", ", ", "}")
       s"$n$m"
+    case Type.Ptr(pointee) => s"ptr[${prettyprintTypeName(pointee)}]"
     case _ => t.toString
   }
 

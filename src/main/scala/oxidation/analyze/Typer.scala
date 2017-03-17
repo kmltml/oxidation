@@ -114,9 +114,16 @@ object Typer {
             else (pars zip paramTypes).toVector.traverse {
               case (e, t) => solveType(e, ExpectedType.Specific(t), ctxt)
             }
+          case Ptr(_) =>
+            pars match {
+              case Seq() => Right(Seq.empty)
+              case Seq(off) => solveType(off, ExpectedType.Numeric, ctxt).map(Seq(_))
+              case s => Left(TyperError.TooManyParamsForPointerDereference(s.size))
+            }
         }
         valType <- fnTyped.typ match {
           case Fun(_, retType) => Right(retType)
+          case Ptr(pointee) => Right(lookupType(pointee, ctxt))
         }
         t <- unifyType(valType, expected)
       } yield Typed(ast.App(fnTyped, typedParams), t)
@@ -217,7 +224,10 @@ object Typer {
             case Ctxt.Mutable(t) => Right(Typed(ast.Var(s), t))
             case Ctxt.Immutable(_) => Left(TyperError.ImmutableAssign(s))
           }
-          case e => Left(TyperError.NotAnLVal(e))
+          case e => solveType(e, ExpectedType.Undefined, ctxt).flatMap {
+            case lTyped @ Typed(ast.App(Typed(ptr, _: Ptr), _), _) => Right(lTyped)
+            case e => Left(TyperError.NotAnLVal(e))
+          }
         }
         rtyped <- solveType(rval, ExpectedType.Specific(ltyped.typ), ctxt)
         t <- unifyType(U0, expected)
@@ -225,6 +235,7 @@ object Typer {
   }
 
   def lookupType(t: TypeName, ctxt: Ctxt): Type = t match {
+    case TypeName.App(TypeName.Named(Symbol.Global(Seq("ptr"))), Seq(pointee)) => Type.Ptr(pointee)
     case TypeName.Named(s) => ctxt.types(s)
   }
 
@@ -258,6 +269,7 @@ object Typer {
     case (t, ExpectedType.Numeric) => Left(TyperError.CantMatch(expected, t))
 
     case (f: Fun, ExpectedType.Appliable) => Right(f)
+    case (p: Ptr, ExpectedType.Appliable) => Right(p)
     case (_, ExpectedType.Appliable) => Left(TyperError.CantMatch(expected, t))
 
     case (t, ExpectedType.Specific(u)) =>
