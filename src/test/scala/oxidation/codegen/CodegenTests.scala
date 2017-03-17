@@ -56,21 +56,39 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
         ), Val.R(r(2, _.I32)))
       }
       "If" - {
-        compileExpr(ast.If(ast.Var(l('x)) :: U1, ast.IntLit(10) :: I32, Some(ast.IntLit(20) :: I32)) :: I32)
-          .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.U1)), nextReg = 1)).value ==>
-          (Vector(
-            Inst.Flow(FlowControl.Branch(r(0, _.U1), Name.Local("if", 0), Name.Local("else", 1))),
+        "with else branch" - {
+          compileExpr(ast.If(ast.Var(l('x)) :: U1, ast.IntLit(10) :: I32, Some(ast.IntLit(20) :: I32)) :: I32)
+            .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.U1)), nextReg = 1)).value ==>
+            (Vector(
+              Inst.Flow(FlowControl.Branch(r(0, _.U1), Name.Local("if", 0), Name.Local("else", 0))),
 
-            Inst.Label(Name.Local("if", 0)),
-            Inst.Eval(Some(r(1, _.I32)), Op.Copy(10)),
-            Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 2))),
+              Inst.Label(Name.Local("if", 0)),
+              Inst.Eval(Some(r(1, _.I32)), Op.Copy(10)),
+              Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
 
-            Inst.Label(Name.Local("else", 1)),
-            Inst.Eval(Some(r(1, _.I32)), Op.Copy(20)),
-            Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 2))),
+              Inst.Label(Name.Local("else", 0)),
+              Inst.Eval(Some(r(1, _.I32)), Op.Copy(20)),
+              Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
 
-            Inst.Label(Name.Local("ifafter", 2))
-          ), Val.R(r(1, _.I32)))
+              Inst.Label(Name.Local("ifafter", 0))
+            ), Val.R(r(1, _.I32)))
+        }
+        "whithout else branch" - {
+          val fooType = Fun(Seq.empty, U0)
+          compileExpr(ast.If(ast.Var(l('x)) :: U1,
+            ast.App(ast.Var(g('foo)) :: fooType, Seq.empty) :: U0, None) :: U0)
+            .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.U1)), nextReg = 1)).value ==>
+            (Vector(
+              Inst.Flow(FlowControl.Branch(r(0, _.U1), Name.Local("if", 0), Name.Local("ifafter", 0))),
+
+              Inst.Label(Name.Local("if", 0)),
+              Inst.Eval(Some(r(2, _.U0)), Op.Call(Val.G(Name.Global(List("foo"))), List.empty)),
+              Inst.Eval(Some(r(1, _.U0)), Op.Copy(r(2, _.U0))),
+              Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
+
+              Inst.Label(Name.Local("ifafter", 0))
+            ), Val.R(r(1, _.U0)))
+        }
       }
       "App" - {
         "function" - {

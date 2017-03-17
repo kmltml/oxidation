@@ -17,6 +17,10 @@ object CodegenState {
     (s.copy(nextName = s.nextName + 1), Name.Local(prefix, s.nextName))
   }
 
+  def genLocalIndex: State[CodegenState, Int] = State { s =>
+    (s.copy(nextName = s.nextName + 1), s.nextName)
+  }
+
   def withBindings(bindings: (Symbol, ir.Register)*): State[CodegenState, Unit] =
     State.modify(s => s.copy(registerBindings = s.registerBindings ++ bindings))
 

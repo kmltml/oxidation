@@ -50,15 +50,19 @@ object Codegen {
         _ <- restoreBindings(bindings)
       } yield vals.lastOption getOrElse Val.I(0)
 
-    case Typed(ast.If(cond, pos, Some(neg)), typ) =>
+    case Typed(ast.If(cond, pos, neg), typ) =>
       for {
         condVal <- compileExpr(cond)
-        trueLbl <- genLocalName("if")
-        falseLbl <- genLocalName("else")
-        afterLbl <- genLocalName("ifafter")
+        lbli <- genLocalIndex
+        trueLbl = Name.Local("if", lbli)
+        falseLbl = Name.Local("else", lbli)
+        afterLbl = Name.Local("ifafter", lbli)
         res <- genReg(translateType(typ))
         _ <- Res.tell(Vector(
-          Inst.Flow(FlowControl.Branch(condVal, trueLbl, falseLbl))
+          Inst.Flow(FlowControl.Branch(condVal, trueLbl, neg match {
+            case Some(_) => falseLbl
+            case None => afterLbl
+          }))
         ))
 
         _ <- Res.tell(Vector(
@@ -70,14 +74,18 @@ object Codegen {
           Inst.Flow(FlowControl.Goto(afterLbl))
         ))
 
-        _ <- Res.tell(Vector(
-          Inst.Label(falseLbl)
-        ))
-        falseVal <- compileExpr(neg)
-        _ <- Res.tell(Vector(
-          Inst.Eval(Some(res), Op.Copy(falseVal)),
-          Inst.Flow(FlowControl.Goto(afterLbl))
-        ))
+        _ <- neg.map { neg =>
+          for {
+            _ <- Res.tell(Vector(
+              Inst.Label(falseLbl)
+            ))
+            falseVal <- compileExpr(neg)
+            _ <- Res.tell(Vector(
+              Inst.Eval(Some(res), Op.Copy(falseVal)),
+              Inst.Flow(FlowControl.Goto(afterLbl))
+            ))
+          } yield ()
+        } getOrElse Res.pure(())
 
         _ <- Res.tell(Vector(
           Inst.Label(afterLbl)
@@ -136,6 +144,9 @@ object Codegen {
 
   private[codegen] def genLocalName(prefix: String): Res[Name] =
     WriterT.lift(CodegenState.genLocalName(prefix))
+
+  private def genLocalIndex: Res[Int] =
+    WriterT.lift(CodegenState.genLocalIndex)
 
   private[codegen] def withBindings(bindings: (Symbol, ir.Register)*): Res[Unit] =
     WriterT.lift(CodegenState.withBindings(bindings: _*))
