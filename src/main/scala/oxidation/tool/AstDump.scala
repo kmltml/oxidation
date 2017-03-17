@@ -69,11 +69,6 @@ object AstDump extends App {
         }, identity)
         for(a <- typed) println(TypedAstPrettyprint.stringify(TypedAstPrettyprint.prettyprintDef(a)))
     }
-     /* onFailure = (_, _, _) => Console.err.println(res),
-      onSuccess = (ast, _) => {
-        ast.foreach(d => println(stringify(prettyprintDef(d))))
-      }
-    )*/
   }
 
 
