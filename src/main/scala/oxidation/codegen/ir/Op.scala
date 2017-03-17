@@ -12,9 +12,11 @@ object Op {
 
   final case class Arith(op: InfixOp, left: Val, right: Val) extends Op
   final case class Copy(src: Val) extends Op
+  final case class Call(fn: Val, params: List[Val]) extends Op
 
   implicit val show: Show[Op] = {
     case Copy(src) => show"$src"
     case Arith(op, left, right) => show"$left $op $right"
+    case Call(fn, params) => show"call $fn (${params.map(_.show).mkString(", ")})"
   }
 }

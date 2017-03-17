@@ -1,4 +1,5 @@
 def main(x: i32): i32 = {
-    val y = x * 20
-    if(x > y) x else y
+    square(2 * x) + 10
 }
+
+def square(x: i32): i32 = x * x

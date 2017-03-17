@@ -53,8 +53,8 @@ object IrDump extends App {
       case d: analyze.ast.TermDef => Codegen.compileDef(d)
     }
     irDefs.foreach {
-      case ir.Def.Fun(name, params, body) =>
-        println(show"def $name(${params.map(_.show).mkString(", ")}) {")
+      case ir.Def.Fun(name, params, ret, body) =>
+        println(show"def $name(${params.map(_.show).mkString(", ")}): $ret {")
         body.foreach { block =>
           println(show"  ${block.name} {")
           block.instructions.foreach { instr =>

@@ -22,7 +22,10 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
           .run.runA(CodegenState()).value ==> (Vector.empty, Val.I(20))
       }
       "BoolLit" - {
-
+        compileExpr(ast.BoolLit(true) :: U1).run.runA(CodegenState()).value ==>
+          (Vector.empty, Val.I(1))
+        compileExpr(ast.BoolLit(false) :: U1).run.runA(CodegenState()).value ==>
+          (Vector.empty, Val.I(0))
       }
       "InfixOp" - {
         compileExpr(ast.InfixAp(InfixOp.Add, ast.IntLit(1) :: I32, ast.IntLit(2) :: I32) :: I32)
@@ -40,12 +43,6 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
       "Var" - {
         compileExpr(ast.Var(l('x)) :: I32).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)))).value ==>
           (Vector.empty, Val.R(r(0, _.I32)))
-      }
-      "BoolLit" - {
-        compileExpr(ast.BoolLit(true) :: U1).run.runA(CodegenState()).value ==>
-          (Vector.empty, Val.I(1))
-        compileExpr(ast.BoolLit(false) :: U1).run.runA(CodegenState()).value ==>
-          (Vector.empty, Val.I(0))
       }
       "Block" - {
         compileExpr(ast.Block(Vector(
@@ -74,6 +71,15 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
 
             Inst.Label(Name.Local("ifafter", 2))
           ), Val.R(r(1, _.I32)))
+      }
+      "App" - {
+        "function" - {
+          compileExpr(ast.App(ast.Var(g('f)) :: Fun(Seq(I32), U1), Seq(ast.IntLit(10) :: I32)) :: I32)
+            .run.runA(CodegenState()).value ==>
+            (Vector(
+              Inst.Eval(Some(r(0, _.I32)), Op.Call(Val.G(Name.Global(List("f"))), List(10)))
+            ), Val.R(r(0, _.I32)))
+        }
       }
     }
   }

@@ -83,6 +83,19 @@ object Codegen {
           Inst.Label(afterLbl)
         ))
       } yield Val.R(res)
+
+    case Typed(ast.App(Typed(fn, fnType: analyze.Type.Fun), params), t) =>
+      for {
+        fnVal <- fn match {
+          case ast.Var(Symbol.Global(path)) => Res.pure(Val.G(Name.Global(path.toList)))
+          case _ => compileExpr(Typed(fn, fnType))
+        }
+        paramVals <- params.toList.traverse(compileExpr)
+        r <- genReg(translateType(t))
+        _ <- Res.tell(Vector(
+          Inst.Eval(Some(r), Op.Call(fnVal, paramVals))
+        ))
+      } yield Val.R(r)
   }
 
   def compileDef(d: ast.Def): Def = d match {
@@ -94,7 +107,8 @@ object Codegen {
         v <- compileExpr(body)
       } yield (paramRegs.map(_._2), v)
       val (instrs, (paramRegs, v)) = s.run.runA(CodegenState()).value
-      Def.Fun(Name.Global(name.toList), paramRegs, Vector(Block(Name.Local("body", 0), instrs, FlowControl.Return(v))))
+      val retType = translateType(body.typ)
+      Def.Fun(Name.Global(name.toList), paramRegs, retType, Vector(Block(Name.Local("body", 0), instrs, FlowControl.Return(v))))
   }
 
   private def translateType(t: analyze.Type): ir.Type = t match {
