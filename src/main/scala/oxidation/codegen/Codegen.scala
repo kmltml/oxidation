@@ -46,6 +46,16 @@ object Codegen {
               ))
               _ <- withBindings(name -> r)
             } yield Val.R(r): Val
+
+          case Typed(ast.VarDef(name, _, expr), _) => // TODO deduplicate
+            for {
+              v <- compileExpr(expr)
+              r <- genReg(translateType(expr.typ))
+              _ <- Res.tell(Vector(
+                Inst.Eval(Some(r), Op.Copy(v))
+              ))
+              _ <- withBindings(name -> r)
+            } yield Val.R(r): Val
         }
         _ <- restoreBindings(bindings)
       } yield vals.lastOption getOrElse Val.I(0)

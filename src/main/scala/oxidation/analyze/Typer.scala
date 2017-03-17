@@ -1,9 +1,8 @@
 package oxidation
 package analyze
 
-import parse.{ ast => P }
+import parse.{ast => P}
 import Type._
-
 import cats._
 import cats.data._
 import cats.implicits._
@@ -172,35 +171,41 @@ object Typer {
         t <- unifyType(U0, expected)
       } yield Typed(ast.While(condTyped, bodyTyped), t)
 
+    case P.Block(Seq()) =>
+      Right(Typed(ast.Block(Seq.empty), U0))
+
     case P.Block(stmnts) =>
       type S[A] = StateT[TyperResult, Ctxt, A]
-      stmnts.toList.traverse[S, Typed[ast.BlockStatement]] {
+      def stmnt(s: P.BlockStatement, ex: ExpectedType): S[Typed[ast.BlockStatement]] = s match {
         case e: P.Expression =>
           for {
             c <- StateT.get[TyperResult, Ctxt]
-            t <- StateT.lift(solveType(e, ExpectedType.Undefined, c))
+            t <- StateT.lift(solveType(e, ex, c))
           } yield t
 
         case P.ValDef(name, tpe, value) =>
           for {
             c <- StateT.get[TyperResult, Ctxt]
             expectedType = tpe.map(t => ExpectedType.Specific(lookupType(t, c))).getOrElse(ExpectedType.Undefined)
-            t <- StateT.lift(solveType(value, expectedType, c))
-            _ <- StateT.modify[TyperResult, Ctxt](_.withTerms(Map(name -> Ctxt.Immutable(t.typ))))
-          } yield Typed(ast.ValDef(name, tpe, t): ast.BlockStatement, U0)
+            typedVal <- StateT.lift(solveType(value, expectedType, c))
+            _ <- StateT.modify[TyperResult, Ctxt](_.withTerms(Map(name -> Ctxt.Immutable(typedVal.typ))))
+            t <- StateT.lift(unifyType(U0, ex))
+          } yield Typed(ast.ValDef(name, tpe, typedVal): ast.BlockStatement, t)
 
         case P.VarDef(name, tpe, value) => // TODO remove this ugly duplication
           for {
             c <- StateT.get[TyperResult, Ctxt]
             expectedType = tpe.map(t => ExpectedType.Specific(lookupType(t, c))).getOrElse(ExpectedType.Undefined)
-            t <- StateT.lift(solveType(value, expectedType, c))
-            _ <- StateT.modify[TyperResult, Ctxt](_.withTerms(Map(name -> Ctxt.Mutable(t.typ))))
-          } yield Typed(ast.VarDef(name, tpe, t): ast.BlockStatement, U0)
-
-      }.runA(ctxt).map { body =>
-        val lastType = body.lastOption.map(_.typ).getOrElse(U0)
-        Typed(ast.Block(body), lastType)
+            typedVal <- StateT.lift(solveType(value, expectedType, c))
+            _ <- StateT.modify[TyperResult, Ctxt](_.withTerms(Map(name -> Ctxt.Mutable(typedVal.typ))))
+            t <- StateT.lift(unifyType(U0, ex))
+          } yield Typed(ast.VarDef(name, tpe, typedVal): ast.BlockStatement, t)
       }
+      (for {
+        body <- stmnts.init.toVector.traverse(stmnt(_, ExpectedType.Undefined))
+        last <- stmnt(stmnts.last, expected)
+        t <- StateT.lift(unifyType(last.typ, expected))
+      } yield Typed(ast.Block(body :+ last), last.typ)).runA(ctxt)
 
     case P.Assign(l, Some(op), r) =>
       solveType(P.Assign(l, None, P.InfixAp(op, l, r)), expected, ctxt)
