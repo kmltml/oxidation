@@ -93,6 +93,17 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         findType(P.If(P.BoolLit(true), P.Var(l('x)), Some(P.Var(l('y)))),
           ExpectedType.Numeric, Ctxt.default.withTerms(Map(l('x) -> imm(I32), l('y) -> imm(I64)))) ==> Right(I64)
       }
+      "While" - {
+        solveType(P.While(
+          P.InfixAp(InfixOp.Lt, P.Var(l('x)), P.IntLit(10)),
+          P.Assign(P.Var(l('x)), Some(InfixOp.Add), P.IntLit(1))
+        ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> Ctxt.Mutable(I32)))) ==>
+          Right(ast.While(
+            ast.InfixAp(InfixOp.Lt, ast.Var(l('x)) :: I32, ast.IntLit(10) :: I32) :: U1,
+            ast.Assign(ast.Var(l('x)) :: I32, None,
+              ast.InfixAp(InfixOp.Add, ast.Var(l('x)) :: I32, ast.IntLit(1) :: I32) :: I32) :: U0
+          ) :: U0)
+      }
       "struct member select" - {
         findType(P.Select(P.Var(l('x)), "x"), ExpectedType.Undefined,
           Ctxt.default.withTerms(Map(l('x) -> imm(Struct(g('s), Seq(StructMember("x", I32), StructMember("x", I64))))))) ==>

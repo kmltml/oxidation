@@ -165,6 +165,13 @@ object Typer {
         typ <- unifyType(t, expected)
       } yield Typed(ast.If(condTyped, posTyped, Some(negTyped)), typ)
 
+    case P.While(cond, body) =>
+      for {
+        condTyped <- solveType(cond, ExpectedType.Specific(U1), ctxt)
+        bodyTyped <- solveType(body, ExpectedType.Undefined, ctxt)
+        t <- unifyType(U0, expected)
+      } yield Typed(ast.While(condTyped, bodyTyped), t)
+
     case P.Block(stmnts) =>
       type S[A] = StateT[TyperResult, Ctxt, A]
       stmnts.toList.traverse[S, Typed[ast.BlockStatement]] {
