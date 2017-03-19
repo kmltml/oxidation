@@ -2,7 +2,7 @@ package oxidation
 package backend
 package amd64
 
-sealed trait Reg {
+sealed trait Reg extends Product with Serializable {
 
   def *(i: Int): (Reg, Int) = (this, i) // to allow for mov(Val.m(Reg.RBX * 2, 3), Val.I(10)) syntax
 

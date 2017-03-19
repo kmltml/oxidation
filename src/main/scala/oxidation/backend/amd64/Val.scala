@@ -1,6 +1,6 @@
 package oxidation.backend.amd64
 
-sealed trait Val
+sealed trait Val extends Product with Serializable
 
 object Val {
 
