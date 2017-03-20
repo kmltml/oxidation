@@ -1,6 +1,7 @@
 def main(x: i32): i32 = {
     var y = 10
     while(y < 50) {
+        y = if(y % 2 == 0) square(y) else y + 1
         y = square(y)
     }
     y

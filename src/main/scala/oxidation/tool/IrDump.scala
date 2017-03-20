@@ -7,15 +7,25 @@ import oxidation.analyze._
 import oxidation.parse.Parser
 
 import scala.io.Source
-
 import cats._
 import cats.data._
 import cats.implicits._
-import oxidation.codegen.{ Codegen, ir }
+import oxidation.codegen.pass.Pass
+import oxidation.codegen.{pass, ir, Codegen}
 
 object IrDump extends App {
 
-  case class Options(infiles: Seq[File] = Seq.empty, verbose: Boolean = false) extends LogOptions
+  case class Options(infiles: Seq[File] = Seq.empty,
+                     passes: List[Pass] = List.empty,
+		     verbose: Boolean = false) extends LogOptions
+
+  val AllPasses: List[(String, Pass)] = List(
+    "explicit-blocks" -> pass.ExplicitBlocks
+  )
+
+  implicit val passRead: scopt.Read[Pass] =
+    scopt.Read.reads(n => AllPasses.find(_._1 == n).map(_._2)
+      .getOrElse(throw new IllegalArgumentException(s"No pass named $n")))
 
   val optParser = new scopt.OptionParser[Options]("astdump") {
 
@@ -27,6 +37,11 @@ object IrDump extends App {
     arg[File]("infiles")
       .required().unbounded()
       .action((f, o) => o.copy(infiles = o.infiles :+ f))
+
+    def upTo(p: Pass): List[Pass] = AllPasses.map(_._2).reverse.dropWhile(_ != p).reverse
+
+    opt[Pass]('p', "passupto")
+      .action((p, o) => o.copy(passes = upTo(p)))
 
   }
 
@@ -69,7 +84,8 @@ object IrDump extends App {
         case d: analyze.ast.TermDef => Codegen.compileDef(d)
       }
     }
-    irDefs.foreach {
+    val passed = options.passes.foldLeft(irDefs)((defs, pass) => defs.flatMap(pass.txDef))
+    passed.foreach {
       case ir.Def.Fun(name, params, ret, body) =>
         println(show"def $name(${params.map(_.show).mkString(", ")}): $ret {")
         body.foreach { block =>
