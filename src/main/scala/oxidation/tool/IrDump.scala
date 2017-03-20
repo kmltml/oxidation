@@ -1,7 +1,7 @@
 package oxidation
 package tool
 
-import java.io.File
+import java.io.{DataOutputStream, File, FileOutputStream, OutputStream, OutputStreamWriter, PrintWriter}
 
 import oxidation.analyze._
 import oxidation.parse.Parser
@@ -10,14 +10,22 @@ import scala.io.Source
 import cats._
 import cats.data._
 import cats.implicits._
+import oxidation.codegen.ir.serialization.Serialize
 import oxidation.codegen.pass.Pass
-import oxidation.codegen.{pass, ir, Codegen}
+import oxidation.codegen.{Codegen, ir, pass}
 
 object IrDump extends App {
 
   case class Options(infiles: Seq[File] = Seq.empty,
                      passes: List[Pass] = List.empty,
-		     verbose: Boolean = false) extends LogOptions
+                     verbose: Boolean = false,
+                     out: OutputStream = Console.out,
+                     format: Format = Textual) extends LogOptions
+
+  sealed trait Format
+  case object Textual extends Format
+  case object Binary extends Format
+
 
   val AllPasses: List[(String, Pass)] = List(
     "explicit-blocks" -> pass.ExplicitBlocks
@@ -42,6 +50,12 @@ object IrDump extends App {
 
     opt[Pass]('p', "passupto")
       .action((p, o) => o.copy(passes = upTo(p)))
+
+    opt[File]('o', "outfile")
+      .action((f, o) => o.copy(out = new FileOutputStream(f)))
+
+    opt[Unit]('b', "binary")
+      .action((_, o) => o.copy(format = Binary))
 
   }
 
@@ -85,18 +99,26 @@ object IrDump extends App {
       }
     }
     val passed = options.passes.foldLeft(irDefs)((defs, pass) => defs.flatMap(pass.txDef))
-    passed.foreach {
-      case ir.Def.Fun(name, params, ret, body) =>
-        println(show"def $name(${params.map(_.show).mkString(", ")}): $ret {")
-        body.foreach { block =>
-          println(show"  ${block.name} {")
-          block.instructions.foreach { instr =>
-            println(show"    $instr")
-          }
-          println(show"    ${block.flow}")
-          println("  }")
+    options.format match {
+      case Textual =>
+        val writer = new PrintWriter(options.out, true)
+        passed.foreach {
+          case ir.Def.Fun(name, params, ret, body) =>
+            writer.println(show"def $name(${params.map(_.show).mkString(", ")}): $ret {")
+            body.foreach { block =>
+              writer.println(show"  ${block.name} {")
+              block.instructions.foreach { instr =>
+                writer.println(show"    $instr")
+              }
+              writer.println(show"    ${block.flow}")
+              writer.println("  }")
+            }
+            writer.println("}")
         }
-        println("}")
+
+      case Binary =>
+        val s = new Serialize(new DataOutputStream(options.out))
+        s.writeDefs(passed.toSeq)
     }
   }
 

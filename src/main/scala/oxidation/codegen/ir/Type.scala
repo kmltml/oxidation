@@ -15,13 +15,13 @@ object Type {
 
   sealed trait Num extends Type
 
-  abstract class I(val w: Int) extends Num
+  sealed abstract class I(val w: Int) extends Num
   case object I8 extends I(8)
   case object I16 extends I(16)
   case object I32 extends I(32)
   case object I64 extends I(64)
 
-  abstract class U(val w: Int) extends Num
+  sealed abstract class U(val w: Int) extends Num
   case object U8 extends U(8)
   case object U16 extends U(16)
   case object U32 extends U(32)
