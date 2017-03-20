@@ -28,4 +28,12 @@ class FlowGraph(val blocks: Map[Name, ir.Block]) {
     go(name, Set.empty)
   }
 
+  def predecessors(name: Name): Set[ir.Block] = {
+    def go(name: Name, found: Set[ir.Block]): Set[ir.Block] = {
+      val search = parents(name) -- found
+      search.foldLeft(found)((f, b) => go(b.name, f))
+    }
+    go(name, Set.empty)
+  }
+
 }

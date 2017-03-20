@@ -10,20 +10,20 @@ import codegen.{Name, ir}
 
 object RegisterLifetime {
 
+  def reads(op: ir.Op): Set[ir.Register] = {
+    val vals = op match {
+      case ir.Op.Arith(_, l, r) => Set(l, r)
+      case ir.Op.Call(fn, params) => params.toSet + fn
+      case ir.Op.Copy(v) => Set(v)
+      case ir.Op.Unary(_, v) => Set(v)
+    }
+    vals.collect {
+      case ir.Val.R(r) => r
+    }
+  }
+
   def inputs(block: ir.Block): Set[ir.Register] = {
     final case class Res(written: Set[ir.Register], input: Set[ir.Register])
-
-    def reads(op: ir.Op): Set[ir.Register] = {
-      val vals = op match {
-        case ir.Op.Arith(_, l, r) => Set(l, r)
-        case ir.Op.Call(fn, params) => params.toSet + fn
-        case ir.Op.Copy(v) => Set(v)
-        case ir.Op.Unary(_, v) => Set(v)
-      }
-      vals.collect {
-        case ir.Val.R(r) => r
-      }
-    }
 
     block.instructions.foldLeft(Res(Set.empty, Set.empty)) {
       case (r, ir.Inst.Label(_)) => r
@@ -44,6 +44,24 @@ object RegisterLifetime {
     }
     val read = graph.successors(name).foldMap(b => inputs(b.name))
     written & read
+  }
+
+  def ghosts(graph: FlowGraph, name: Name, inputs: Map[Name, Set[ir.Register]], outputs: Map[Name, Set[ir.Register]]): Set[ir.Register] = {
+    val outsBefore = graph.predecessors(name).flatMap(b => outputs(b.name))
+    val insAfter = graph.successors(name).flatMap(b => inputs(b.name))
+    outsBefore & insAfter
+  }
+
+  type Bound = Option[Int]
+
+  def lifetime(reg: ir.Register, instrs: Vector[(ir.Inst, Int)], inputs: Set[ir.Register], outputs: Set[ir.Register]): (Bound, Bound) = {
+    val firstWrite = if(inputs(reg)) None else instrs.collectFirst {
+      case (ir.Inst.Eval(Some(`reg`), _), i) => i
+    }
+    val lastRead = if(outputs(reg)) None else instrs.collectFirst {
+      case (ir.Inst.Eval(_, op), i) if reads(op)(reg) => i
+    }
+    firstWrite -> lastRead
   }
 
 }
