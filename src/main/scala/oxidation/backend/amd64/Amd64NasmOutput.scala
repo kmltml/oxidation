@@ -41,6 +41,17 @@ trait Amd64NasmOutput extends Output {
     ln(show"add $dest, $src")
   override def sub(dest: Val, src: Val): M =
     ln(show"sub $dest, $src")
+  override def div(dest: Val, src: Val): M =
+    ln(show"div $dest, $src")
+
+  override def test(dest: Val, src: Val) = ln(show"test $dest, $src")
+  override def cmp(dest: Val, src: Val) = ln(show"cmp $dest, $src")
+
+  def setl(dest: Val): M = ln(show"setl $dest")
+  def setle(dest: Val): M = ln(show"setle $dest")
+  def setg(dest: Val): M = ln(show"setg $dest")
+  def setge(dest: Val): M = ln(show"setge $dest")
+  def sete(dest: Val): M = ln(show"sete $dest")
 
   override def push(src: Val): M =
     ln(show"push $src")
@@ -48,5 +59,10 @@ trait Amd64NasmOutput extends Output {
   override def pop(dest: Val): M =
     ln(show"pop $dest")
 
+  override def jmp(dest: Name) =
+    ln(show"jmp $dest")
+
   override def ret: M = ln("ret")
+
+  override def jnz(dest: Name) = ln(show"jnz $dest")
 }

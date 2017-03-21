@@ -36,13 +36,6 @@ class Amd64Target { this: Output =>
     override def tailRecM[A, B](a: A)(f: (A) => S[Either[A, B]]): S[B] = w.tailRecM(a)(f)
   }
 
-  implicit def monoidMonadMonoid[F[_], M](implicit F: Monad[F], M: Monoid[M]): Monoid[F[M]] = new Monoid[F[M]] {
-
-    override def empty: F[M] = F.pure(M.empty)
-
-    override def combine(x: F[M], y: F[M]): F[M] = for(xx <- x; yy <- y) yield xx |+| yy
-  }
-
   def outputDef(d: ir.Def): M = d match {
     case ir.Def.Fun(name, params, _, blocks) =>
       val res: S[Unit] = blocks.traverse_ {
@@ -72,7 +65,7 @@ class Amd64Target { this: Output =>
   def outputInstruction(i: ir.Inst): S[Unit] = i match {
     case ir.Inst.Label(n) => S.tell(label(n))
     case ir.Inst.Eval(dest, op) => op match {
-      case ir.Op.Arith(InfixOp.Add, left, right) => dest match {
+      case ir.Op.Arith(op @ (InfixOp.Add | InfixOp.Mod), left, right) => dest match {
         case None => S.pure(())
         case Some(r) => for {
           lv <- find(left)
@@ -80,10 +73,62 @@ class Amd64Target { this: Output =>
           res <- reg(r)
           _ <- S.tell(Vector(
             mov(res, lv),
-            add(res, rv)
+            op match {
+              case InfixOp.Add => add(res, rv)
+            }
+          ).combineAll)
+        } yield ()
+
+      }
+      case ir.Op.Arith(op @ (InfixOp.Div | InfixOp.Mod), left, right) => dest match {
+        case None => S.pure(())
+        case Some(r) => for {
+          lv <- find(left)
+          rv <- find(right)
+          res <- reg(r)
+          _ <- S.tell(Vector(
+            mov(res, lv),
+            push(RAX),
+            push(RDX),
+            mov(RDX, 0),
+            mov(RAX, lv),
+            div(RAX, rv),
+            mov(res, op match {
+              case InfixOp.Div => RAX
+              case InfixOp.Mod => RDX
+            }),
+            pop(RDX),
+            pop(RAX)
+          ).combineAll)
+        } yield ()
+      case ir.Op.Arith(op @ (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq), left, right) => dest match {
+        case None => S.pure(())
+        case Some(r) => for {
+          lv <- find(left)
+          rv <- find(right)
+          res <- reg(r)
+          _ <- S.tell(Vector(
+            cmp(lv, rv),
+            op match {
+              case InfixOp.Lt => setl(res)
+              case InfixOp.Gt => setg(res)
+              case InfixOp.Geq => setge(res)
+              case InfixOp.Leq => setle(res)
+              case InfixOp.Eq => sete(res)
+            }
           ).combineAll)
         } yield ()
       }
+
+      case ir.Op.Copy(src) => dest match {
+        case None => S.pure(())
+        case Some(r) => for {
+          srcv <- find(src)
+          res <- reg(r)
+          _ <- S.tell(mov(res, srcv))
+        } yield ()
+      }
+
     }
   }
 
@@ -94,6 +139,15 @@ class Amd64Target { this: Output =>
         mov(RAX, rval),
         epilogue,
         ret
+      ).combineAll)
+    } yield ()
+    case ir.FlowControl.Goto(n) => S.tell(jmp(n))
+    case ir.FlowControl.Branch(cond, ifTrue, ifFalse) => for {
+      condv <- find(cond)
+      _ <- S.tell(Vector(
+        test(condv, condv),
+        jnz(ifTrue),
+        jmp(ifFalse)
       ).combineAll)
     } yield ()
   }
