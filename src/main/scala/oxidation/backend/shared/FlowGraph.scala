@@ -7,31 +7,30 @@ import codegen.ir
 
 class FlowGraph(val blocks: Map[Name, ir.Block]) {
 
-  lazy val parents: Memo[Name, Set[ir.Block]] = Memo { n =>
-    val block = blocks(n)
-    blocks.values.filter(b => children(b.name) contains block).toSet
+  lazy val parents: Memo[Name, Set[Name]] = Memo { n =>
+    blocks.keys.filter(children(_) contains n).toSet
   }
 
-  lazy val children: Memo[Name, Set[ir.Block]] = Memo { n =>
-    (blocks(n).flow match {
+  lazy val children: Memo[Name, Set[Name]] = Memo { n =>
+    blocks(n).flow match {
       case ir.FlowControl.Return(_) => Set.empty
       case ir.FlowControl.Branch(_, t, f) => Set(t, f)
       case ir.FlowControl.Goto(l) => Set(l)
-    }).map(blocks)
+    }
   }
 
-  def successors(name: Name): Set[ir.Block] = {
-    def go(name: Name, found: Set[ir.Block]): Set[ir.Block] = {
+  def successors(name: Name): Set[Name] = {
+    def go(name: Name, found: Set[Name]): Set[Name] = {
       val search = children(name) -- found
-      search.foldLeft(found)((f, b) => go(b.name, f))
+      search.foldLeft(found ++ search)((f, b) => f ++ go(b, f))
     }
     go(name, Set.empty)
   }
 
-  def predecessors(name: Name): Set[ir.Block] = {
-    def go(name: Name, found: Set[ir.Block]): Set[ir.Block] = {
+  def predecessors(name: Name): Set[Name] = {
+    def go(name: Name, found: Set[Name]): Set[Name] = {
       val search = parents(name) -- found
-      search.foldLeft(found)((f, b) => go(b.name, f))
+      search.foldLeft(found ++ search)((f, b) => f ++ go(b, f))
     }
     go(name, Set.empty)
   }

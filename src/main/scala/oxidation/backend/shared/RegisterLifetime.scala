@@ -25,9 +25,19 @@ object RegisterLifetime {
   def inputs(block: ir.Block): Set[ir.Register] = {
     final case class Res(written: Set[ir.Register], input: Set[ir.Register])
 
-    block.instructions.foldLeft(Res(Set.empty, Set.empty)) {
+    (block.instructions :+ ir.Inst.Flow(block.flow)).foldLeft(Res(Set.empty, Set.empty)) {
       case (r, ir.Inst.Label(_)) => r
-      case (r, ir.Inst.Flow(_)) => r
+      case (r, ir.Inst.Flow(flow)) =>
+        val vals = flow match {
+          case ir.FlowControl.Return(v) => Set(v)
+          case ir.FlowControl.Branch(c, _, _) => Set(c)
+          case ir.FlowControl.Goto(_) => Set.empty
+        }
+        val read = vals.collect {
+          case ir.Val.R(r) => r
+        }
+        val input = read diff r.written
+        r.copy(input = r.input ++ input)
       case (r, ir.Inst.Eval(dest, op)) =>
         val read = reads(op)
         val written = r.written ++ dest
@@ -42,13 +52,13 @@ object RegisterLifetime {
       case ir.Inst.Eval(Some(r), _) => Set(r)
       case _ => Set.empty
     }
-    val read = graph.successors(name).foldMap(b => inputs(b.name))
+    val read = graph.successors(name).foldMap(inputs(_))
     written & read
   }
 
   def ghosts(graph: FlowGraph, name: Name, inputs: Map[Name, Set[ir.Register]], outputs: Map[Name, Set[ir.Register]]): Set[ir.Register] = {
-    val outsBefore = graph.predecessors(name).flatMap(b => outputs(b.name))
-    val insAfter = graph.successors(name).flatMap(b => inputs(b.name))
+    val outsBefore = graph.predecessors(name).flatMap(b => outputs(b))
+    val insAfter = graph.successors(name).flatMap(inputs(_))
     outsBefore & insAfter
   }
 
