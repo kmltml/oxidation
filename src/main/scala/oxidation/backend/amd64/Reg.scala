@@ -29,4 +29,9 @@ object Reg {
   case object R14 extends Reg
   case object R15 extends Reg
 
+
+  val callerSaved: List[Reg] = List(RCX, RDX, R8, R9, RAX, R10, R11)
+  val calleeSaved: List[Reg] = List(RDI, RSI, R12, R13, R14, R15)
+
+
 }

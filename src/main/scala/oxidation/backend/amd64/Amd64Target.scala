@@ -3,31 +3,25 @@ package backend
 package amd64
 
 import Reg._
-
 import cats._
 import cats.data._
 import cats.implicits._
-
 import codegen.ir
+import oxidation.backend.shared.RegisterAllocator
 
 class Amd64Target { this: Output =>
 
-  type S[A] = WriterT[State[RegisterBindings, ?], M, A]
+  type S[A] = Writer[M, A]
 
-  val S = new MonadWriter[S, M] with MonadState[S, RegisterBindings] {
+  val S = new MonadWriter[S, M] {
 
     private val w = MonadWriter[S, M]
-    private val s = MonadState[State[RegisterBindings, ?], RegisterBindings]
 
     override def writer[A](aw: (M, A)): S[A] = w.writer(aw)
 
     override def listen[A](fa: S[A]): S[(M, A)] = w.listen(fa)
 
     override def pass[A](fa: S[((M) => M, A)]): S[A] = w.pass(fa)
-
-    override def get: S[RegisterBindings] = WriterT.lift(s.get)
-
-    override def set(ss: RegisterBindings): S[Unit] = WriterT.lift(s.set(ss))
 
     override def pure[A](x: A): S[A] = w.pure(x)
 
@@ -36,16 +30,11 @@ class Amd64Target { this: Output =>
     override def tailRecM[A, B](a: A)(f: (A) => S[Either[A, B]]): S[B] = w.tailRecM(a)(f)
   }
 
+  val allocator: RegisterAllocator[Val] =
+    new RegisterAllocator[Val](Reg.calleeSaved.map(Val.R), Reg.callerSaved.map(Val.R))
+
   def outputDef(d: ir.Def): M = d match {
     case ir.Def.Fun(name, params, _, blocks) =>
-      val res: S[Unit] = blocks.traverse_ {
-        case ir.Block(name, instructions, flow) =>
-          for {
-            _ <- S.tell(label(name))
-            _ <- instructions.traverse(outputInstruction)
-            _ <- outputFlow(flow)
-          } yield ()
-      }
       val paramBindings = params.zipWithIndex.map {
         case (r, 0) => r -> Val.R(RCX)
         case (r, 1) => r -> Val.R(RDX)
@@ -53,103 +42,102 @@ class Amd64Target { this: Output =>
         case (r, 3) => r -> Val.R(R9)
         case (r, i) => r -> Val.m(RBP, 8 * i)
       }.toMap
-      val freeLocations = List(RCX, RDX, R8, R9, RAX, R10, R11, R12, R13, R14, R15, RDI, RSI, RBX).map(Val.R) diff paramBindings.values.toSeq
-      val (bindings, (m, _)) = res.run.run(RegisterBindings(locations = paramBindings, freeLocations = freeLocations)).value
+      val allocations = allocator.allocate(blocks, paramBindings.mapValues(allocator.R))
+      val bindings = allocations.mapValues {
+        case allocator.R(r) => r
+        case allocator.Stack(off) => Val.m(RBP, -8 * off)
+      }
+      val requiredStackSpace = allocations.values.collect {
+        case allocator.Stack(off) => off
+      }.toList.maximumOption.getOrElse(0) * 8
+      val res: S[Unit] = blocks.traverse_ {
+        case ir.Block(name, instructions, flow) =>
+          for {
+            _ <- S.tell(label(name))
+            _ <- instructions.traverse(outputInstruction(_)(bindings))
+            _ <- outputFlow(flow)(bindings)
+          } yield ()
+      }
+      val m = res.written
       Vector(
         label(name),
-        prologue(bindings.requiredStackSpace),
+        prologue(requiredStackSpace),
         m
       ).combineAll
   }
 
-  def outputInstruction(i: ir.Inst): S[Unit] = i match {
+  def outputInstruction(i: ir.Inst)(implicit bindings: Map[ir.Register, Val]): S[Unit] = i match {
     case ir.Inst.Label(n) => S.tell(label(n))
     case ir.Inst.Eval(dest, op) => op match {
-      case ir.Op.Arith(op @ (InfixOp.Add | InfixOp.Mod), left, right) => dest match {
+      case ir.Op.Arith(op @ (InfixOp.Add | InfixOp.Sub), left, right) => dest match {
         case None => S.pure(())
-        case Some(r) => for {
-          lv <- find(left)
-          rv <- find(right)
-          res <- reg(r)
-          _ <- S.tell(Vector(
-            mov(res, lv),
+        case Some(r) =>
+          S.tell(Vector(
+            mov(toVal(r), toVal(left)),
             op match {
-              case InfixOp.Add => add(res, rv)
+              case InfixOp.Add => add(toVal(r), toVal(right))
+              case InfixOp.Add => sub(toVal(r), toVal(right))
             }
           ).combineAll)
-        } yield ()
-
       }
       case ir.Op.Arith(op @ (InfixOp.Div | InfixOp.Mod), left, right) => dest match {
         case None => S.pure(())
-        case Some(r) => for {
-          lv <- find(left)
-          rv <- find(right)
-          res <- reg(r)
-          _ <- S.tell(Vector(
-            mov(res, lv),
-            push(RAX),
-            push(RDX),
+        case Some(r) =>
+          val res = toVal(r)
+          S.tell(Vector(
+            res match { case Val.R(RAX) => M.empty; case _ => push(RAX) },
+            res match { case Val.R(RDX) => M.empty; case _ => push(RDX) },
+            res match { case Val.R(RDI) => M.empty; case _ => push(RDI) },
+            mov(RDI, toVal(right)),
             mov(RDX, 0),
-            mov(RAX, lv),
-            div(RAX, rv),
-            mov(res, op match {
+            mov(RAX, toVal(left)),
+            div(RAX, RDI),
+            mov(toVal(r), op match {
               case InfixOp.Div => RAX
               case InfixOp.Mod => RDX
             }),
-            pop(RDX),
-            pop(RAX)
+            res match { case Val.R(RAX) => M.empty; case _ => pop(RAX) },
+            res match { case Val.R(RDX) => M.empty; case _ => pop(RDX) },
+            res match { case Val.R(RDI) => M.empty; case _ => pop(RDI) }
           ).combineAll)
-        } yield ()
+      }
       case ir.Op.Arith(op @ (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq), left, right) => dest match {
         case None => S.pure(())
-        case Some(r) => for {
-          lv <- find(left)
-          rv <- find(right)
-          res <- reg(r)
-          _ <- S.tell(Vector(
-            cmp(lv, rv),
+        case Some(r) =>
+          S.tell(Vector(
+            cmp(toVal(left), toVal(right)),
             op match {
-              case InfixOp.Lt => setl(res)
-              case InfixOp.Gt => setg(res)
-              case InfixOp.Geq => setge(res)
-              case InfixOp.Leq => setle(res)
-              case InfixOp.Eq => sete(res)
+              case InfixOp.Lt => setl(toVal(r))
+              case InfixOp.Gt => setg(toVal(r))
+              case InfixOp.Geq => setge(toVal(r))
+              case InfixOp.Leq => setle(toVal(r))
+              case InfixOp.Eq => sete(toVal(r))
             }
           ).combineAll)
-        } yield ()
       }
 
       case ir.Op.Copy(src) => dest match {
         case None => S.pure(())
-        case Some(r) => for {
-          srcv <- find(src)
-          res <- reg(r)
-          _ <- S.tell(mov(res, srcv))
-        } yield ()
+        case Some(r) => S.tell(mov(toVal(r), toVal(src)))
       }
 
     }
   }
 
-  def outputFlow(f: ir.FlowControl): S[Unit] = f match {
-    case ir.FlowControl.Return(r) => for {
-      rval <- find(r)
-      _ <- S.tell(Vector(
-        mov(RAX, rval),
+  def outputFlow(f: ir.FlowControl)(implicit bindings: Map[ir.Register, Val]): S[Unit] = f match {
+    case ir.FlowControl.Return(r) =>
+      S.tell(Vector(
+        mov(RAX, toVal(r)),
         epilogue,
         ret
       ).combineAll)
-    } yield ()
     case ir.FlowControl.Goto(n) => S.tell(jmp(n))
-    case ir.FlowControl.Branch(cond, ifTrue, ifFalse) => for {
-      condv <- find(cond)
-      _ <- S.tell(Vector(
-        test(condv, condv),
+    case ir.FlowControl.Branch(cond, ifTrue, ifFalse) =>
+      S.tell(Vector(
+        test(toVal(cond), toVal(cond)),
         jnz(ifTrue),
         jmp(ifFalse)
       ).combineAll)
-    } yield ()
   }
 
   def prologue(localCount: Int): M = Vector(
@@ -163,27 +151,10 @@ class Amd64Target { this: Output =>
     pop(RBP)
   ).combineAll
 
-  private def find(v: ir.Val): S[Val] = v match {
-    case ir.Val.I(i) => S.pure(Val.I(i))
-    case ir.Val.R(r) => reg(r)
+  private def toVal(v: ir.Val)(implicit bindings: Map[ir.Register, Val]): Val = v match {
+    case ir.Val.I(i) => Val.I(i)
+    case ir.Val.R(r) => bindings(r)
   }
-
-  private def reg(r: ir.Register): S[Val] = for {
-    bind <- S.inspect(_.locations.get(r))
-    reg <- bind.map(S.pure).getOrElse(bindFreeReg(r))
-  } yield reg
-
-  private def bindFreeReg(r: ir.Register): S[Val] = for {
-    freeLocations <- S.inspect(_.freeLocations)
-    reg <- freeLocations.headOption.map(S.pure)
-      .getOrElse(allocateReg(r))
-  } yield reg
-
-  private def allocateReg(r: ir.Register): S[Val] = for {
-    index <- S.inspect(_.requiredStackSpace)
-    loc = Val.m(RBP, -8 * (index + 1))
-    _ <- S.modify(s => s.copy(requiredStackSpace = index + 1,
-                              locations = s.locations.updated(r, loc))) // [RBP] = stored RBP, so first local is [RBP - 8]
-  } yield loc: Val
+  private def toVal(r: ir.Register)(implicit bindings: Map[ir.Register, Val]): Val = bindings(r)
 
 }

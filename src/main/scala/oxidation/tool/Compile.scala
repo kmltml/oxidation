@@ -11,7 +11,8 @@ import cats._
 import cats.data._
 import cats.implicits._
 import oxidation.backend.amd64.{Amd64NasmOutput, Amd64Target}
-import oxidation.codegen.Codegen
+import oxidation.codegen.{Codegen, pass}
+import oxidation.codegen.pass.Pass
 
 object Compile extends App {
 
@@ -69,9 +70,13 @@ object Compile extends App {
         case d: analyze.ast.TermDef => Codegen.compileDef(d)
       }
     }
+    val passes: List[Pass] = List(
+      pass.ExplicitBlocks
+    )
+    val passed = passes.foldLeft(irDefs)((defs, pass) => defs.flatMap(pass.txDef))
     phase("asm-out") {
       val target = new Amd64Target with Amd64NasmOutput
-      irDefs.foldMap(target.outputDef).foreach(println)
+      passed.foldMap(target.outputDef).foreach(println)
     }
   }
 
