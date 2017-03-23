@@ -21,6 +21,16 @@ object RegisterLifetime {
       case ir.Val.R(r) => r
     }
   }
+  def reads(flow: ir.FlowControl): Set[ir.Register] = {
+    val vals = flow match {
+      case ir.FlowControl.Branch(v, _, _) => Set(v)
+      case ir.FlowControl.Return(v) => Set(v)
+      case ir.FlowControl.Goto(_) => Set.empty
+    }
+    vals.collect {
+      case ir.Val.R(r) => r
+    }
+  }
 
   def inputs(block: ir.Block): Set[ir.Register] = {
     final case class Res(written: Set[ir.Register], input: Set[ir.Register])
@@ -40,9 +50,8 @@ object RegisterLifetime {
         r.copy(input = r.input ++ input)
       case (r, ir.Inst.Eval(dest, op)) =>
         val read = reads(op)
-        val written = r.written ++ dest
-        val input = read diff written
-        Res(written = written, input = r.input ++ input)
+        val input = read diff r.written
+        Res(written = r.written ++ dest, input = r.input ++ input)
     }.input
   }
 
@@ -68,9 +77,10 @@ object RegisterLifetime {
     val firstWrite = if(inputs(reg)) None else instrs.collectFirst {
       case (ir.Inst.Eval(Some(`reg`), _), i) => i
     }
-    val lastRead = if(outputs(reg)) None else instrs.collectFirst {
+    val lastRead = if(outputs(reg)) None else instrs.collect {
       case (ir.Inst.Eval(_, op), i) if reads(op)(reg) => i
-    }
+      case (ir.Inst.Flow(flow), i) if reads(flow)(reg) => i
+    }.lastOption
     firstWrite -> lastRead
   }
 

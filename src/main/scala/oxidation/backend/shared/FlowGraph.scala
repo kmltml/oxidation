@@ -36,3 +36,10 @@ class FlowGraph(val blocks: Map[Name, ir.Block]) {
   }
 
 }
+
+object FlowGraph {
+
+  def apply(blocks: Map[Name, ir.Block]): FlowGraph = new FlowGraph(blocks)
+  def apply(blocks: Seq[ir.Block]): FlowGraph = FlowGraph(blocks.map(b => b.name -> b).toMap)
+
+}
