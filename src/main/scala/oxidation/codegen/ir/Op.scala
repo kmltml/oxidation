@@ -6,7 +6,21 @@ import cats._
 import cats.data._
 import cats.implicits._
 
-sealed trait Op
+sealed trait Op {
+
+  def reads: Set[ir.Register] = {
+    val vals = this match {
+      case ir.Op.Arith(_, l, r) => Set(l, r)
+      case ir.Op.Call(fn, params) => params.map(ir.Val.R).toSet + fn
+      case ir.Op.Copy(v) => Set(v)
+      case ir.Op.Unary(_, v) => Set(v)
+    }
+    vals.collect {
+      case ir.Val.R(r) => r
+    }
+  }
+
+}
 
 object Op {
 

@@ -10,28 +10,6 @@ import codegen.{Name, ir}
 
 object RegisterLifetime {
 
-  def reads(op: ir.Op): Set[ir.Register] = {
-    val vals = op match {
-      case ir.Op.Arith(_, l, r) => Set(l, r)
-      case ir.Op.Call(fn, params) => params.map(ir.Val.R).toSet + fn
-      case ir.Op.Copy(v) => Set(v)
-      case ir.Op.Unary(_, v) => Set(v)
-    }
-    vals.collect {
-      case ir.Val.R(r) => r
-    }
-  }
-  def reads(flow: ir.FlowControl): Set[ir.Register] = {
-    val vals = flow match {
-      case ir.FlowControl.Branch(v, _, _) => Set(v)
-      case ir.FlowControl.Return(v) => Set(v)
-      case ir.FlowControl.Goto(_) => Set.empty
-    }
-    vals.collect {
-      case ir.Val.R(r) => r
-    }
-  }
-
   def inputs(block: ir.Block): Set[ir.Register] = {
     final case class Res(written: Set[ir.Register], input: Set[ir.Register])
 
@@ -49,7 +27,7 @@ object RegisterLifetime {
         val input = read diff r.written
         r.copy(input = r.input ++ input)
       case (r, ir.Inst.Eval(dest, op)) =>
-        val read = reads(op)
+        val read = op.reads
         val input = read diff r.written
         Res(written = r.written ++ dest, input = r.input ++ input)
     }.input
@@ -68,7 +46,7 @@ object RegisterLifetime {
   def ghosts(graph: FlowGraph, name: Name, inputs: Map[Name, Set[ir.Register]], outputs: Map[Name, Set[ir.Register]]): Set[ir.Register] = {
     val outsBefore = graph.predecessors(name).flatMap(b => outputs(b))
     val insAfter = graph.successors(name).flatMap(inputs(_))
-    outsBefore & insAfter
+    (outsBefore ++ inputs(name)) & (insAfter ++ outputs(name))
   }
 
   type Bound = Option[Int]
@@ -78,8 +56,8 @@ object RegisterLifetime {
       case (ir.Inst.Eval(Some(`reg`), _), i) => i
     }
     val lastRead = if(outputs(reg)) None else instrs.collect {
-      case (ir.Inst.Eval(_, op), i) if reads(op)(reg) => i
-      case (ir.Inst.Flow(flow), i) if reads(flow)(reg) => i
+      case (ir.Inst.Eval(_, op), i) if op.reads(reg) => i
+      case (ir.Inst.Flow(flow), i) if flow.reads(reg) => i
     }.lastOption
     firstWrite -> lastRead
   }

@@ -6,7 +6,20 @@ import cats._
 import cats.data._
 import cats.implicits._
 
-sealed trait FlowControl
+sealed trait FlowControl {
+
+  def reads: Set[ir.Register] = {
+    val vals = this match {
+      case ir.FlowControl.Branch(v, _, _) => Set(v)
+      case ir.FlowControl.Return(v) => Set(v)
+      case ir.FlowControl.Goto(_) => Set.empty
+    }
+    vals.collect {
+      case ir.Val.R(r) => r
+    }
+  }
+
+}
 
 object FlowControl {
 
