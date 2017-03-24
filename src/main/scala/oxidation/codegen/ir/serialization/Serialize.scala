@@ -69,7 +69,7 @@ class Serialize(val out: DataOutputStream) {
 
   def writeOp(op: Op): Unit = op match {
     case Op.Arith(o, l, r) => writeTag(Tag.Op.Arith); writeInfixOp(o); writeVal(l); writeVal(r)
-    case Op.Call(f, p) => writeTag(Tag.Op.Call); writeVal(f); writeSeq(p)(writeVal)
+    case Op.Call(f, p) => writeTag(Tag.Op.Call); writeVal(f); writeSeq(p)(writeRegister)
     case Op.Copy(s) => writeTag(Tag.Op.Copy); writeVal(s)
     case Op.Unary(o, r) => writeTag(Tag.Op.Unary); writePrefixOp(o); writeVal(r)
   }

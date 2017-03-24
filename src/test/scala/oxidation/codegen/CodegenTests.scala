@@ -128,8 +128,9 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
           compileExpr(ast.App(ast.Var(g('f)) :: Fun(Seq(I32), U1), Seq(ast.IntLit(10) :: I32)) :: I32)
             .run.runA(CodegenState()).value ==>
             (Vector(
-              Inst.Eval(Some(r(0, _.I32)), Op.Call(Val.G(Name.Global(List("f"))), List(10)))
-            ), Val.R(r(0, _.I32)))
+              Inst.Eval(Some(r(0, _.I32)), Op.Copy(10)),
+              Inst.Eval(Some(r(1, _.I32)), Op.Call(Val.G(Name.Global(List("f"))), List(r(0, _.I32))))
+            ), Val.R(r(1, _.I32)))
         }
       }
     }

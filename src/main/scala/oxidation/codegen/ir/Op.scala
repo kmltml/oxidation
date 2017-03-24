@@ -12,7 +12,7 @@ object Op {
 
   final case class Arith(op: InfixOp, left: Val, right: Val) extends Op
   final case class Copy(src: Val) extends Op
-  final case class Call(fn: Val, params: List[Val]) extends Op
+  final case class Call(fn: Val, params: List[Register]) extends Op
   final case class Unary(op: PrefixOp, right: Val) extends Op
 
   implicit val show: Show[Op] = {

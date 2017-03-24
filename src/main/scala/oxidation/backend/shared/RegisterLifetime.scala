@@ -13,7 +13,7 @@ object RegisterLifetime {
   def reads(op: ir.Op): Set[ir.Register] = {
     val vals = op match {
       case ir.Op.Arith(_, l, r) => Set(l, r)
-      case ir.Op.Call(fn, params) => params.toSet + fn
+      case ir.Op.Call(fn, params) => params.map(ir.Val.R).toSet + fn
       case ir.Op.Copy(v) => Set(v)
       case ir.Op.Unary(_, v) => Set(v)
     }

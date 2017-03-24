@@ -58,7 +58,7 @@ class Deserialize(val in: DataInputStream) {
 
   def readOp(): Op = readTag() match {
     case Tag.Op.Arith => Op.Arith(readInfixOp(), readVal(), readVal())
-    case Tag.Op.Call => Op.Call(readVal(), readSeq(readVal).toList)
+    case Tag.Op.Call => Op.Call(readVal(), readSeq(readRegister).toList)
     case Tag.Op.Copy => Op.Copy(readVal())
     case Tag.Op.Unary => Op.Unary(readPrefixOp(), readVal())
   }

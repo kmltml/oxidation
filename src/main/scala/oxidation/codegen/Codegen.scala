@@ -138,7 +138,15 @@ object Codegen {
           case ast.Var(Symbol.Global(path)) => Res.pure(Val.G(Name.Global(path.toList)))
           case _ => compileExpr(Typed(fn, fnType))
         }
-        paramVals <- params.toList.traverse(compileExpr)
+        paramVals <- params.toList.traverse { p =>
+          for {
+            v <- compileExpr(p)
+            r <- genReg(translateType(p.typ))
+            _ <- Res.tell(Vector(
+              Inst.Eval(Some(r), Op.Copy(v))
+            ))
+          } yield r
+        }
         r <- genReg(translateType(t))
         _ <- Res.tell(Vector(
           Inst.Eval(Some(r), Op.Call(fnVal, paramVals))
@@ -160,7 +168,15 @@ object Codegen {
       val s: Res[(List[Register], Val)] = for {
         paramRegs <- params.getOrElse(Seq.empty).toList
           .traverse(p => genReg(translateType(p.typ)).map(Symbol.Local(p.name) -> _))
-        _ <- withBindings(paramRegs: _*)
+        paramTemps <- paramRegs.traverse {
+          case (name, r) => for {
+            temp <- genReg(r.typ)
+            _ <- Res.tell(Vector(
+              Inst.Eval(Some(temp), Op.Copy(Val.R(r)))
+            ))
+          } yield name -> temp
+        }
+        _ <- withBindings(paramTemps: _*)
         v <- compileExpr(body)
       } yield (paramRegs.map(_._2), v)
       val (instrs, (paramRegs, v)) = s.run.runA(CodegenState()).value
