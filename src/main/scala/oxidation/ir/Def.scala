@@ -1,6 +1,7 @@
 package oxidation
-package codegen
 package ir
+
+import oxidation.codegen.Name
 
 sealed trait Def
 

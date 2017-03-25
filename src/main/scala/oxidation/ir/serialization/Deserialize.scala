@@ -1,9 +1,9 @@
 package oxidation
-package codegen
 package ir
 package serialization
 
 import java.io.DataInputStream
+import codegen.Name
 
 class Deserialize(val in: DataInputStream) {
 

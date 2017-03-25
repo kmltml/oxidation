@@ -4,8 +4,8 @@ package shared
 
 import utest._
 import codegen.Name
-import codegen.ir._
-import oxidation.codegen.ir.Type._
+import ir._
+import ir.Type._
 import <->.EdgeSyntax
 
 object RegisterAllocatorTests extends TestSuite {

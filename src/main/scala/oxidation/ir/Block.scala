@@ -1,6 +1,7 @@
 package oxidation
-package codegen
 package ir
+
+import codegen.Name
 
 case class Block(name: Name, instructions: Vector[Inst], flow: FlowControl) {
 

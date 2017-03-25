@@ -5,8 +5,6 @@ package shared
 import cats._
 import cats.data._
 import cats.implicits._
-import codegen.ir
-import oxidation.codegen.ir.Register
 import <->.EdgeSyntax
 
 class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs: List[Reg]) {
@@ -67,8 +65,8 @@ class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs
     type F[A] = WriterT[State[Set[ir.Register], ?], Set[Edge[ir.Register]], A]
     val W = MonadWriter[F, Set[Edge[ir.Register]]]
     val S = new MonadState[F, Set[ir.Register]] {
-      override def get: F[Set[Register]] = WriterT.lift(State.get)
-      override def set(s: Set[Register]): F[Unit] = WriterT.lift(State.set(s))
+      override def get: F[Set[ir.Register]] = WriterT.lift(State.get)
+      override def set(s: Set[ir.Register]): F[Unit] = WriterT.lift(State.set(s))
       override def flatMap[A, B](fa: F[A])(f: (A) => F[B]): F[B] = W.flatMap(fa)(f)
       override def tailRecM[A, B](a: A)(f: (A) => F[Either[A, B]]): F[B] = W.tailRecM(a)(f)
       override def pure[A](x: A): F[A] = W.pure(x)

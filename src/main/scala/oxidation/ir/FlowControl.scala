@@ -1,6 +1,7 @@
 package oxidation
-package codegen
 package ir
+
+import oxidation.codegen.Name
 
 import cats._
 import cats.data._
@@ -8,14 +9,14 @@ import cats.implicits._
 
 sealed trait FlowControl {
 
-  def reads: Set[ir.Register] = {
+  def reads: Set[Register] = {
     val vals = this match {
-      case ir.FlowControl.Branch(v, _, _) => Set(v)
-      case ir.FlowControl.Return(v) => Set(v)
-      case ir.FlowControl.Goto(_) => Set.empty
+      case oxidation.ir.FlowControl.Branch(v, _, _) => Set(v)
+      case oxidation.ir.FlowControl.Return(v) => Set(v)
+      case oxidation.ir.FlowControl.Goto(_) => Set.empty
     }
     vals.collect {
-      case ir.Val.R(r) => r
+      case oxidation.ir.Val.R(r) => r
     }
   }
 

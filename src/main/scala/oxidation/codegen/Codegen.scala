@@ -213,13 +213,13 @@ object Codegen {
   private def genLocalIndex: Res[Int] =
     WriterT.lift(CodegenState.genLocalIndex)
 
-  private[codegen] def withBindings(bindings: (Symbol, ir.Register)*): Res[Unit] =
+  private[codegen] def withBindings(bindings: (Symbol, Register)*): Res[Unit] =
     WriterT.lift(CodegenState.withBindings(bindings: _*))
 
-  private[codegen] def restoreBindings(bindings: Map[Symbol, ir.Register]): Res[Unit] =
+  private[codegen] def restoreBindings(bindings: Map[Symbol, Register]): Res[Unit] =
     WriterT.lift(State.modify(_.copy(registerBindings = bindings)))
 
-  private[codegen] def storeBindings: Res[Map[Symbol, ir.Register]] =
+  private[codegen] def storeBindings: Res[Map[Symbol, Register]] =
     WriterT.lift(State.inspect(_.registerBindings))
 
 }

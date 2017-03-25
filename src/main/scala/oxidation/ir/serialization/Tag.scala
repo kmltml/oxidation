@@ -1,4 +1,6 @@
-package oxidation.codegen.ir.serialization
+package oxidation
+package ir
+package serialization
 
 object Tag {
 

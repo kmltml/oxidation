@@ -6,7 +6,7 @@ import cats._
 import cats.data._
 import cats.implicits._
 
-import codegen.{Name, ir}
+import codegen.Name
 
 object RegisterLifetime {
 

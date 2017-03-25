@@ -6,7 +6,6 @@ import Reg._
 import cats._
 import cats.data._
 import cats.implicits._
-import codegen.ir
 import oxidation.backend.shared.RegisterAllocator
 
 class Amd64Target { this: Output =>

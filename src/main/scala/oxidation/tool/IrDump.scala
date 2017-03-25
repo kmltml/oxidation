@@ -3,16 +3,18 @@ package tool
 
 import java.io.{DataOutputStream, File, FileOutputStream, OutputStream, OutputStreamWriter, PrintWriter}
 
-import oxidation.analyze._
-import oxidation.parse.Parser
+import analyze._
+import parse.Parser
 
 import scala.io.Source
+
 import cats._
 import cats.data._
 import cats.implicits._
-import oxidation.codegen.ir.serialization.Serialize
-import oxidation.codegen.pass.Pass
-import oxidation.codegen.{Codegen, ir, pass}
+
+import ir.serialization.Serialize
+import codegen.pass.Pass
+import codegen.{Codegen, pass}
 
 object IrDump extends App {
 

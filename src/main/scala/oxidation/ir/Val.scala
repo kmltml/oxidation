@@ -1,10 +1,11 @@
 package oxidation
-package codegen
 package ir
 
 import cats._
 import cats.data._
 import cats.implicits._
+
+import codegen.Name
 
 sealed trait Val
 

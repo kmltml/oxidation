@@ -3,7 +3,6 @@ package backend
 package shared
 
 import codegen.Name
-import codegen.ir
 
 class FlowGraph(val blocks: Map[Name, ir.Block]) {
 

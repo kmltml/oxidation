@@ -1,5 +1,4 @@
 package oxidation
-package codegen
 package ir
 
 import cats._
