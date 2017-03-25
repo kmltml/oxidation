@@ -21,7 +21,7 @@ class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs
       block <- blocks
       inst <- block.instructions
       r <- inst match {
-        case ir.Inst.Eval(Some(r), _) => Vector(r)
+        case ir.Inst.Move(r, _) => Vector(r)
         case _ => Vector.empty
       }
     } yield r

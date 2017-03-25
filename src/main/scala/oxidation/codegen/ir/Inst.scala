@@ -11,7 +11,8 @@ sealed trait Inst {
   import Inst._
 
   def regs: Set[Register] = this match {
-    case Eval(dest, op) => op.reads ++ dest
+    case Move(dest, op) => op.reads + dest
+    case Do(op) => op.reads
     case Label(_) => Set.empty
     case Flow(f) => f.reads
   }
@@ -20,13 +21,14 @@ sealed trait Inst {
 
 object Inst {
 
-  final case class Eval(dest: Option[Register], op: Op) extends Inst
+  final case class Move(dest: Register, op: Op) extends Inst
+  final case class Do(op: Op) extends Inst
   final case class Label(name: Name) extends Inst
   final case class Flow(flowControl: FlowControl) extends Inst
 
   implicit val show: Show[Inst] = {
-    case Eval(None, op) => op.show
-    case Eval(Some(reg), op) => show"$reg = $op"
+    case Do(op) => op.show
+    case Move(reg, op) => show"$reg = $op"
 
     case Label(name) => show"$name:"
 

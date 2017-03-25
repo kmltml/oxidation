@@ -26,17 +26,21 @@ object RegisterLifetime {
         }
         val input = read diff r.written
         r.copy(input = r.input ++ input)
-      case (r, ir.Inst.Eval(dest, op)) =>
+      case (r, ir.Inst.Move(dest, op)) =>
         val read = op.reads
         val input = read diff r.written
-        Res(written = r.written ++ dest, input = r.input ++ input)
+        Res(written = r.written + dest, input = r.input ++ input)
+      case (r, ir.Inst.Do(op)) =>
+        val read = op.reads
+        val input = read diff r.written
+        r.copy(input = r.input ++ input)
     }.input
   }
 
   def outputs(graph: FlowGraph, name: Name, inputs: Map[Name, Set[ir.Register]]): Set[ir.Register] = {
     val block = graph.blocks(name)
     val written: Set[ir.Register] = block.instructions.foldMap {
-      case ir.Inst.Eval(Some(r), _) => Set(r)
+      case ir.Inst.Move(r, _) => Set(r)
       case _ => Set.empty
     }
     val read = graph.successors(name).foldMap(inputs(_))
@@ -53,10 +57,10 @@ object RegisterLifetime {
 
   def lifetime(reg: ir.Register, instrs: Vector[(ir.Inst, Int)], inputs: Set[ir.Register], outputs: Set[ir.Register]): (Bound, Bound) = {
     val firstWrite = if(inputs(reg)) None else instrs.collectFirst {
-      case (ir.Inst.Eval(Some(`reg`), _), i) => i
+      case (ir.Inst.Move(`reg`, _), i) => i
     }
     val lastRead = if(outputs(reg)) None else instrs.collect {
-      case (ir.Inst.Eval(_, op), i) if op.reads(reg) => i
+      case (ir.Inst.Move(_, op), i) if op.reads(reg) => i
       case (ir.Inst.Flow(flow), i) if flow.reads(reg) => i
     }.lastOption
     firstWrite -> lastRead

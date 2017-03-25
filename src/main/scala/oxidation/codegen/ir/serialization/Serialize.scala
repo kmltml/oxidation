@@ -39,9 +39,10 @@ class Serialize(val out: DataOutputStream) {
   }
 
   def writeInst(i: Inst): Unit = i match {
-    case Inst.Eval(dest, op) => writeTag(Tag.Inst.Eval); writeOption(dest)(writeRegister); writeOp(op)
-    case Inst.Flow(flow) => writeTag(Tag.Inst.Flow); writeFlow(flow)
-    case Inst.Label(l) => writeTag(Tag.Inst.Label); writeName(l)
+    case Inst.Move(dest, op) => writeTag(Tag.Inst.Move); writeRegister(dest); writeOp(op)
+    case Inst.Do(op)         => writeTag(Tag.Inst.Do); writeOp(op)
+    case Inst.Flow(flow)     => writeTag(Tag.Inst.Flow); writeFlow(flow)
+    case Inst.Label(l)       => writeTag(Tag.Inst.Label); writeName(l)
   }
 
   def writeFlow(f: FlowControl): Unit = f match {

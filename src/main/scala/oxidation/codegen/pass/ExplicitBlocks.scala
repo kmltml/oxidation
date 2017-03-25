@@ -7,7 +7,7 @@ object ExplicitBlocks extends Pass {
   override def onBlock: ir.Block =?> Vector[ir.Block] = {
     case ir.Block(name, instructions, flow) =>
       divide(name, instructions, flow) ensuring { blocks => blocks.forall(_.instructions.forall {
-        case ir.Inst.Eval(_, _) => true
+        case ir.Inst.Move(_, _) | ir.Inst.Do(_) => true
         case ir.Inst.Flow(_) | ir.Inst.Label(_) => false
       })}
   }

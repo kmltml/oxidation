@@ -30,7 +30,8 @@ class Deserialize(val in: DataInputStream) {
     Block(readName(), readSeq(readInst).toVector, readFlow())
 
   def readInst(): Inst = readTag() match {
-    case Tag.Inst.Eval => Inst.Eval(readOption(readRegister), readOp())
+    case Tag.Inst.Move => Inst.Move(readRegister(), readOp())
+    case Tag.Inst.Do => Inst.Do(readOp())
     case Tag.Inst.Flow => Inst.Flow(readFlow())
     case Tag.Inst.Label => Inst.Label(readName())
   }

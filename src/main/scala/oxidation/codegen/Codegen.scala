@@ -28,7 +28,7 @@ object Codegen {
         rval <- compileExpr(right)
         res <- genReg(translateType(valType))
         _ <- Res.tell(Vector(
-          Inst.Eval(Some(res), Op.Arith(op, lval, rval))
+          Inst.Move(res, Op.Arith(op, lval, rval))
         ))
       } yield Val.R(res)
 
@@ -37,7 +37,7 @@ object Codegen {
         v <- compileExpr(expr)
         r <- genReg(translateType(valType))
         _ <- Res.tell(Vector(
-          Inst.Eval(Some(r), Op.Unary(op, v))
+          Inst.Move(r, Op.Unary(op, v))
         ))
       } yield Val.R(r)
 
@@ -51,7 +51,7 @@ object Codegen {
               v <- compileExpr(expr)
               r <- genReg(translateType(expr.typ))
               _ <- Res.tell(Vector(
-                Inst.Eval(Some(r), Op.Copy(v))
+                Inst.Move(r, Op.Copy(v))
               ))
               _ <- withBindings(name -> r)
             } yield Val.R(r): Val
@@ -61,7 +61,7 @@ object Codegen {
               v <- compileExpr(expr)
               r <- genReg(translateType(expr.typ))
               _ <- Res.tell(Vector(
-                Inst.Eval(Some(r), Op.Copy(v))
+                Inst.Move(r, Op.Copy(v))
               ))
               _ <- withBindings(name -> r)
             } yield Val.R(r): Val
@@ -89,7 +89,7 @@ object Codegen {
         ))
         trueVal <- compileExpr(pos)
         _ <- Res.tell(Vector(
-          Inst.Eval(Some(res), Op.Copy(trueVal)),
+          Inst.Move(res, Op.Copy(trueVal)),
           Inst.Flow(FlowControl.Goto(afterLbl))
         ))
 
@@ -100,7 +100,7 @@ object Codegen {
             ))
             falseVal <- compileExpr(neg)
             _ <- Res.tell(Vector(
-              Inst.Eval(Some(res), Op.Copy(falseVal)),
+              Inst.Move(res, Op.Copy(falseVal)),
               Inst.Flow(FlowControl.Goto(afterLbl))
             ))
           } yield ()
@@ -143,13 +143,13 @@ object Codegen {
             v <- compileExpr(p)
             r <- genReg(translateType(p.typ))
             _ <- Res.tell(Vector(
-              Inst.Eval(Some(r), Op.Copy(v))
+              Inst.Move(r, Op.Copy(v))
             ))
           } yield r
         }
         r <- genReg(translateType(t))
         _ <- Res.tell(Vector(
-          Inst.Eval(Some(r), Op.Call(fnVal, paramVals))
+          Inst.Move(r, Op.Call(fnVal, paramVals))
         ))
       } yield Val.R(r)
 
@@ -158,7 +158,7 @@ object Codegen {
         right <- compileExpr(rval)
         dest <- WriterT.lift(CodegenState.inspect(_.registerBindings(n))): Res[Register]
         _ <- Res.tell(Vector(
-          Inst.Eval(Some(dest), Op.Copy(right))
+          Inst.Move(dest, Op.Copy(right))
         ))
       } yield Val.I(0)
   }
@@ -172,7 +172,7 @@ object Codegen {
           case (name, r) => for {
             temp <- genReg(r.typ)
             _ <- Res.tell(Vector(
-              Inst.Eval(Some(temp), Op.Copy(Val.R(r)))
+              Inst.Move(temp, Op.Copy(Val.R(r)))
             ))
           } yield name -> temp
         }

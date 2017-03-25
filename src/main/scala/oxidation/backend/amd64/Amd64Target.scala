@@ -68,58 +68,46 @@ class Amd64Target { this: Output =>
 
   def outputInstruction(i: ir.Inst)(implicit bindings: Map[ir.Register, Val]): S[Unit] = i match {
     case ir.Inst.Label(n) => S.tell(label(n))
-    case ir.Inst.Eval(dest, op) => op match {
-      case ir.Op.Arith(op @ (InfixOp.Add | InfixOp.Sub), left, right) => dest match {
-        case None => S.pure(())
-        case Some(r) =>
-          S.tell(Vector(
-            mov(toVal(r), toVal(left)),
-            op match {
-              case InfixOp.Add => add(toVal(r), toVal(right))
-              case InfixOp.Add => sub(toVal(r), toVal(right))
-            }
-          ).combineAll)
-      }
-      case ir.Op.Arith(op @ (InfixOp.Div | InfixOp.Mod), left, right) => dest match {
-        case None => S.pure(())
-        case Some(r) =>
-          val res = toVal(r)
-          S.tell(Vector(
-            res match { case Val.R(RAX) => M.empty; case _ => push(RAX) },
-            res match { case Val.R(RDX) => M.empty; case _ => push(RDX) },
-            res match { case Val.R(RDI) => M.empty; case _ => push(RDI) },
-            mov(RDI, toVal(right)),
-            mov(RDX, 0),
-            mov(RAX, toVal(left)),
-            div(RAX, RDI),
-            mov(toVal(r), op match {
-              case InfixOp.Div => RAX
-              case InfixOp.Mod => RDX
-            }),
-            res match { case Val.R(RAX) => M.empty; case _ => pop(RAX) },
-            res match { case Val.R(RDX) => M.empty; case _ => pop(RDX) },
-            res match { case Val.R(RDI) => M.empty; case _ => pop(RDI) }
-          ).combineAll)
-      }
-      case ir.Op.Arith(op @ (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq), left, right) => dest match {
-        case None => S.pure(())
-        case Some(r) =>
+    case ir.Inst.Move(dest, op) => op match {
+      case ir.Op.Arith(op @ (InfixOp.Add | InfixOp.Sub), left, right) =>
+        S.tell(Vector(
+          mov(toVal(dest), toVal(left)),
+          op match {
+            case InfixOp.Add => add(toVal(dest), toVal(right))
+            case InfixOp.Sub => sub(toVal(dest), toVal(right))
+          }
+        ).combineAll)
+      case ir.Op.Arith(op @ (InfixOp.Div | InfixOp.Mod), left, right) =>
+        val res = toVal(dest)
+        S.tell(Vector(
+          res match { case Val.R(RAX) => M.empty; case _ => push(RAX) },
+          res match { case Val.R(RDX) => M.empty; case _ => push(RDX) },
+          res match { case Val.R(RDI) => M.empty; case _ => push(RDI) },
+          mov(RDI, toVal(right)),
+          mov(RDX, 0),
+          mov(RAX, toVal(left)),
+          div(RAX, RDI),
+          mov(res, op match {
+            case InfixOp.Div => RAX
+            case InfixOp.Mod => RDX
+          }),
+          res match { case Val.R(RAX) => M.empty; case _ => pop(RAX) },
+          res match { case Val.R(RDX) => M.empty; case _ => pop(RDX) },
+          res match { case Val.R(RDI) => M.empty; case _ => pop(RDI) }
+        ).combineAll)
+      case ir.Op.Arith(op @ (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq), left, right) =>
           S.tell(Vector(
             cmp(toVal(left), toVal(right)),
             op match {
-              case InfixOp.Lt => setl(toVal(r))
-              case InfixOp.Gt => setg(toVal(r))
-              case InfixOp.Geq => setge(toVal(r))
-              case InfixOp.Leq => setle(toVal(r))
-              case InfixOp.Eq => sete(toVal(r))
+              case InfixOp.Lt => setl(toVal(dest))
+              case InfixOp.Gt => setg(toVal(dest))
+              case InfixOp.Geq => setge(toVal(dest))
+              case InfixOp.Leq => setle(toVal(dest))
+              case InfixOp.Eq => sete(toVal(dest))
             }
           ).combineAll)
-      }
 
-      case ir.Op.Copy(src) => dest match {
-        case None => S.pure(())
-        case Some(r) => S.tell(mov(toVal(r), toVal(src)))
-      }
+      case ir.Op.Copy(src) => S.tell(mov(toVal(dest), toVal(src)))
 
     }
   }

@@ -30,21 +30,21 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
       "InfixAp" - {
         compileExpr(ast.InfixAp(InfixOp.Add, ast.IntLit(1) :: I32, ast.IntLit(2) :: I32) :: I32)
           .run.runA(CodegenState()).value ==> (Vector(
-            Inst.Eval(Some(r(0, _.I32)), Op.Arith(InfixOp.Add, 1, 2))
+            Inst.Move(r(0, _.I32), Op.Arith(InfixOp.Add, 1, 2))
           ), Val.R(r(0, _.I32)))
 
         compileExpr(ast.InfixAp(InfixOp.Add,
           ast.InfixAp(InfixOp.Sub, ast.IntLit(3) :: I32, ast.IntLit(2) :: I32) :: I32,
           ast.IntLit(1) :: I32) :: I32).run.runA(CodegenState()).value ==> (Vector(
-            Inst.Eval(Some(r(0, _.I32)), Op.Arith(InfixOp.Sub, 3, 2)),
-            Inst.Eval(Some(r(1, _.I32)), Op.Arith(InfixOp.Add, r(0, _.I32), 1))
+            Inst.Move(r(0, _.I32), Op.Arith(InfixOp.Sub, 3, 2)),
+            Inst.Move(r(1, _.I32), Op.Arith(InfixOp.Add, r(0, _.I32), 1))
           ), Val.R(r(1, _.I32)))
       }
       "PrefixAp" - {
         compileExpr(ast.PrefixAp(PrefixOp.Neg, ast.IntLit(20) :: I32) :: I32)
           .run.runA(CodegenState()).value ==>
           (Vector(
-            Inst.Eval(Some(r(0, _.I32)), Op.Unary(PrefixOp.Neg, 20))
+            Inst.Move(r(0, _.I32), Op.Unary(PrefixOp.Neg, 20))
           ), Val.R(r(0, _.I32)))
       }
       "Var" - {
@@ -57,9 +57,9 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
           ast.ValDef(l('y), None, ast.IntLit(20) :: I32) :: U0,
           ast.InfixAp(InfixOp.Add, ast.Var(l('x)) :: I32, ast.Var(l('y)) :: I32) :: I32
         )) :: I32).run.runA(CodegenState()).value ==> (Vector(
-          Inst.Eval(Some(r(0, _.I32)), Op.Copy(10)),
-          Inst.Eval(Some(r(1, _.I32)), Op.Copy(20)),
-          Inst.Eval(Some(r(2, _.I32)), Op.Arith(InfixOp.Add, r(0, _.I32), r(1, _.I32)))
+          Inst.Move(r(0, _.I32), Op.Copy(10)),
+          Inst.Move(r(1, _.I32), Op.Copy(20)),
+          Inst.Move(r(2, _.I32), Op.Arith(InfixOp.Add, r(0, _.I32), r(1, _.I32)))
         ), Val.R(r(2, _.I32)))
       }
       "If" - {
@@ -70,11 +70,11 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
               Inst.Flow(FlowControl.Branch(r(0, _.U1), Name.Local("if", 0), Name.Local("else", 0))),
 
               Inst.Label(Name.Local("if", 0)),
-              Inst.Eval(Some(r(1, _.I32)), Op.Copy(10)),
+              Inst.Move(r(1, _.I32), Op.Copy(10)),
               Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
 
               Inst.Label(Name.Local("else", 0)),
-              Inst.Eval(Some(r(1, _.I32)), Op.Copy(20)),
+              Inst.Move(r(1, _.I32), Op.Copy(20)),
               Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
 
               Inst.Label(Name.Local("ifafter", 0))
@@ -89,8 +89,8 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
               Inst.Flow(FlowControl.Branch(r(0, _.U1), Name.Local("if", 0), Name.Local("ifafter", 0))),
 
               Inst.Label(Name.Local("if", 0)),
-              Inst.Eval(Some(r(2, _.U0)), Op.Call(Val.G(Name.Global(List("foo"))), List.empty)),
-              Inst.Eval(Some(r(1, _.U0)), Op.Copy(r(2, _.U0))),
+              Inst.Move(r(2, _.U0), Op.Call(Val.G(Name.Global(List("foo"))), List.empty)),
+              Inst.Move(r(1, _.U0), Op.Copy(r(2, _.U0))),
               Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
 
               Inst.Label(Name.Local("ifafter", 0))
@@ -105,12 +105,12 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
         ) :: U0).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)), nextReg = 1)).value ==>
           (Vector(
             Inst.Label(Name.Local("whilecond", 0)),
-            Inst.Eval(Some(r(1, _.U1)), Op.Arith(InfixOp.Lt, r(0, _.I32), 10)),
+            Inst.Move(r(1, _.U1), Op.Arith(InfixOp.Lt, r(0, _.I32), 10)),
             Inst.Flow(FlowControl.Branch(r(1, _.U1), Name.Local("while", 0), Name.Local("whileafter", 0))),
 
             Inst.Label(Name.Local("while", 0)),
-            Inst.Eval(Some(r(2, _.I32)), Op.Arith(InfixOp.Add, r(0, _.I32), 1)),
-            Inst.Eval(Some(r(0, _.I32)), Op.Copy(r(2, _.I32))),
+            Inst.Move(r(2, _.I32), Op.Arith(InfixOp.Add, r(0, _.I32), 1)),
+            Inst.Move(r(0, _.I32), Op.Copy(r(2, _.I32))),
             Inst.Flow(FlowControl.Goto(Name.Local("whilecond", 0))),
 
             Inst.Label(Name.Local("whileafter", 0))
@@ -120,7 +120,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
         compileExpr(ast.Assign(ast.Var(l('x)) :: I32, None, ast.IntLit(20) :: I32) :: U0)
           .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)), nextReg = 1)).value ==>
           (Vector(
-            Inst.Eval(Some(r(0, _.I32)), Op.Copy(20))
+            Inst.Move(r(0, _.I32), Op.Copy(20))
           ), Val.I(0))
       }
       "App" - {
@@ -128,8 +128,8 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
           compileExpr(ast.App(ast.Var(g('f)) :: Fun(Seq(I32), U1), Seq(ast.IntLit(10) :: I32)) :: I32)
             .run.runA(CodegenState()).value ==>
             (Vector(
-              Inst.Eval(Some(r(0, _.I32)), Op.Copy(10)),
-              Inst.Eval(Some(r(1, _.I32)), Op.Call(Val.G(Name.Global(List("f"))), List(r(0, _.I32))))
+              Inst.Move(r(0, _.I32), Op.Copy(10)),
+              Inst.Move(r(1, _.I32), Op.Call(Val.G(Name.Global(List("f"))), List(r(0, _.I32))))
             ), Val.R(r(1, _.I32)))
         }
       }

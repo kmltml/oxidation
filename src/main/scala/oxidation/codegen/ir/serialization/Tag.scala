@@ -12,8 +12,9 @@ object Tag {
   }
 
   object Inst {
-    final val Eval  = 0
-    final val Label = 1 + Eval
+    final val Move  = 0
+    final val Do    = 1 + Move
+    final val Label = 1 + Do
     final val Flow  = 1 + Label
   }
 
