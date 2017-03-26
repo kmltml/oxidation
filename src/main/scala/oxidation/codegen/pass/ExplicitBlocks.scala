@@ -2,7 +2,7 @@ package oxidation
 package codegen
 package pass
 
-object ExplicitBlocks extends Pass {
+object ExplicitBlocks extends IdPass {
 
   override def onBlock: ir.Block =?> Vector[ir.Block] = {
     case ir.Block(name, instructions, flow) =>

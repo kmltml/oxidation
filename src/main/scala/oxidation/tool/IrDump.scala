@@ -100,7 +100,7 @@ object IrDump extends App {
         case d: analyze.ast.TermDef => Codegen.compileDef(d)
       }
     }
-    val passed = options.passes.foldLeft(irDefs)((defs, pass) => defs.flatMap(pass.txDef))
+    val passed = options.passes.foldLeft(irDefs)((defs, pass) => defs.flatMap(d => pass.extract(pass.txDef(d))))
     options.format match {
       case Textual =>
         val writer = new PrintWriter(options.out, true)

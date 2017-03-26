@@ -20,7 +20,9 @@ trait Output {
 
   def add(dest: Val, src: Val): M
   def sub(dest: Val, src: Val): M
-  def div(dest: Val, src: Val): M
+
+  def div(src: Val): M
+  def mul(src: Val): M
 
   def test(dest: Val, src: Val): M
   def cmp(dest: Val, src: Val): M

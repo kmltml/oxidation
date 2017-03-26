@@ -10,7 +10,7 @@ case class CodegenState(nextReg: Int = 0, nextName: Int = 0, registerBindings: M
 object CodegenState {
 
   def genReg(t: ir.Type): State[CodegenState, ir.Register] = State { s =>
-    (s.copy(nextReg = s.nextReg + 1), ir.Register(s.nextReg, t))
+    (s.copy(nextReg = s.nextReg + 1), ir.Register(Codegen.CodegenReg, s.nextReg, t))
   }
 
   def genLocalName(prefix: String): State[CodegenState, Name] = State { s =>

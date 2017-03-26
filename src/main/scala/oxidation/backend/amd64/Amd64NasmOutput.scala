@@ -25,6 +25,11 @@ trait Amd64NasmOutput extends Output {
       show"[${(rs ++ off) mkString " + "}]"
   }
 
+  private implicit val showName: Show[Name] = {
+    case Name.Global(p) => p.mkString(".")
+    case Name.Local(p, i) => show".$p.$i"
+  }
+
   type M = Vector[String]
 
   override def M: Monoid[M] = Monoid[Vector[String]]
@@ -41,8 +46,12 @@ trait Amd64NasmOutput extends Output {
     ln(show"add $dest, $src")
   override def sub(dest: Val, src: Val): M =
     ln(show"sub $dest, $src")
-  override def div(dest: Val, src: Val): M =
-    ln(show"div $dest, $src")
+
+  override def div(src: Val): M =
+    ln(show"div $src")
+
+  override def mul(src: Val): M =
+    ln(show"mul $src")
 
   override def test(dest: Val, src: Val) = ln(show"test $dest, $src")
   override def cmp(dest: Val, src: Val) = ln(show"cmp $dest, $src")

@@ -50,6 +50,7 @@ object Tag {
     final val U16 = 1 + U8
     final val U32 = 1 + U16
     final val U64 = 1 + U32
+    final val Fun = 1 + U64
   }
 
   object InfixOp {
@@ -82,6 +83,10 @@ object Tag {
   object Name {
     final val Global = 0
     final val Local  = 1 + Global
+  }
+
+  object RegisterNamespace {
+    final val CodegenReg = 0
   }
 
 }

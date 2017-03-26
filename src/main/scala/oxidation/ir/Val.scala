@@ -7,18 +7,24 @@ import cats.implicits._
 
 import codegen.Name
 
-sealed trait Val
+sealed trait Val {
+
+  def typ: Type
+
+}
 
 object Val {
 
-  final case class R(register: Register) extends Val
-  final case class I(value: Int) extends Val
-  final case class G(name: Name) extends Val
+  final case class R(register: Register) extends Val {
+    def typ = register.typ
+  }
+  final case class I(value: Int, typ: Type) extends Val
+  final case class G(name: Name, typ: Type) extends Val
 
   implicit val show: Show[Val] = {
     case R(reg) => reg.show
-    case I(value) => value.show
-    case G(n) => show"@$n"
+    case I(value, typ) => show"($value)[$typ]"
+    case G(n, typ) => show"(@$n)[$typ]"
   }
 
 }

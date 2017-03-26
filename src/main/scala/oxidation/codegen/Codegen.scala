@@ -13,14 +13,20 @@ object Codegen {
   type Res[A] = WriterT[State[CodegenState, ?], Vector[Inst], A]
   private val Res = MonadWriter[Res, Vector[Inst]]
 
+  object CodegenReg extends RegisterNamespace {
+    override def prefix: String = "r"
+  }
+
+  def register(index: Int, typ: ir.Type): ir.Register = ir.Register(CodegenReg, index, typ)
+
   def compileExpr(expr: Typed[ast.Expression]): Res[Val] = expr match {
-    case Typed(ast.IntLit(i), _) => Res.pure(Val.I(i))
-    case Typed(ast.BoolLit(b), _) =>
+    case Typed(ast.IntLit(i), typ) => Res.pure(Val.I(i, translateType(typ)))
+    case Typed(ast.BoolLit(b), typ) =>
       val i = b match {
         case true => 1
         case false => 0
       }
-      Res.pure(Val.I(i))
+      Res.pure(Val.I(i, translateType(typ)))
     case Typed(ast.Var(n), _) => WriterT.lift(State.inspect(s => Val.R(s.registerBindings(n))))
     case Typed(ast.InfixAp(op, left, right), valType) =>
       for {
@@ -67,7 +73,7 @@ object Codegen {
             } yield Val.R(r): Val
         }
         _ <- restoreBindings(bindings)
-      } yield vals.lastOption getOrElse Val.I(0)
+      } yield vals.lastOption getOrElse Val.I(0, ir.Type.U0)
 
     case Typed(ast.If(cond, pos, neg), typ) =>
       for {
@@ -130,12 +136,12 @@ object Codegen {
           Inst.Flow(FlowControl.Goto(condLbl)),
           Inst.Label(afterLbl)
         ))
-      } yield Val.I(0)
+      } yield Val.I(0, ir.Type.U0)
 
     case Typed(ast.App(Typed(fn, fnType: analyze.Type.Fun), params), t) =>
       for {
         fnVal <- fn match {
-          case ast.Var(Symbol.Global(path)) => Res.pure(Val.G(Name.Global(path.toList)))
+          case ast.Var(Symbol.Global(path)) => Res.pure(Val.G(Name.Global(path.toList), translateType(fnType)))
           case _ => compileExpr(Typed(fn, fnType))
         }
         paramVals <- params.toList.traverse { p =>
@@ -160,7 +166,7 @@ object Codegen {
         _ <- Res.tell(Vector(
           Inst.Move(dest, Op.Copy(right))
         ))
-      } yield Val.I(0)
+      } yield Val.I(0, ir.Type.U0)
   }
 
   def compileDef(d: ast.Def): Def = d match {
@@ -202,7 +208,8 @@ object Codegen {
     case analyze.Type.U0 => ir.Type.U0
 
 
-//    case analyze.Type.Fun(params, ret) =>
+    case analyze.Type.Fun(params, ret) =>
+      ir.Type.Fun(params.toList.map(translateType), translateType(ret))
 
 //    case analyze.Type.Struct(name, members) =>
 

@@ -79,6 +79,14 @@ class Edge[A](val a: A, val b: A) {
 
 }
 
+object Edge {
+
+  implicit def show[A: Show]: Show[Edge[A]] = {
+    case a <-> b => show"$a <-> $b"
+  }
+
+}
+
 object <-> {
 
   def apply[A](a: A, b: A): Edge[A] = new Edge(a, b)

@@ -29,24 +29,18 @@ class Amd64Target { this: Output =>
     override def tailRecM[A, B](a: A)(f: (A) => S[Either[A, B]]): S[B] = w.tailRecM(a)(f)
   }
 
-  val allocator: RegisterAllocator[Val] =
-    new RegisterAllocator[Val](Reg.calleeSaved.map(Val.R), Reg.callerSaved.map(Val.R))
+  val allocator: RegisterAllocator[Reg] =
+    new RegisterAllocator[Reg](Reg.calleeSaved, Reg.callerSaved)
 
   def outputDef(d: ir.Def): M = d match {
-    case fun @ ir.Def.Fun(name, params, _, blocks) =>
-      val paramBindings = params.zipWithIndex.map {
-        case (r, 0) => r -> Val.R(RCX)
-        case (r, 1) => r -> Val.R(RDX)
-        case (r, 2) => r -> Val.R(R8)
-        case (r, 3) => r -> Val.R(R9)
-        case (r, i) => r -> Val.m(RBP, 8 * i)
-      }.toMap
-      val allocations = allocator.allocate(fun, paramBindings)
+    case ir.Def.Fun(name, _, _, _) =>
+      val (precolours, Vector(fun @ ir.Def.Fun(_, _, _, blocks))) = Amd64BackendPass.txDef(d).run.runEmptyA.value
+      val allocations = allocator.allocate(fun, precolours.toMap)
       val spills = allocations.collect {
         case (r, allocator.Spill) => r
       }.zipWithIndex.toMap
       val bindings = allocations.map {
-        case (reg, allocator.R(r)) => reg -> r
+        case (reg, allocator.R(r)) => reg -> Val.R(r)
         case (r, allocator.Spill) => r -> Val.m(RBP, -8 * spills(r))
       }
       val requiredStackSpace = spills.size * 8
@@ -66,8 +60,14 @@ class Amd64Target { this: Output =>
       ).combineAll
   }
 
+  def move(dest: Val, src: Val): M =
+    if(dest == src) M.empty else mov(dest, src)
+
   def outputInstruction(i: ir.Inst)(implicit bindings: Map[ir.Register, Val]): S[Unit] = i match {
     case ir.Inst.Label(n) => S.tell(label(n))
+
+    case ir.Inst.Do(ir.Op.Copy(_)) => S.pure(())
+
     case ir.Inst.Move(dest, op) => op match {
       case ir.Op.Arith(op @ (InfixOp.Add | InfixOp.Sub), left, right) =>
         S.tell(Vector(
@@ -77,24 +77,8 @@ class Amd64Target { this: Output =>
             case InfixOp.Sub => sub(toVal(dest), toVal(right))
           }
         ).combineAll)
-      case ir.Op.Arith(op @ (InfixOp.Div | InfixOp.Mod), left, right) =>
-        val res = toVal(dest)
-        S.tell(Vector(
-          res match { case Val.R(RAX) => M.empty; case _ => push(RAX) },
-          res match { case Val.R(RDX) => M.empty; case _ => push(RDX) },
-          res match { case Val.R(RDI) => M.empty; case _ => push(RDI) },
-          mov(RDI, toVal(right)),
-          mov(RDX, 0),
-          mov(RAX, toVal(left)),
-          div(RAX, RDI),
-          mov(res, op match {
-            case InfixOp.Div => RAX
-            case InfixOp.Mod => RDX
-          }),
-          res match { case Val.R(RAX) => M.empty; case _ => pop(RAX) },
-          res match { case Val.R(RDX) => M.empty; case _ => pop(RDX) },
-          res match { case Val.R(RDI) => M.empty; case _ => pop(RDI) }
-        ).combineAll)
+      case ir.Op.Arith(InfixOp.Div, _, right) => S.tell(div(toVal(right)))
+      case ir.Op.Arith(InfixOp.Mul, _, right) => S.tell(mul(toVal(right)))
       case ir.Op.Arith(op @ (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq), left, right) =>
           S.tell(Vector(
             cmp(toVal(left), toVal(right)),
@@ -107,7 +91,8 @@ class Amd64Target { this: Output =>
             }
           ).combineAll)
 
-      case ir.Op.Copy(src) => S.tell(mov(toVal(dest), toVal(src)))
+      case ir.Op.Copy(src) => S.tell(move(toVal(dest), toVal(src)))
+      case ir.Op.Garbled => S.pure(())
 
     }
   }
@@ -115,7 +100,7 @@ class Amd64Target { this: Output =>
   def outputFlow(f: ir.FlowControl)(implicit bindings: Map[ir.Register, Val]): S[Unit] = f match {
     case ir.FlowControl.Return(r) =>
       S.tell(Vector(
-        mov(RAX, toVal(r)),
+        move(RAX, toVal(r)),
         epilogue,
         ret
       ).combineAll)
@@ -140,7 +125,7 @@ class Amd64Target { this: Output =>
   ).combineAll
 
   private def toVal(v: ir.Val)(implicit bindings: Map[ir.Register, Val]): Val = v match {
-    case ir.Val.I(i) => Val.I(i)
+    case ir.Val.I(i, _) => Val.I(i)
     case ir.Val.R(r) => bindings(r)
   }
   private def toVal(r: ir.Register)(implicit bindings: Map[ir.Register, Val]): Val = bindings(r)

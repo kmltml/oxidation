@@ -20,3 +20,5 @@ def factorial(x: i32): i32 = {
     }
     r
 }
+
+def div(a: i32, b: i32) = a / b

@@ -27,6 +27,16 @@ object Inst {
   final case class Label(name: Name) extends Inst
   final case class Flow(flowControl: FlowControl) extends Inst
 
+  object Eval {
+
+    def unapply(i: Inst): Option[(Option[Register], Op)] = i match {
+      case Move(r, o) => Some((Some(r), o))
+      case Do(o) => Some((None, o))
+      case _ => None
+    }
+
+  }
+
   implicit val show: Show[Inst] = {
     case Do(op) => op.show
     case Move(reg, op) => show"$reg = $op"

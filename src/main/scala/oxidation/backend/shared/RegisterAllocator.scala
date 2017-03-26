@@ -96,7 +96,9 @@ class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs
       case a <-> b =>
         !graph.interfering(a, b) &&
         (graph.neighbors(a) ++ graph.neighbors(b)).count(graph.degree(_) >= colourCount) < colourCount &&
-        !(graph.precoloured(a) && graph.precoloured(b))
+        !(graph.precoloured(a) && graph.precoloured(b)) &&
+        !((graph.colours.get(a) orElse graph.colours.get(b)).exists(c => (graph.neighbors(a) ++ graph.neighbors(b)).flatMap(graph.colours.get).contains(c)))
+        // TODO ^^ This is ugly, and not present in original paper, something should be done about this ^^
     } match {
       case None => graph
       case Some(a <-> b) =>
@@ -112,20 +114,21 @@ class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs
   }
 
   def select(graph: Graph, removed: RemovedNodes): Graph = removed match {
-    case Nil => graph
     case (node, neighbors) :: rest =>
       val neighborColors = neighbors
         .map(n => graph.nodes.find(n subsetOf _).get)
         .map(graph.colours(_))
       // Simplify should only remove nodes in such way, that there will be a color available when re-inserting it
       // This failing to find a register would signify a bug in the simplify method, not here.
-      val colour = colours.find(!neighborColors(_)).get
+      // Also, prefer caller saved regs, to minimize register saving in prologue
+      val colour = (callerSavedRegs.find(!neighborColors(_)) orElse calleeSavedRegs.find(!neighborColors(_))).get
       select(graph |+| InterferenceGraph(
         nodes = graph.nodes + node,
         colours = graph.colours.updated(node, colour),
         interferenceEdges = neighbors.map(_ <-> node),
         preferenceEdges = Set.empty
       ), rest)
+    case Nil => graph
   }
 
   def allocate(fun: ir.Def.Fun, precoloured: Map[ir.Register, Reg]): Map[ir.Register, Alloc] = {

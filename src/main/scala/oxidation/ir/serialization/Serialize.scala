@@ -3,7 +3,8 @@ package ir
 package serialization
 
 import java.io.DataOutputStream
-import codegen.Name
+
+import codegen.{Codegen, Name}
 
 class Serialize(val out: DataOutputStream) {
 
@@ -52,21 +53,25 @@ class Serialize(val out: DataOutputStream) {
   }
 
   def writeRegister(reg: Register): Unit = {
+    reg.ns match {
+      case Codegen.CodegenReg => Tag.RegisterNamespace.CodegenReg
+    }
     writeInt(reg.index); writeType(reg.typ)
   }
 
-  def writeType(t: Type): Unit = writeTag(t match {
-    case Type.U0 => Tag.Type.U0
-    case Type.U1 => Tag.Type.U1
-    case Type.I8 => Tag.Type.I8
-    case Type.I16 => Tag.Type.I16
-    case Type.I32 => Tag.Type.I32
-    case Type.I64 => Tag.Type.I64
-    case Type.U8 => Tag.Type.U8
-    case Type.U16 => Tag.Type.U16
-    case Type.U32 => Tag.Type.U32
-    case Type.U64 => Tag.Type.U64
-  })
+  def writeType(t: Type): Unit = t match {
+    case Type.U0 => writeTag(Tag.Type.U0)
+    case Type.U1 => writeTag(Tag.Type.U1)
+    case Type.I8 => writeTag(Tag.Type.I8)
+    case Type.I16 => writeTag(Tag.Type.I16)
+    case Type.I32 => writeTag(Tag.Type.I32)
+    case Type.I64 => writeTag(Tag.Type.I64)
+    case Type.U8 => writeTag(Tag.Type.U8)
+    case Type.U16 => writeTag(Tag.Type.U16)
+    case Type.U32 => writeTag(Tag.Type.U32)
+    case Type.U64 => writeTag(Tag.Type.U64)
+    case Type.Fun(p, r) => writeTag(Tag.Type.Fun); writeSeq(p)(writeType); writeType(r)
+  }
 
   def writeOp(op: Op): Unit = op match {
     case Op.Arith(o, l, r) => writeTag(Tag.Op.Arith); writeInfixOp(o); writeVal(l); writeVal(r)
@@ -103,8 +108,8 @@ class Serialize(val out: DataOutputStream) {
   })
 
   def writeVal(v: Val): Unit = v match {
-    case Val.G(n) => writeTag(Tag.Val.G); writeName(n)
-    case Val.I(i) => writeTag(Tag.Val.I); writeInt(i)
+    case Val.G(n, t) => writeTag(Tag.Val.G); writeName(n); writeType(t)
+    case Val.I(i, t) => writeTag(Tag.Val.I); writeInt(i); writeType(t)
     case Val.R(r) => writeTag(Tag.Val.R); writeRegister(r)
   }
 

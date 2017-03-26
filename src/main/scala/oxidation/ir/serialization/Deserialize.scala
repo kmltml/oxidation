@@ -3,7 +3,8 @@ package ir
 package serialization
 
 import java.io.DataInputStream
-import codegen.Name
+
+import codegen.{Codegen, Name}
 
 class Deserialize(val in: DataInputStream) {
 
@@ -42,7 +43,11 @@ class Deserialize(val in: DataInputStream) {
     case Tag.FlowControl.Branch => FlowControl.Branch(readVal(), readName(), readName())
   }
 
-  def readRegister(): Register = Register(readInt(), readType())
+  def readRegister(): Register = Register(readRegisterNS(), readInt(), readType())
+
+  def readRegisterNS(): RegisterNamespace = readTag() match {
+    case Tag.RegisterNamespace.CodegenReg => Codegen.CodegenReg
+  }
 
   def readType(): Type = readTag() match {
     case Tag.Type.U0 => Type.U0
@@ -55,6 +60,7 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Type.U16 => Type.U16
     case Tag.Type.U32 => Type.U32
     case Tag.Type.U64 => Type.U64
+    case Tag.Type.Fun => Type.Fun(readSeq(readType).toList, readType())
   }
 
   def readOp(): Op = readTag() match {
@@ -92,8 +98,8 @@ class Deserialize(val in: DataInputStream) {
   }
 
   def readVal(): Val = readTag() match {
-    case Tag.Val.G => Val.G(readName())
-    case Tag.Val.I => Val.I(readInt())
+    case Tag.Val.G => Val.G(readName(), readType())
+    case Tag.Val.I => Val.I(readInt(), readType())
     case Tag.Val.R => Val.R(readRegister())
   }
 
