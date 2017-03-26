@@ -11,34 +11,7 @@ class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs
 
   sealed trait Alloc
   final case class R(r: Reg) extends Alloc
-  final case class Stack(offset: Int) extends Alloc
-
-  def allocate(blocks: Vector[ir.Block], preallocated: Map[ir.Register, Alloc]): Map[ir.Register, Alloc] = {
-    // Placeholder no-op register allocation here
-    val irRegs = for {
-      block <- blocks
-      inst <- block.instructions
-      r <- inst match {
-        case ir.Inst.Move(r, _) => Vector(r)
-        case _ => Vector.empty
-      }
-    } yield r
-
-    type S[A] = State[(List[Reg], Int), A]
-    val S = MonadState[S, (List[Reg], Int)]
-
-    val freeRegs: List[Reg] = (callerSavedRegs ++ calleeSavedRegs) diff preallocated.values.collect {
-      case R(r) => r
-    }.toList
-
-    irRegs.traverse(r => for {
-      free <- S.get
-      reg <- free match {
-        case (Nil, i) => S.set((Nil, i + 1)).as(Stack(i): Alloc)
-        case (h :: t, i) => S.set((t, i)).as(R(h): Alloc)
-      }
-    } yield r -> reg).runA((freeRegs, 0)).value.toMap ++ preallocated
-  }
+  case object Spill extends Alloc
 
   sealed trait Bound extends Product with Serializable
     { def location: Int; def register: ir.Register }
@@ -80,7 +53,10 @@ class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs
       case End(_, r) => S.modify(_ - r)
     }
     val edges = f.written.runA(inputs).value
-    InterferenceGraph(regs.toSet, Map.empty, edges)
+    val moves = instrs.collect {
+      case (ir.Inst.Move(dest, ir.Op.Copy(ir.Val.R(src))), _) => dest <-> src
+    }
+    InterferenceGraph(regs.toSet, Map.empty, edges, moves.toSet)
   }
 
   def buildInterferenceGraph(fun: ir.Def.Fun): InterferenceGraph[ir.Register, Reg] = {
@@ -97,5 +73,109 @@ class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs
     }
   }
 
+  val colourCount = calleeSavedRegs.size + callerSavedRegs.size
+  val colours: Set[Reg] = calleeSavedRegs.toSet ++ callerSavedRegs.toSet
+
+  type Graph = InterferenceGraph[Set[ir.Register], Reg]
+  type RemovedNodes = List[(Set[ir.Register], Set[Set[ir.Register]])]
+
+  def simplify(graph: Graph, removedNodes: RemovedNodes): (Graph, RemovedNodes) = {
+    graph.nodes.find { n =>
+      !graph.moveRelated(n) &&
+      graph.degree(n) < colourCount &&
+      !graph.precoloured(n)
+    } match {
+      case None => (graph, removedNodes)
+      case Some(n) =>
+        simplify(graph - n, (n, graph.neighbors(n)) :: removedNodes)
+    }
+  }
+
+  def coalesce(graph: InterferenceGraph[Set[ir.Register], Reg]): InterferenceGraph[Set[ir.Register], Reg] = {
+    graph.preferenceEdges.find {
+      case a <-> b =>
+        !graph.interfering(a, b) &&
+        (graph.neighbors(a) ++ graph.neighbors(b)).count(graph.degree(_) >= colourCount) < colourCount &&
+        !(graph.precoloured(a) && graph.precoloured(b))
+    } match {
+      case None => graph
+      case Some(a <-> b) =>
+        val removed = graph - a - b
+        val newNode = a ++ b
+        coalesce(removed |+| InterferenceGraph(
+          nodes = removed.nodes + newNode,
+          colours = (graph.colours.get(a) orElse graph.colours.get(b)).map(r => Map(newNode -> r)) getOrElse Map.empty,
+          interferenceEdges = (graph.neighbors(a) ++ graph.neighbors(b)).map(newNode <-> _),
+          preferenceEdges = (graph.moveNeighbors(a) ++ graph.moveNeighbors(b) diff Set(a, b)).map(newNode <-> _)
+        ))
+    }
+  }
+
+  def select(graph: Graph, removed: RemovedNodes): Graph = removed match {
+    case Nil => graph
+    case (node, neighbors) :: rest =>
+      val neighborColors = neighbors
+        .map(n => graph.nodes.find(n subsetOf _).get)
+        .map(graph.colours(_))
+      // Simplify should only remove nodes in such way, that there will be a color available when re-inserting it
+      // This failing to find a register would signify a bug in the simplify method, not here.
+      val colour = colours.find(!neighborColors(_)).get
+      select(graph |+| InterferenceGraph(
+        nodes = graph.nodes + node,
+        colours = graph.colours.updated(node, colour),
+        interferenceEdges = neighbors.map(_ <-> node),
+        preferenceEdges = Set.empty
+      ), rest)
+  }
+
+  def allocate(fun: ir.Def.Fun, precoloured: Map[ir.Register, Reg]): Map[ir.Register, Alloc] = {
+
+    def simplifyCoalesce(initialGraph: Graph, graph: Graph, removedNodes: RemovedNodes): Map[ir.Register, Alloc] = {
+      val (g1, newRemoved) = simplify(graph, removedNodes)
+      val g2 = coalesce(g1)
+      (g2, newRemoved) match {
+        case (graph, removedNodes) =>
+          if (graph.nodes.forall(graph.precoloured)) {
+            select(graph, removedNodes).colours.flatMap {
+              case (k, v) => k.map(_ -> R(v))
+            }
+          } else if (graph.nodes.exists(n => graph.degree(n) < colourCount && !graph.moveRelated(n) && !graph.precoloured(n))) {
+            simplifyCoalesce(initialGraph, graph, removedNodes)
+          } else if (graph.preferenceEdges.nonEmpty) {
+            removeConflicting(initialGraph, graph, removedNodes)
+          } else {
+            spill(initialGraph, graph.nodes)
+          }
+      }
+    }
+
+    def removeConflicting(initialGraph: Graph, graph: Graph, removedNodes: RemovedNodes): Map[ir.Register, Alloc] = {
+      val conflicting = graph.preferenceEdges.filter {
+        case a <-> b => graph.interfering(a, b)
+      }
+      if(conflicting.nonEmpty) {
+        simplifyCoalesce(initialGraph, graph.copy(preferenceEdges = graph.preferenceEdges -- conflicting), removedNodes)
+      } else {
+        freeze(initialGraph, graph, removedNodes)
+      }
+    }
+
+    def freeze(initialGraph: Graph, graph: Graph, removedNodes: RemovedNodes): Map[ir.Register, Alloc] = {
+      graph.preferenceEdges.find {
+        case a <-> b => graph.degree(a) < colourCount || graph.degree(b) < colourCount
+      } match {
+        case None => spill(initialGraph, graph.nodes)
+        case Some(e) => simplifyCoalesce(initialGraph, graph.copy(preferenceEdges = graph.preferenceEdges - e), removedNodes)
+      }
+    }
+
+    def spill(initialGraph: Graph, candidates: Set[Set[ir.Register]]): Map[ir.Register, Alloc] = {
+      val regToSpill = candidates.find(_.size == 1).map(_.head).getOrElse(candidates.flatten.head)
+      val graph = initialGraph - Set(regToSpill)
+      simplifyCoalesce(graph, graph, Nil).updated(regToSpill, Spill)
+    }
+    val initialGraph: Graph = buildInterferenceGraph(fun).copy(colours = precoloured).mapVar(Set(_))
+    simplifyCoalesce(initialGraph, initialGraph, Nil)
+  }
 
 }

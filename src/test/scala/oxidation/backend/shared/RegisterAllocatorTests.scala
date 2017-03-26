@@ -39,6 +39,10 @@ object RegisterAllocatorTests extends TestSuite {
           colours = Map.empty,
           interferenceEdges = Set(
             Register(0, I32) <-> Register(1, U1)
+          ),
+          preferenceEdges = Set(
+            Register(2, I32) <-> Register(3, I32),
+            Register(2, I32) <-> Register(0, I32)
           )
         )
       }

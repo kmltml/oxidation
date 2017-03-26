@@ -165,7 +165,7 @@ object Codegen {
 
   def compileDef(d: ast.Def): Def = d match {
     case ast.DefDef(Symbol.Global(name), params, _, body) =>
-      val s: Res[(List[Register], Val)] = for {
+      val s: Res[(List[Register], ir.Register)] = for {
         paramRegs <- params.getOrElse(Seq.empty).toList
           .traverse(p => genReg(translateType(p.typ)).map(Symbol.Local(p.name) -> _))
         paramTemps <- paramRegs.traverse {
@@ -178,10 +178,14 @@ object Codegen {
         }
         _ <- withBindings(paramTemps: _*)
         v <- compileExpr(body)
-      } yield (paramRegs.map(_._2), v)
+        vtemp <- genReg(translateType(body.typ))
+        _ <- Res.tell(Vector(
+          Inst.Move(vtemp, Op.Copy(v))
+        ))
+      } yield (paramRegs.map(_._2), vtemp)
       val (instrs, (paramRegs, v)) = s.run.runA(CodegenState()).value
       val retType = translateType(body.typ)
-      Def.Fun(Name.Global(name.toList), paramRegs, retType, Vector(Block(Name.Local("body", 0), instrs, FlowControl.Return(v))))
+      Def.Fun(Name.Global(name.toList), paramRegs, retType, Vector(Block(Name.Local("body", 0), instrs, FlowControl.Return(ir.Val.R(v)))))
   }
 
   private def translateType(t: analyze.Type): ir.Type = t match {

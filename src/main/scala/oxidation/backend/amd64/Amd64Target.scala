@@ -33,7 +33,7 @@ class Amd64Target { this: Output =>
     new RegisterAllocator[Val](Reg.calleeSaved.map(Val.R), Reg.callerSaved.map(Val.R))
 
   def outputDef(d: ir.Def): M = d match {
-    case ir.Def.Fun(name, params, _, blocks) =>
+    case fun @ ir.Def.Fun(name, params, _, blocks) =>
       val paramBindings = params.zipWithIndex.map {
         case (r, 0) => r -> Val.R(RCX)
         case (r, 1) => r -> Val.R(RDX)
@@ -41,14 +41,15 @@ class Amd64Target { this: Output =>
         case (r, 3) => r -> Val.R(R9)
         case (r, i) => r -> Val.m(RBP, 8 * i)
       }.toMap
-      val allocations = allocator.allocate(blocks, paramBindings.mapValues(allocator.R))
-      val bindings = allocations.mapValues {
-        case allocator.R(r) => r
-        case allocator.Stack(off) => Val.m(RBP, -8 * off)
+      val allocations = allocator.allocate(fun, paramBindings)
+      val spills = allocations.collect {
+        case (r, allocator.Spill) => r
+      }.zipWithIndex.toMap
+      val bindings = allocations.map {
+        case (reg, allocator.R(r)) => reg -> r
+        case (r, allocator.Spill) => r -> Val.m(RBP, -8 * spills(r))
       }
-      val requiredStackSpace = allocations.values.collect {
-        case allocator.Stack(off) => off
-      }.toList.maximumOption.getOrElse(0) * 8
+      val requiredStackSpace = spills.size * 8
       val res: S[Unit] = blocks.traverse_ {
         case ir.Block(name, instructions, flow) =>
           for {
