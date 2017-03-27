@@ -25,6 +25,14 @@ object ParserTests extends TestSuite {
         expr.parse("true").get.value ==> BoolLit(true)
         expr.parse("false").get.value ==> BoolLit(false)
       }
+      "char literals" - {
+        expr.parse("'a'").get.value ==> CharLit('a')
+        expr.parse("'0'").get.value ==> CharLit('0')
+        expr.parse("'\\n'").get.value ==> CharLit('\n')
+        expr.parse("'\\\\'").get.value ==> CharLit('\\')
+        expr.parse("'\\''").get.value ==> CharLit('\'')
+        expr.parse("'\\0'").get.value ==> CharLit('\0')
+      }
       "string literals" - {
         expr.parse(""" "Hello, \"world\"!\n" """).get.value ==> StringLit("Hello, \"world\"!\n")
       }
@@ -155,8 +163,8 @@ object ParserTests extends TestSuite {
         expr.parse("foo <<= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Shl), Var("bar"))
         expr.parse("foo >>= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Shr), Var("bar"))
         expr.parse("foo ^= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Xor), Var("bar"))
-        expr.parse("foo &= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.And), Var("bar"))
-        expr.parse("foo |= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Or), Var("bar"))
+        expr.parse("foo &= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.BitAnd), Var("bar"))
+        expr.parse("foo |= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.BitOr), Var("bar"))
       }
     }
 

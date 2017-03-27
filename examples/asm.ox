@@ -1,1 +1,1 @@
-def div(a: i32, b: i32): i32 = a / b
+def a = 'a'

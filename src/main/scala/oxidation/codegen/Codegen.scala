@@ -27,6 +27,7 @@ object Codegen {
         case false => 0
       }
       Res.pure(Val.I(i, translateType(typ)))
+    case Typed(ast.CharLit(c), typ) => Res.pure(Val.I(c.toInt, translateType(typ)))
     case Typed(ast.Var(n), _) => WriterT.lift(State.inspect(s => Val.R(s.registerBindings(n))))
     case Typed(ast.InfixAp(op, left, right), valType) =>
       for {

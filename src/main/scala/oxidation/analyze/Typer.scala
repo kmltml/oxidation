@@ -23,6 +23,8 @@ object Typer {
 
     case P.BoolLit(b) => unifyType(U1, expected).map(Typed(ast.BoolLit(b), _))
 
+    case P.CharLit(c) => unifyType(U8, expected).map(Typed(ast.CharLit(c), _))
+
     case P.StructLit(name, members) =>
       for {
         struct <- lookupType(TypeName.Named(name), ctxt) match {

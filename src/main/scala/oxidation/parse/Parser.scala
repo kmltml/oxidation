@@ -34,7 +34,7 @@ class Parser {
   val compilationUnit: P[Seq[TLD]] = P((WS ~~ tld).repX(sep = semi) ~~ End)
 
   private val expression0: P[Expression] = P(
-    stringLiteral | intLiteral | structLit | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
+    stringLiteral | intLiteral | structLit | charLiteral | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
   )
   private val expression1: P[Expression] = P(
     expression0 ~~ postfix.repX
@@ -180,6 +180,16 @@ class Parser {
   | K("false").as(BoolLit(false))
   )
 
+  private val charLiteral: P[CharLit] = P(
+    "'" ~~
+    ( LiteralStr("\\\\").as('\\')
+    | LiteralStr("\\'").as('\'')
+    | LiteralStr("\\n").as('\n')
+    | LiteralStr("\\0").as('\0')
+    | CharPred(_ != '\'').!.map(_.head)
+    ) ~~ "'"
+  ).map(CharLit)
+
   private val stringLiteral: P[StringLit] = {
     val escapeSequence =
     ( LiteralStr("\\\"").as("\"")
@@ -228,8 +238,8 @@ class Parser {
   | O("<<=").as(Some(InfixOp.Shl))
   | O(">>=").as(Some(InfixOp.Shr))
   | O("^=").as(Some(InfixOp.Xor))
-  | O("&=").as(Some(InfixOp.And))
-  | O("|=").as(Some(InfixOp.Or))
+  | O("&=").as(Some(InfixOp.BitAnd))
+  | O("|=").as(Some(InfixOp.BitOr))
   )
 
   private val op3: P[InfixOp] = P(

@@ -29,6 +29,9 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         findType(P.BoolLit(true), ExpectedType.Undefined) ==> Right(U1)
         findType(P.BoolLit(false), ExpectedType.Specific(U1)) ==> Right(U1)
       }
+      "CharLit" - {
+        solveType(P.CharLit('a'), ExpectedType.Undefined, Ctxt.default) ==> Right(ast.CharLit('a') :: U8)
+      }
       "struct literals" - {
         val Vec2 = Struct(g('Vec2), Seq(
           StructMember("x", I32), StructMember("y", I64)

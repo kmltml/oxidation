@@ -27,6 +27,10 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
         compileExpr(ast.BoolLit(false) :: U1).run.runA(CodegenState()).value ==>
           (Vector.empty, Val.I(0, ir.Type.U1))
       }
+      "CharLit" - {
+        compileExpr(ast.CharLit('a') :: U8).run.runA(CodegenState()).value ==>
+          (Vector.empty, Val.I(97, ir.Type.U8))
+      }
       "InfixAp" - {
         compileExpr(ast.InfixAp(InfixOp.Add, ast.IntLit(1) :: I32, ast.IntLit(2) :: I32) :: I32)
           .run.runA(CodegenState()).value ==> (Vector(
