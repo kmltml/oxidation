@@ -61,6 +61,7 @@ object RegisterLifetime {
     }
     val lastRead = if(outputs(reg)) None else instrs.collect {
       case (ir.Inst.Move(_, op), i) if op.reads(reg) => i
+      case (ir.Inst.Do(op), i) if op.reads(reg) => i
       case (ir.Inst.Flow(flow), i) if flow.reads(reg) => i
     }.lastOption
     firstWrite -> lastRead

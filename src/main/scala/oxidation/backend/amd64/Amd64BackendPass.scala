@@ -83,6 +83,21 @@ object Amd64BackendPass extends Pass {
         Inst.Move(otherTemp, Op.Garbled),
         Inst.Move(dest, Op.Copy(ir.Val.R(destTemp)))
       )
+
+    case inst @ Inst.Eval(dest, Op.Call(_, params)) =>
+      val destColour = dest.map(_ -> RegLoc.A)
+      val paramColours = params.zipWithIndex.collect {
+        case (r, 0) => r -> RegLoc.C
+        case (r, 1) => r -> RegLoc.D
+        case (r, 2) => r -> RegLoc.R8
+        case (r, 3) => r -> RegLoc.R9
+      }
+      F.tell(paramColours.toSet ++ destColour).as(Vector(inst))
+
+    case inst @ Inst.Move(dest, Op.Arith(InfixOp.Add | InfixOp.Sub, l, r)) =>
+      F.pure(Vector(
+        inst, Inst.Do(Op.Copy(r))
+      ))
   }
 
   override def onBlock: Block =?> F[Vector[Block]] = {

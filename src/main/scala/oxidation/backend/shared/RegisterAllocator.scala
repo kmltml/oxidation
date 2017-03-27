@@ -6,6 +6,7 @@ import cats._
 import cats.data._
 import cats.implicits._
 import <->.EdgeSyntax
+import oxidation.ir.RegisterNamespace
 
 class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs: List[Reg]) {
 
@@ -13,28 +14,42 @@ class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs
   final case class R(r: Reg) extends Alloc
   case object Spill extends Alloc
 
-  sealed trait Bound extends Product with Serializable
-    { def location: Int; def register: ir.Register }
-  final case class Start(location: Int, register: ir.Register) extends Bound
-  final case class End(location: Int, register: ir.Register) extends Bound
+  sealed trait Event extends Product with Serializable
+    { def location: Int }
+  final case class Start(location: Int, register: ir.Register) extends Event
+  final case class End(location: Int, register: ir.Register) extends Event
+  final case class Call(location: Int) extends Event
 
-  implicit val boundOrder: Ordering[Bound] = {
+  implicit val eventOrder: Ordering[Event] = {
     case (Start(x, _), End(y, _)) if x == y => 1
+    case (Start(x, _), Call(y)) if x == y => 1
     case (End(x, _), Start(y, _)) if x == y => -1
+    case (Call(x), Start(y, _)) if x == y => -1
     case (a, b) => a.location - b.location
   }
+
+  object VirtualReg extends RegisterNamespace {
+    override def prefix: String = "vr"
+  }
+
+  val virtualRegs: Map[ir.Register, Reg] = callerSavedRegs.zipWithIndex.map {
+    case (r, i) => ir.Register(VirtualReg, i, ir.Type.U0) -> r
+  }.toMap
 
   def buildInterferenceSubGraph(block: ir.Block, inputs: Set[ir.Register],
                                 outputs: Set[ir.Register]): InterferenceGraph[ir.Register, Reg] = {
     val instrs = (block.instructions :+ ir.Inst.Flow(block.flow)).zipWithIndex
     val regs = block.instructions.flatMap(_.regs)
     val lifetimes = regs.map(r => r -> RegisterLifetime.lifetime(r, instrs, inputs, outputs)).toMap
-    val sorted = lifetimes.flatMap {
+    val calls = instrs.collect {
+      case (ir.Inst.Eval(_, ir.Op.Call(_, _)), i) => Call(i)
+    }
+    val sorted = (lifetimes.flatMap {
       case (r, (Some(s), Some(e))) => Vector(Start(s, r), End(e, r))
       case (r, (Some(s), None)) => Vector(Start(s, r))
       case (r, (None, Some(e))) => Vector(End(e, r))
       case _ => Vector.empty
-    }.toVector.sorted
+    }.toVector ++ calls).sorted
     type F[A] = WriterT[State[Set[ir.Register], ?], Set[Edge[ir.Register]], A]
     val W = MonadWriter[F, Set[Edge[ir.Register]]]
     val S = new MonadState[F, Set[ir.Register]] {
@@ -51,12 +66,17 @@ class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs
         _ <- W.tell(live.map(r <-> _))
       } yield ()
       case End(_, r) => S.modify(_ - r)
+      case Call(_) => for {
+        live <- S.get
+        _ <- W.tell(for (a <- live; b <- virtualRegs.keySet) yield a <-> b)
+      } yield ()
     }
     val edges = f.written.runA(inputs).value
     val moves = instrs.collect {
       case (ir.Inst.Move(dest, ir.Op.Copy(ir.Val.R(src))), _) => dest <-> src
     }
-    InterferenceGraph(regs.toSet, Map.empty, edges, moves.toSet)
+    val callVRegs = if(calls.isEmpty) Set() else virtualRegs.keySet
+    InterferenceGraph(regs.toSet ++ callVRegs, Map.empty, edges, moves.toSet)
   }
 
   def buildInterferenceGraph(fun: ir.Def.Fun): InterferenceGraph[ir.Register, Reg] = {
@@ -68,9 +88,10 @@ class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs
     }
     val outputs = graph.blocks.mapValues(b => RegisterLifetime.outputs(graph, b.name, inputs))
     val ghosts = graph.blocks.mapValues(b => RegisterLifetime.ghosts(graph, b.name, inputs, outputs))
-    fun.body.foldMap { b =>
+    val interferenceGraph = fun.body.foldMap { b =>
       buildInterferenceSubGraph(b, inputs(b.name) ++ ghosts(b.name), outputs(b.name) ++ ghosts(b.name))
     }
+    interferenceGraph.copy(colours = interferenceGraph.colours ++ virtualRegs.filterKeys(interferenceGraph.nodes))
   }
 
   val colourCount = calleeSavedRegs.size + callerSavedRegs.size
@@ -177,7 +198,9 @@ class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs
       val graph = initialGraph - Set(regToSpill)
       simplifyCoalesce(graph, graph, Nil).updated(regToSpill, Spill)
     }
-    val initialGraph: Graph = buildInterferenceGraph(fun).copy(colours = precoloured).mapVar(Set(_))
+
+    val g = buildInterferenceGraph(fun)
+    val initialGraph: Graph = g.copy(colours = g.colours ++ precoloured).mapVar(Set(_))
     simplifyCoalesce(initialGraph, initialGraph, Nil)
   }
 

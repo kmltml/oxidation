@@ -68,6 +68,9 @@ trait Amd64NasmOutput extends Output {
   override def pop(dest: Val): M =
     ln(show"pop $dest")
 
+  override def call(dest: Name): M =
+    ln(show"call $dest")
+
   override def jmp(dest: Name) =
     ln(show"jmp $dest")
 

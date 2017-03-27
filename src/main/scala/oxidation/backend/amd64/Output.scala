@@ -36,6 +36,7 @@ trait Output {
   def push(src: Val): M
   def pop(dest: Val): M
 
+  def call(dest: Name): M
   def jmp(dest: Name): M
   def ret: M
 

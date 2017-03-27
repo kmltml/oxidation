@@ -12,6 +12,13 @@ case class InterferenceGraph[Var, Reg](nodes: Set[Var], colours: Map[Var, Reg],
                                        interferenceEdges: Set[Edge[Var]],
                                        preferenceEdges: Set[Edge[Var]]) {
 
+  interferenceEdges.find {
+    case a <-> b => (colours.get(a), colours.get(b)).map2(_ == _) getOrElse false
+  } match {
+    case None =>
+    case Some(a <-> b) => throw new AssertionError(s"Malcoloured graph! Interfering nodes $a and $b are both coloured with ${colours(a)}")
+  }
+
   def interfering(a: Var, b: Var): Boolean =
     interferenceEdges.contains(a <-> b) || interferenceEdges.contains(b <-> a)
 

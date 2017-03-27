@@ -20,6 +20,8 @@ object RegisterAllocatorTests extends TestSuite {
     callerSavedRegs = List(5, 6, 7, 8, 9)
   )
 
+  def vr(index: Int, typ: Type): Register = Register(allocator.VirtualReg, index, typ)
+
   val tests = apply {
     "buildInterferenceGraph" - {
       "simple graph" - {
@@ -45,6 +47,48 @@ object RegisterAllocatorTests extends TestSuite {
           preferenceEdges = Set(
             register(2, I32) <-> register(3, I32),
             register(2, I32) <-> register(0, I32)
+          )
+        )
+      }
+      "variables around function call" - {
+        val fun = Def.Fun(Name.Global(List("foo")), List(register(0, I32)), I32, Vector(
+          Block(Name.Local("body", 0), Vector(
+            Inst.Move(register(1, I32), Op.Copy(register(0, I32))),
+            Inst.Move(register(2, I32), Op.Copy(10)),
+            Inst.Move(register(3, I32), Op.Copy(20)),
+            Inst.Move(register(4, I32), Op.Copy(register(1, I32))),
+            Inst.Move(register(5, I32),
+              Op.Call(Val.G(Name.Global(List("add")), Fun(List(I32, I32), I32)),
+                List(register(3, I32), register(4, I32)))),
+            Inst.Move(register(6, I32), Op.Copy(register(5, I32))),
+            Inst.Move(register(7, I32), Op.Arith(InfixOp.Add, register(2, I32), register(6, I32))),
+            Inst.Move(register(8, I32), Op.Copy(register(7, I32)))
+          ), FlowControl.Return(register(8, I32)))
+        ))
+        allocator.buildInterferenceGraph(fun) ==> InterferenceGraph[Register, Int](
+          nodes = Set(register(0, I32), register(1, I32), register(2, I32), register(3, I32),
+            register(4, I32), register(5, I32), register(6, I32), register(7, I32), register(8, I32),
+            vr(0, U0), vr(1, U0), vr(2, U0), vr(3, U0), vr(4, U0)),
+          colours = allocator.virtualRegs,
+          interferenceEdges = Set(
+            register(1, I32) <-> register(2, I32),
+            register(1, I32) <-> register(3, I32),
+            register(2, I32) <-> register(3, I32),
+            register(2, I32) <-> register(4, I32),
+            register(2, I32) <-> register(5, I32),
+            register(2, I32) <-> register(6, I32),
+            register(2, I32) <-> vr(0, U0),
+            register(2, I32) <-> vr(1, U0),
+            register(2, I32) <-> vr(2, U0),
+            register(2, I32) <-> vr(3, U0),
+            register(2, I32) <-> vr(4, U0),
+            register(3, I32) <-> register(4, I32)
+          ),
+          preferenceEdges = Set(
+            register(0, I32) <-> register(1, I32),
+            register(4, I32) <-> register(1, I32),
+            register(5, I32) <-> register(6, I32),
+            register(8, I32) <-> register(7, I32)
           )
         )
       }

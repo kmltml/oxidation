@@ -50,19 +50,22 @@ class Amd64Target { this: Output =>
         case (reg, allocator.R(r)) => reg -> Val.R(Reg(r, regSize(reg.typ)))
         case (r, allocator.Spill) => r -> Val.m(RBP, -8 * spills(r))
       }
+      val calleeSaved = allocations.values.collect {
+        case allocator.R(l) if RegLoc.calleeSaved.contains(l) => l
+      }.toList.distinct
       val requiredStackSpace = spills.size * 8
       val res: S[Unit] = blocks.traverse_ {
         case ir.Block(name, instructions, flow) =>
           for {
             _ <- S.tell(label(name))
             _ <- instructions.traverse(outputInstruction(_)(bindings))
-            _ <- outputFlow(flow)(bindings)
+            _ <- outputFlow(flow, requiredStackSpace, calleeSaved)(bindings)
           } yield ()
       }
       val m = res.written
       Vector(
         label(name),
-        prologue(requiredStackSpace),
+        prologue(requiredStackSpace, calleeSaved),
         m
       ).combineAll
   }
@@ -74,6 +77,10 @@ class Amd64Target { this: Output =>
     case ir.Inst.Label(n) => S.tell(label(n))
 
     case ir.Inst.Do(ir.Op.Copy(_)) => S.pure(())
+
+    case ir.Inst.Eval(_, ir.Op.Call(ir.Val.G(fun, _), params)) =>
+      if(params.drop(4).nonEmpty) throw new NotImplementedError("passing parameters on stack is not yet supported")
+      S.tell(call(fun))
 
     case ir.Inst.Move(dest, op) => op match {
       case ir.Op.Arith(op @ (InfixOp.Add | InfixOp.Sub), left, right) =>
@@ -104,11 +111,11 @@ class Amd64Target { this: Output =>
     }
   }
 
-  def outputFlow(f: ir.FlowControl)(implicit bindings: Map[ir.Register, Val]): S[Unit] = f match {
+  def outputFlow(f: ir.FlowControl, localCount: Int, savedRegs: List[RegLoc])(implicit bindings: Map[ir.Register, Val]): S[Unit] = f match {
     case ir.FlowControl.Return(r) =>
       S.tell(Vector(
         move(Reg(RegLoc.A, regSize(r.typ)), toVal(r)),
-        epilogue,
+        epilogue(localCount, savedRegs),
         ret
       ).combineAll)
     case ir.FlowControl.Goto(n) => S.tell(jmp(n))
@@ -120,13 +127,16 @@ class Amd64Target { this: Output =>
       ).combineAll)
   }
 
-  def prologue(localCount: Int): M = Vector(
+  def prologue(localCount: Int, regsToSave: List[RegLoc]): M = Vector(
     push(RBP),
     mov(RBP, RSP),
-    sub(RSP, localCount * 8)
+    regsToSave.foldMap(l => push(Reg(l, RegSize.QWord))),
+    if(localCount == 0) M.empty else sub(RSP, localCount * 8)
   ).combineAll
 
-  def epilogue: M = Vector(
+  def epilogue(localCount: Int, savedRegs: List[RegLoc]): M = Vector(
+    if(localCount == 0) M.empty else add(RSP, localCount * 8),
+    savedRegs.reverse.foldMap(l => pop(Reg(l, RegSize.QWord))),
     mov(RSP, RBP),
     pop(RBP)
   ).combineAll
