@@ -39,7 +39,13 @@ class Amd64Target { this: Output =>
     case ir.Type.U64 | ir.Type.I64 => RegSize.QWord
   }
 
+  def outputDefs(ds: Vector[ir.Def]): M = {
+    text |+| ds.foldMap(outputDef)
+  }
+
   def outputDef(d: ir.Def): M = d match {
+    case ir.Def.ExternFun(name, _, _) =>
+      extern(name)
     case ir.Def.Fun(name, _, _, _) =>
       val (precolours, Vector(fun @ ir.Def.Fun(_, _, _, blocks))) = Amd64BackendPass.txDef(d).run.runEmptyA.value
       val allocations = allocator.allocate(fun, precolours.toMap)
@@ -53,7 +59,7 @@ class Amd64Target { this: Output =>
       val calleeSaved = allocations.values.collect {
         case allocator.R(l) if RegLoc.calleeSaved.contains(l) => l
       }.toList.distinct
-      val requiredStackSpace = spills.size * 8
+      val requiredStackSpace = spills.size + 4 // 4 qwords of shadow space for called procedures
       val res: S[Unit] = blocks.traverse_ {
         case ir.Block(name, instructions, flow) =>
           for {
@@ -64,6 +70,7 @@ class Amd64Target { this: Output =>
       }
       val m = res.written
       Vector(
+        global(name),
         label(name),
         prologue(requiredStackSpace, calleeSaved),
         m

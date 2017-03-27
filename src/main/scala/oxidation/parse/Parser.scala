@@ -101,12 +101,12 @@ class Parser {
     bs.foldLeft(head) { case (a, (op, b)) => InfixAp(op, a, b) }
   }
 
-  private def K(p: String): P0 = p ~~ !CharPred(c => c.isLetterOrDigit || idSpecialChars.contains(c))
+  private def K(p: P0): P0 = p ~~ !CharPred(c => c.isLetterOrDigit || idSpecialChars.contains(c))
   private def O(p: String): P0 = p ~~ !CharIn("~!%^&*+=<>|/?")
 
   val keyword: P0 =
-    P(Seq("if", "else", "def", "while", "struct", "enum",
-      "val", "var", "true", "false", "module", "import", "type").map(K).reduce(_ | _))
+    P(K(StringIn("if", "else", "def", "while", "struct", "enum", "extern",
+      "val", "var", "true", "false", "module", "import", "type")))
 
   private val idSpecialChars = "$_"
   private val idStart = CharPred(c => c.isLetter || idSpecialChars.contains(c))
@@ -133,7 +133,9 @@ class Parser {
     val param = (id.! ~ ":" ~ typ).map(Param.tupled)
     val paramList = "(" ~ param.rep(sep = ",") ~ ")"
 
-    P(K("def") ~/ sym ~ paramList.? ~ (":" ~/ typ).? ~ "=" ~ expression).map(DefDef.tupled)
+    val extern = K("extern").as(Extern())
+
+    P(K("def") ~/ sym ~ paramList.? ~ (":" ~/ typ).? ~ "=" ~ (expression | extern)).map(DefDef.tupled)
   }
 
   private val defBody: P[(Symbol, Option[TypeName], Expression)] =

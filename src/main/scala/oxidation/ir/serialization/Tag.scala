@@ -11,6 +11,7 @@ object Tag {
 
   object Def {
     final val Fun = 0
+    final val ExternFun = 1 + Fun
   }
 
   object Inst {

@@ -116,6 +116,9 @@ object IrDump extends App {
               writer.println("  }")
             }
             writer.println("}")
+
+          case ir.Def.ExternFun(name, params, ret) =>
+            writer.println(show"def $name(${params.map(_.show).mkString(", ")}): $ret = extern")
         }
 
       case Binary =>

@@ -34,10 +34,21 @@ trait Amd64NasmOutput extends Output {
 
   override def M: Monoid[M] = Monoid[Vector[String]]
 
+  override def text: M =
+    ln("section .text")
+
+  override def data: M =
+    ln("section .data")
+
   override def label(name: Name): M = name match {
     case Name.Global(path) => ln(show"""${path.mkString(".")}:""")
     case Name.Local(prefix, i) => ln(show""".$prefix.$i:""")
   }
+
+  override def global(name: Name): M =
+    ln(show"global $name")
+  override def extern(name: Name): M =
+    ln(show"extern $name")
 
   override def mov(dest: Val, src: Val): M =
     ln(show"mov $dest, $src")

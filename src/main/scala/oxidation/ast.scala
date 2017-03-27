@@ -29,6 +29,8 @@ trait Ast {
   final case class While(cond: Typed[Expression], body: Typed[Expression]) extends Expression
   final case class Assign(lval: Typed[Expression], op: Option[InfixOp], rval: Typed[Expression]) extends Expression
 
+  final case class Extern() extends Expression
+
   sealed trait TLD
 
   sealed trait Def extends BlockStatement with TLD {
@@ -59,7 +61,7 @@ trait Ast {
   def traverse[A](stmnt: Typed[BlockStatement])(f: PartialFunction[Typed[BlockStatement], A]): Vector[A] = {
     val result = f.lift(stmnt)
     val more = stmnt match {
-      case _: IntLit | _: StringLit | _: BoolLit | _: Var |
+      case _: IntLit | _: StringLit | _: BoolLit | _: Var | _: Extern |
            _: TypeAliasDef | _: StructDef | _: EnumDef | _: CharLit => Vector.empty[A]
       case InfixAp(_, left, right) => traverse(left)(f) ++ traverse(right)(f)
       case PrefixAp(_, e) => traverse(e)(f)

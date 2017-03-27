@@ -90,14 +90,15 @@ object RegisterLifetimeTests extends TestSuite {
         val insts = Vector(
           0 -> Inst.Move(register(0, I32), Op.Copy(2)),
           1 -> Inst.Move(register(1, I32), Op.Copy(register(3, I32))),
-          2 -> Inst.Move(register(2, I32), Op.Arith(InfixOp.Add, register(0, I32), register(2, I32))),
-          3 -> Inst.Flow(FlowControl.Branch(register(0, I32), null, null))
+          2 -> Inst.Move(register(5, I32), Op.Copy(5)),
+          3 -> Inst.Move(register(2, I32), Op.Arith(InfixOp.Add, register(0, I32), register(2, I32))),
+          4 -> Inst.Flow(FlowControl.Branch(register(0, I32), null, null))
         ).map(_.swap)
         val ins = Set(register(2, I32), register(4, I32))
-        val outs = Set(register(2, I32), register(4, I32))
+        val outs = Set(register(1, I32), register(2, I32), register(4, I32))
         "r0 write-read" - {
           lifetime(register(0, I32), insts, ins, outs) ==>
-            Some(0) -> Some(3)
+            Some(0) -> Some(4)
         }
         "r1 write-out" - {
           lifetime(register(1, I32), insts, ins, outs) ==>
@@ -114,6 +115,10 @@ object RegisterLifetimeTests extends TestSuite {
         "r4 ghost" - {
           lifetime(register(4, I32), insts, ins, outs) ==>
             None -> None
+        }
+        "r5 write-forget" - {
+          lifetime(register(5, I32), insts, ins, outs) ==>
+            Some(2) -> Some(3)
         }
       }
     }

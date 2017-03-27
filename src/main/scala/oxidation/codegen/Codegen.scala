@@ -171,6 +171,10 @@ object Codegen {
   }
 
   def compileDef(d: ast.Def): Def = d match {
+    case ast.DefDef(Symbol.Global(name), params, _, Typed(ast.Extern(), ret)) =>
+      val plist = params.getOrElse(Nil).toList
+      Def.ExternFun(Name.Global(name.toList), plist.map(p => translateType(p.typ)), translateType(ret))
+
     case ast.DefDef(Symbol.Global(name), params, _, body) =>
       val s: Res[(List[Register], ir.Register)] = for {
         paramRegs <- params.getOrElse(Seq.empty).toList

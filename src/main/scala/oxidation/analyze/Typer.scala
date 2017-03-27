@@ -25,6 +25,11 @@ object Typer {
 
     case P.CharLit(c) => unifyType(U8, expected).map(Typed(ast.CharLit(c), _))
 
+    case P.Extern() => expected match {
+      case ExpectedType.Specific(t) => Right(Typed(ast.Extern(), t))
+      case _ => Left(TyperError.ExternNoExplicitType())
+    }
+
     case P.StructLit(name, members) =>
       for {
         struct <- lookupType(TypeName.Named(name), ctxt) match {

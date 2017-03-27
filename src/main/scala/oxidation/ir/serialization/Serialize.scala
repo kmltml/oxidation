@@ -31,6 +31,11 @@ class Serialize(val out: DataOutputStream) {
       writeSeq(params)(writeRegister)
       writeType(ret)
       writeSeq(body)(writeBlock)
+    case Def.ExternFun(name, params, ret) =>
+      writeTag(Tag.Def.ExternFun)
+      writeName(name)
+      writeSeq(params)(writeType)
+      writeType(ret)
   }
 
   def writeBlock(b: Block): Unit = {

@@ -155,6 +155,16 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
             Left(TyperError.NotAnLVal(ast.IntLit(2) :: I32))
         }
       }
+      "Extern" - {
+        "explicitly typed" - {
+          solveType(P.Extern(), ExpectedType.Specific(I32), Ctxt.default) ==>
+            Right(ast.Extern() :: I32)
+        }
+        "type-inferred" - {
+          solveType(P.Extern(), ExpectedType.Undefined, Ctxt.default) ==>
+            Left(TyperError.ExternNoExplicitType())
+        }
+      }
     }
   }
 

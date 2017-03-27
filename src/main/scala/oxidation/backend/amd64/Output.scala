@@ -14,7 +14,13 @@ trait Output {
 
   implicit def M: Monoid[M]
 
+  def text: M
+  def data: M
+
   def label(name: Name): M
+
+  def global(name: Name): M
+  def extern(name: Name): M
 
   def mov(dest: Val, src: Val): M
 

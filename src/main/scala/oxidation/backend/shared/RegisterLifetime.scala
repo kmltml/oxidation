@@ -63,7 +63,7 @@ object RegisterLifetime {
       case (ir.Inst.Move(_, op), i) if op.reads(reg) => i
       case (ir.Inst.Do(op), i) if op.reads(reg) => i
       case (ir.Inst.Flow(flow), i) if flow.reads(reg) => i
-    }.lastOption
+    }.lastOption.orElse(firstWrite.map(_ + 1))
     firstWrite -> lastRead
   }
 

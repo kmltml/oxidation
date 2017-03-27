@@ -130,7 +130,8 @@ object SymbolResolver {
         case e: parse.ast.Expression => solveExpr(e, interiorScope)
       }.map(parse.ast.Block)
 
-    case _: parse.ast.IntLit | _: parse.ast.BoolLit | _: parse.ast.StringLit | _: parse.ast.CharLit => Right(e)
+    case _: parse.ast.IntLit | _: parse.ast.BoolLit | _: parse.ast.StringLit | _: parse.ast.CharLit |
+         _: parse.ast.Extern => Right(e)
   }
 
   private def solveType(t: TypeName, scope: Scope): Res[TypeName] = t match {

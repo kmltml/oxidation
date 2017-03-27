@@ -106,6 +106,10 @@ trait AstPrettyprint {
 
     case ast.BoolLit(b) => b.toString
 
+    case ast.CharLit(c) => c.toString
+
+    case ast.Extern() => s"Extern$typeInfo"
+
     case ast.StringLit(s) => "\"" + s.flatMap {
       case '\n' => "\\n"
       case '"' => "\\\""

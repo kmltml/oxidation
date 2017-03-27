@@ -92,7 +92,16 @@ object Amd64BackendPass extends Pass {
         case (r, 2) => r -> RegLoc.R8
         case (r, 3) => r -> RegLoc.R9
       }
-      F.tell(paramColours.toSet ++ destColour).as(Vector(inst))
+      for {
+        _ <- F.tell(paramColours.toSet)
+        destInst <- dest match {
+          case Some(r) => F.tell(Set(r -> RegLoc.A)).as(Vector())
+          case None => for {
+            r <- nextReg(Type.U0)
+            _ <- F.tell(Set(r -> RegLoc.A))
+          } yield Vector(Inst.Move(r, Op.Garbled))
+        }
+      } yield inst +: destInst
 
     case inst @ Inst.Move(dest, Op.Arith(InfixOp.Add | InfixOp.Sub, l, r)) =>
       F.pure(Vector(

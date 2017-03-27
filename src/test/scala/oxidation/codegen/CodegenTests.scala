@@ -138,6 +138,15 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
         }
       }
     }
+    "compileDef" - {
+      import Codegen.compileDef
+      "DefDef" - {
+        "Extern" - {
+          compileDef(ast.DefDef(g('mod, 'foo), Some(List(ast.Param("x", I64))), Some(TypeName.Named(g('i32))), ast.Extern() :: I32)) ==>
+            Def.ExternFun(Name.Global(List("mod", "foo")), List(ir.Type.I64), ir.Type.I32)
+        }
+      }
+    }
   }
 
 }

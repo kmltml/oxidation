@@ -14,5 +14,6 @@ object TyperError {
   final case class ImmutableAssign(symbol: Symbol) extends TyperError
   final case class NotAnLVal(expr: Typed[ast.Expression]) extends TyperError
   final case class TooManyParamsForPointerDereference(found: Int) extends TyperError
+  final case class ExternNoExplicitType() extends TyperError
 
 }

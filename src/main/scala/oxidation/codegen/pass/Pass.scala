@@ -38,6 +38,7 @@ trait Pass {
       case ir.Def.Fun(name, params, ret, body) =>
         val newBody = body.traverse(txBlock).map(_.flatten)
         newBody.map(ir.Def.Fun(name, params, ret, _))
+      case efun: ir.Def.ExternFun => F.pure(efun)
     })
   }
 

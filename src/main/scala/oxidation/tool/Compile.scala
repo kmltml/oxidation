@@ -76,7 +76,7 @@ object Compile extends App {
     val passed = passes.foldLeft(irDefs)((defs, pass) => defs.flatMap(d => pass.extract(pass.txDef(d))))
     phase("asm-out") {
       val target = new Amd64Target with Amd64NasmOutput
-      passed.foldMap(target.outputDef).foreach(println)
+      target.outputDefs(passed.toVector).foreach(println)
     }
   }
 

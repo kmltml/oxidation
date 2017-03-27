@@ -171,11 +171,20 @@ object ParserTests extends TestSuite {
     "definition should parse" - {
       val defn = p.whole(p.definition)
       "a function definition" - {
-        defn.parse("def foo(i: i32): i32 = i + 2").get.value ==>
-          DefDef("foo",
-            Some(List(Param("i", TypeName.Named("i32")))),
-            Some(TypeName.Named("i32")),
-            InfixAp(InfixOp.Add, Var("i"), IntLit(2)))
+        "plain" - {
+          defn.parse("def foo(i: i32): i32 = i + 2").get.value ==>
+            DefDef("foo",
+              Some(List(Param("i", TypeName.Named("i32")))),
+              Some(TypeName.Named("i32")),
+              InfixAp(InfixOp.Add, Var("i"), IntLit(2)))
+        }
+        "extern" - {
+          defn.parse("def foo(i: i32): i32 = extern").get.value ==>
+            DefDef("foo",
+              Some(List(Param("i", TypeName.Named("i32")))),
+              Some(TypeName.Named("i32")),
+              Extern())
+        }
       }
       "a variable definition" - {
         defn.parse("var foo = 10").get.value ==> VarDef("foo", None, IntLit(10))
