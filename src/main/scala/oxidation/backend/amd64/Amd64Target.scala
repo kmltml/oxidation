@@ -29,8 +29,15 @@ class Amd64Target { this: Output =>
     override def tailRecM[A, B](a: A)(f: (A) => S[Either[A, B]]): S[B] = w.tailRecM(a)(f)
   }
 
-  val allocator: RegisterAllocator[Reg] =
-    new RegisterAllocator[Reg](Reg.calleeSaved, Reg.callerSaved)
+  val allocator: RegisterAllocator[RegLoc] =
+    new RegisterAllocator[RegLoc](RegLoc.calleeSaved, RegLoc.callerSaved)
+
+  def regSize(t: ir.Type): RegSize = t match {
+    case ir.Type.U0 | ir.Type.U1 | ir.Type.U8 | ir.Type.I8 => RegSize.Byte
+    case ir.Type.U16 | ir.Type.I16 => RegSize.Word
+    case ir.Type.U32 | ir.Type.I32 => RegSize.DWord
+    case ir.Type.U64 | ir.Type.I64 => RegSize.QWord
+  }
 
   def outputDef(d: ir.Def): M = d match {
     case ir.Def.Fun(name, _, _, _) =>
@@ -40,7 +47,7 @@ class Amd64Target { this: Output =>
         case (r, allocator.Spill) => r
       }.zipWithIndex.toMap
       val bindings = allocations.map {
-        case (reg, allocator.R(r)) => reg -> Val.R(r)
+        case (reg, allocator.R(r)) => reg -> Val.R(Reg(r, regSize(reg.typ)))
         case (r, allocator.Spill) => r -> Val.m(RBP, -8 * spills(r))
       }
       val requiredStackSpace = spills.size * 8
@@ -100,7 +107,7 @@ class Amd64Target { this: Output =>
   def outputFlow(f: ir.FlowControl)(implicit bindings: Map[ir.Register, Val]): S[Unit] = f match {
     case ir.FlowControl.Return(r) =>
       S.tell(Vector(
-        move(RAX, toVal(r)),
+        move(Reg(RegLoc.A, regSize(r.typ)), toVal(r)),
         epilogue,
         ret
       ).combineAll)

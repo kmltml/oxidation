@@ -16,8 +16,8 @@ object Amd64BackendPass extends Pass {
     val prefix = "br"
   }
 
-  type F[A] = WriterT[State[Int, ?], Set[(Register, Reg)], A]
-  val F = MonadWriter[F, Set[(Register, Reg)]]
+  type F[A] = WriterT[State[Int, ?], Set[(Register, RegLoc)], A]
+  val F = MonadWriter[F, Set[(Register, RegLoc)]]
   val S = new MonadState[F, Int] {
     override def get: F[Int] = WriterT.lift(State.get)
 
@@ -43,15 +43,15 @@ object Amd64BackendPass extends Pass {
         otherTemp <- nextReg(dest.typ)
         _ <- F.tell(Set(
           destTemp -> (op match {
-            case InfixOp.Div => RAX
-            case InfixOp.Mod => RDX
+            case InfixOp.Div => RegLoc.A
+            case InfixOp.Mod => RegLoc.D
           }),
           otherTemp -> (op match {
-            case InfixOp.Mod => RAX
-            case InfixOp.Div => RDX
+            case InfixOp.Mod => RegLoc.A
+            case InfixOp.Div => RegLoc.D
           }),
-          ltemp -> RAX,
-          sextTemp -> RDX
+          ltemp -> RegLoc.A,
+          sextTemp -> RegLoc.D
         ))
       } yield Vector(
         Inst.Move(ltemp, Op.Copy(l)),
@@ -70,10 +70,10 @@ object Amd64BackendPass extends Pass {
         destTemp <- nextReg(dest.typ)
         otherTemp <- nextReg(dest.typ)
         _ <- F.tell(Set(
-          destTemp -> RAX,
-          otherTemp -> RDX,
-          ltemp -> RAX,
-          sextTemp -> RDX
+          destTemp -> RegLoc.A,
+          otherTemp -> RegLoc.D,
+          ltemp -> RegLoc.A,
+          sextTemp -> RegLoc.D
         ))
       } yield Vector(
         Inst.Move(ltemp, Op.Copy(l)),
@@ -87,16 +87,16 @@ object Amd64BackendPass extends Pass {
 
   override def onBlock: Block =?> F[Vector[Block]] = {
     case b @ Block(_, _, FlowControl.Return(ir.Val.R(r))) =>
-      F.tell(Set(r -> RAX)).as(Vector(b))
+      F.tell(Set(r -> RegLoc.A)).as(Vector(b))
   }
 
   override def onDef: Def =?> F[Vector[Def]] = {
     case fun @ Def.Fun(_, params, _, _) =>
       F.tell(params.zipWithIndex.collect {
-        case (r, 0) => r -> RCX
-        case (r, 1) => r -> RDX
-        case (r, 2) => r -> R8
-        case (r, 3) => r -> R9
+        case (r, 0) => r -> RegLoc.C
+        case (r, 1) => r -> RegLoc.D
+        case (r, 2) => r -> RegLoc.R8
+        case (r, 3) => r -> RegLoc.R9
       }.toSet).as(Vector(fun))
   }
 }

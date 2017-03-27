@@ -9,7 +9,7 @@ import cats.implicits._
 import ir._
 import Type._
 import codegen.{Codegen, Name}
-import oxidation.backend.amd64.Reg._
+import oxidation.backend.amd64.RegLoc._
 import utest._
 
 object Amd64BackendPassTest extends TestSuite {
@@ -33,11 +33,11 @@ object Amd64BackendPassTest extends TestSuite {
             ), FlowControl.Return(register(5, I32)))
           )
         )).written.runEmptyA.value ==> Set(
-          register(0, I32) -> RCX,
-          register(1, I32) -> RDX,
+          register(0, I32) -> C,
+          register(1, I32) -> D,
           register(2, I32) -> R8,
           register(3, I32) -> R9,
-          register(5, I32) -> RAX
+          register(5, I32) -> A
         )
       }
       "div" - {
@@ -49,13 +49,13 @@ object Amd64BackendPassTest extends TestSuite {
             Inst.Move(register(5, I32), Op.Copy(register(4, I32)))
           ), FlowControl.Return(register(5, I32)))
         ))).run.runEmptyA.value ==> (Set(
-          register(0, I32) -> RCX,
-          register(1, I32) -> RDX,
-          br(0, I32) -> RAX,
-          br(1, I32) -> RDX,
-          br(3, I32) -> RAX,
-          br(4, I32) -> RDX,
-          register(5, I32) -> RAX
+          register(0, I32) -> C,
+          register(1, I32) -> D,
+          br(0, I32) -> A,
+          br(1, I32) -> D,
+          br(3, I32) -> A,
+          br(4, I32) -> D,
+          register(5, I32) -> A
         ), Vector(Def.Fun(Name.Global(List("foo")), List(register(0, I32), register(1, I32)), I32, Vector(
           Block(Name.Local("body", 0), Vector(
             Inst.Move(register(2, I32), Op.Copy(register(0, I32))),
