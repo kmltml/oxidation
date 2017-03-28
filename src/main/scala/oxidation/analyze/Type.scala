@@ -5,14 +5,16 @@ sealed trait Type
 
 object Type {
 
-  case object I8 extends Type
-  case object I16 extends Type
-  case object I32 extends Type
-  case object I64 extends Type
-  case object U8 extends Type
-  case object U16 extends Type
-  case object U32 extends Type
-  case object U64 extends Type
+  sealed trait Num extends Type
+
+  case object I8 extends Num
+  case object I16 extends Num
+  case object I32 extends Num
+  case object I64 extends Num
+  case object U8 extends Num
+  case object U16 extends Num
+  case object U32 extends Num
+  case object U64 extends Num
 
   case object U1 extends Type
   case object U0 extends Type

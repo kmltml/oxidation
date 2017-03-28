@@ -153,6 +153,9 @@ trait AstPrettyprint {
 
     case ast.While(cond, body) =>
       s"While$typeInfo(".nl + (prettyprintTypedExp(cond) + ",".nl + prettyprintTypedExp(body)).indent + ")"
+
+    case ast.Widen(expr) =>
+      s"Widen$typeInfo(".p + prettyprintTypedExp(expr) + ")"
   }
 
   def stringify(p: P): String = {

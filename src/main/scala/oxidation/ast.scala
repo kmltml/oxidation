@@ -31,6 +31,10 @@ trait Ast {
 
   final case class Extern() extends Expression
 
+  // Synthetic expressions (not created by the parser)
+  final case class Widen(expr: Typed[Expression]) extends Expression
+
+
   sealed trait TLD
 
   sealed trait Def extends BlockStatement with TLD {

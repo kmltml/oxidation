@@ -1,15 +1,12 @@
 package oxidation.analyze
 
-/**
-  * Created by Kamil on 24.02.2017.
-  */
-sealed trait ExpectedType
+sealed trait ExpectedType extends Product with Serializable
 
 object ExpectedType {
 
   case object Undefined extends ExpectedType
-  case object Numeric extends ExpectedType
   case object Appliable extends ExpectedType
+  case class Numeric(supertypeOf: Option[Type]) extends ExpectedType
   case class Specific(typ: Type) extends ExpectedType
 
 }

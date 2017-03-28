@@ -22,7 +22,7 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
     "solveType" - {
       "int literals" - {
         findType(P.IntLit(20), ExpectedType.Undefined, Ctxt.empty) ==> Right(I32)
-        findType(P.IntLit(20), ExpectedType.Numeric, Ctxt.empty) ==> Right(I32)
+        findType(P.IntLit(20), ExpectedType.Numeric(None), Ctxt.empty) ==> Right(I32)
         findType(P.IntLit(20), ExpectedType.Specific(U32), Ctxt.empty) ==> Right(U32)
       }
       "bool literals" - {
@@ -46,13 +46,31 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
       "operator expressions" - {
         findType(P.InfixAp(InfixOp.Add, P.IntLit(5), P.IntLit(10)), ExpectedType.Undefined, Ctxt.empty) ==>
           Right(I32)
-        findType(P.InfixAp(InfixOp.Mul, P.Var(l('x)), P.Var(l('y))), ExpectedType.Numeric,
+        findType(P.InfixAp(InfixOp.Mul, P.Var(l('x)), P.Var(l('y))), ExpectedType.Numeric(None),
           Ctxt.terms(l('x) -> imm(U8), l('y) -> imm(U32))) ==> Right(U32)
 
         findType(P.InfixAp(InfixOp.Eq, P.IntLit(1), P.IntLit(2)), ExpectedType.Undefined, Ctxt.empty) ==> Right(U1)
+
+        "widening in arithmetic expressions" - {
+          "i32 + i8 -> i32" - {
+            solveType(P.InfixAp(InfixOp.Add, P.Var(l('x)), P.Var(l('y))), ExpectedType.Numeric(None),
+              Ctxt.default.withTerms(Map(l('x) -> imm(I32), l('y) -> imm(I8)))) ==>
+              Right(ast.InfixAp(InfixOp.Add, ast.Var(l('x)) :: I32, ast.Widen(ast.Var(l('y)) :: I8) :: I32) :: I32)
+          }
+          "i8 + i32 -> i32" - {
+            solveType(P.InfixAp(InfixOp.Add, P.Var(l('x)), P.Var(l('y))), ExpectedType.Undefined,
+              Ctxt.default.withTerms(Map(l('x) -> imm(I8), l('y) -> imm(I32)))) ==>
+              Right(ast.InfixAp(InfixOp.Add, ast.Widen(ast.Var(l('x)) :: I8) :: I32, ast.Var(l('y)) :: I32) :: I32)
+          }
+          "(i8 + i32): i64 -> i64" - {
+            solveType(P.InfixAp(InfixOp.Add, P.Var(l('x)), P.Var(l('y))), ExpectedType.Specific(I64),
+              Ctxt.default.withTerms(Map(l('x) -> imm(I8), l('y) -> imm(I32)))) ==>
+              Right(ast.InfixAp(InfixOp.Add, ast.Widen(ast.Var(l('x)) :: I8) :: I64, ast.Widen(ast.Var(l('y)) :: I32) :: I64) :: I64)
+          }
+        }
       }
       "unary prefix operator expressions" - {
-        findType(P.PrefixAp(PrefixOp.Inv, P.IntLit(64)), ExpectedType.Numeric) ==> Right(I32)
+        findType(P.PrefixAp(PrefixOp.Inv, P.IntLit(64)), ExpectedType.Numeric(None)) ==> Right(I32)
         findType(P.PrefixAp(PrefixOp.Neg, P.Var(l('x))), ExpectedType.Undefined, Ctxt.terms(l('x) -> imm(U64))) ==> Right(I64)
         findType(P.PrefixAp(PrefixOp.Not, P.BoolLit(false)), ExpectedType.Undefined) ==> Right(U1)
       }
@@ -72,7 +90,7 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         findType(P.Block(Seq(
           P.ValDef(l('x), Some(TypeName.Named(g('i64))), P.IntLit(10)),
           P.Var(l('x))
-        )), ExpectedType.Numeric) ==> Right(I64)
+        )), ExpectedType.Numeric(None)) ==> Right(I64)
 
         solveType(P.Block(Seq(
           P.VarDef(l('x), None, P.IntLit(10)),
@@ -98,7 +116,7 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
           "with offset" - {
             solveType(P.App(P.Var(l('foo)), Seq(P.IntLit(20))), ExpectedType.Undefined,
               Ctxt.default.withTerms(Map(l('foo) -> Ctxt.Immutable(Ptr(TypeName.Named(g('i32))))))) ==>
-              Right(ast.App(ast.Var(l('foo)) :: Ptr(TypeName.Named(g('i32))), Seq(ast.IntLit(20) :: I32)) :: I32)
+              Right(ast.App(ast.Var(l('foo)) :: Ptr(TypeName.Named(g('i32))), Seq(ast.IntLit(20) :: I64)) :: I32)
           }
         }
       }
@@ -108,7 +126,7 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
           Right(ast.If(ast.BoolLit(true) :: U1, ast.IntLit(10) :: I64, Some(ast.IntLit(20) :: I64)) :: I64)
         findType(P.If(P.BoolLit(true), P.IntLit(42), None), ExpectedType.Undefined) ==> Right(U0)
         findType(P.If(P.BoolLit(true), P.Var(l('x)), Some(P.Var(l('y)))),
-          ExpectedType.Numeric, Ctxt.default.withTerms(Map(l('x) -> imm(I32), l('y) -> imm(I64)))) ==> Right(I64)
+          ExpectedType.Numeric(None), Ctxt.default.withTerms(Map(l('x) -> imm(I32), l('y) -> imm(I64)))) ==> Right(I64)
       }
       "While" - {
         solveType(P.While(
@@ -148,7 +166,7 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         "composite" - {
           solveType(P.Assign(P.Var(l('x)), Some(InfixOp.Add), P.IntLit(20)), ExpectedType.Undefined,
             Ctxt.default.withTerms(Map(l('x) -> Ctxt.Mutable(I64)))) ==>
-            Right(ast.Assign(ast.Var(l('x)) :: I64, None, ast.InfixAp(InfixOp.Add, ast.Var(l('x)) :: I64, ast.IntLit(20) :: I32) :: I64) :: U0)
+            Right(ast.Assign(ast.Var(l('x)) :: I64, None, ast.InfixAp(InfixOp.Add, ast.Var(l('x)) :: I64, ast.IntLit(20) :: I64) :: I64) :: U0)
         }
         "An rval" - {
           solveType(P.Assign(P.IntLit(2), Some(InfixOp.Add), P.IntLit(1)), ExpectedType.Undefined, Ctxt.default) ==>
