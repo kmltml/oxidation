@@ -136,6 +136,13 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
               Inst.Move(r(1, _.I32), Op.Call(Val.G(Name.Global(List("f")), ir.Type.Fun(List(ir.Type.I32), ir.Type.U1)), List(r(0, _.I32))))
             ), Val.R(r(1, _.I32)))
         }
+        "pointer" - {
+          compileExpr(ast.App(ast.Var(l('p)) :: Ptr(TypeName.Named(g('i32))), Nil) :: I32)
+            .run.runA(CodegenState(registerBindings = Map(l('p) -> r(0, _.Ptr)), nextReg = 1)).value ==>
+            (Vector(
+              Inst.Move(r(1, _.I32), Op.Load(r(0, _.Ptr), 0))
+            ), Val.R(r(1, _.I32)))
+        }
       }
     }
     "compileDef" - {

@@ -80,6 +80,7 @@ object Compile extends App {
       val baseInFile = options.infiles.head
       val baseName = baseInFile.getName.split("\\.").head
       val targetFolder = new File(baseInFile.getParentFile, "target")
+      targetFolder.mkdir()
       val asmFile = new File(targetFolder, baseName + ".asm")
       val objFile = new File(targetFolder, baseName + ".obj")
       val exeFile = new File(targetFolder, baseName + ".exe")

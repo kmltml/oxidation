@@ -28,6 +28,8 @@ object Type {
 
   final case class Fun(params: List[Type], ret: Type) extends Type
 
+  case object Ptr extends Type
+
   implicit val show: Show[Type] = Show.fromToString
 
 }

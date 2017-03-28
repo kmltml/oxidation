@@ -23,6 +23,10 @@ object Val {
     implicit def reg(r: Reg): MultipliedReg = MultipliedReg(r * 1)
     implicit def mreg(value: (Reg, Int)): MultipliedReg = MultipliedReg(value)
     implicit def off(i: Int): Offset = Offset(i)
+    implicit def fromVal(v: Val): MemOffset = v match {
+      case R(r) => reg(r)
+      case I(i) => off(i)
+    }
   }
 
 }

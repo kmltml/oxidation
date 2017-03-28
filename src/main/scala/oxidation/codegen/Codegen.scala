@@ -160,6 +160,16 @@ object Codegen {
         ))
       } yield Val.R(r)
 
+    case Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), params), t) =>
+      for {
+        r <- genReg(translateType(t))
+        ptrv <- compileExpr(ptr)
+        offv <- params.headOption.map(compileExpr).getOrElse(Res.pure(Val.I(0, Type.I32)))
+        _ <- Res.tell(Vector(
+          Inst.Move(r, Op.Load(ptrv, offv))
+        ))
+      } yield Val.R(r)
+
     case Typed(ast.Assign(Typed(ast.Var(n), _), None, rval), _) =>
       for {
         right <- compileExpr(rval)
@@ -215,6 +225,8 @@ object Codegen {
 
     case analyze.Type.Fun(params, ret) =>
       ir.Type.Fun(params.toList.map(translateType), translateType(ret))
+
+    case analyze.Type.Ptr(_) => ir.Type.Ptr
 
 //    case analyze.Type.Struct(name, members) =>
 

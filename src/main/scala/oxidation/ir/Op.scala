@@ -16,6 +16,7 @@ sealed trait Op {
       case Op.Copy(v) => Set(v)
       case Op.Unary(_, v) => Set(v)
       case Op.Garbled => Set.empty
+      case Op.Load(a, o) => Set(a, o)
     }
     vals.collect {
       case Val.R(r) => r
@@ -30,6 +31,8 @@ object Op {
   final case class Copy(src: Val) extends Op
   final case class Call(fn: Val, params: List[Register]) extends Op
   final case class Unary(op: PrefixOp, right: Val) extends Op
+  final case class Load(addr: Val, offset: Val) extends Op
+  final case class Store(addr: Val, offset: Val, value: Val) extends Op
   case object Garbled extends Op // Assigned to register to indicate, that some instruction also writes to this register as a side effect
 
   implicit val show: Show[Op] = {

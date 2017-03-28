@@ -36,7 +36,7 @@ class Amd64Target { this: Output =>
     case ir.Type.U0 | ir.Type.U1 | ir.Type.U8 | ir.Type.I8 => RegSize.Byte
     case ir.Type.U16 | ir.Type.I16 => RegSize.Word
     case ir.Type.U32 | ir.Type.I32 => RegSize.DWord
-    case ir.Type.U64 | ir.Type.I64 => RegSize.QWord
+    case ir.Type.U64 | ir.Type.I64 | ir.Type.Ptr => RegSize.QWord
   }
 
   def outputDefs(ds: Vector[ir.Def]): M = {
@@ -115,6 +115,9 @@ class Amd64Target { this: Output =>
       case ir.Op.Copy(src) => S.tell(move(toVal(dest), toVal(src)))
       case ir.Op.Garbled => S.pure(())
 
+      case ir.Op.Load(addr, off) => S.tell(
+        mov(toVal(dest), Val.m(toVal(addr), toVal(off)))
+      )
     }
   }
 
