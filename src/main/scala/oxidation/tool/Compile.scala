@@ -1,7 +1,7 @@
 package oxidation
 package tool
 
-import java.io.{BufferedWriter, File, OutputStreamWriter}
+import java.io.{BufferedWriter, File, FileWriter, OutputStreamWriter}
 
 import oxidation.analyze._
 import oxidation.parse.Parser
@@ -16,11 +16,12 @@ import oxidation.codegen.pass.Pass
 
 object Compile extends App {
 
-  case class Options(infiles: Seq[File] = Seq.empty, verbose: Boolean = false) extends LogOptions
+  case class Options(infiles: Seq[File] = Seq.empty,
+                     verbose: Boolean = false) extends LogOptions
 
-  val optParser = new scopt.OptionParser[Options]("astdump") {
+  val optParser = new scopt.OptionParser[Options]("oxc") {
 
-    head("irdump", "Compiles a program and prints the resulting intermediate representation")
+    head("oxc", "Compiles a program and outputs assembly")
 
     opt[Unit]('v', "verbose")
       .action((_, o) => o.copy(verbose = true))
@@ -76,7 +77,20 @@ object Compile extends App {
     val passed = passes.foldLeft(irDefs)((defs, pass) => defs.flatMap(d => pass.extract(pass.txDef(d))))
     phase("asm-out") {
       val target = new Amd64Target with Amd64NasmOutput
-      target.outputDefs(passed.toVector).foreach(println)
+      val baseInFile = options.infiles.head
+      val baseName = baseInFile.getName.split("\\.").head
+      val targetFolder = new File(baseInFile.getParentFile, "target")
+      val asmFile = new File(targetFolder, baseName + ".asm")
+      val objFile = new File(targetFolder, baseName + ".obj")
+      val exeFile = new File(targetFolder, baseName + ".exe")
+      val out = new FileWriter(asmFile)
+      target.outputDefs(passed.toVector).foreach { l =>
+        out.write(l)
+        out.write('\n')
+      }
+      out.close()
+      sys.runtime.exec(Array("nasm", "-fwin64", "-o", objFile.getAbsolutePath, asmFile.getAbsolutePath))
+      sys.runtime.exec(Array("gcc", objFile.getAbsolutePath, "-Wl,-emain", "-o", exeFile.getAbsolutePath))
     }
   }
 
