@@ -121,11 +121,20 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
           ), Val.I(0, ir.Type.U0))
       }
       "Assign" - {
-        compileExpr(ast.Assign(ast.Var(l('x)) :: I32, None, ast.IntLit(20) :: I32) :: U0)
-          .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)), nextReg = 1)).value ==>
-          (Vector(
-            Inst.Move(r(0, _.I32), Op.Copy(20))
-          ), Val.I(0, ir.Type.U0))
+        "variable" - {
+          compileExpr(ast.Assign(ast.Var(l('x)) :: I32, None, ast.IntLit(20) :: I32) :: U0)
+            .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)), nextReg = 1)).value ==>
+            (Vector(
+              Inst.Move(r(0, _.I32), Op.Copy(20))
+            ), Val.I(0, ir.Type.U0))
+        }
+        "ptr" - {
+          compileExpr(ast.Assign(ast.App(ast.Var(l('p)) :: Ptr(TypeName.Named(g('i32))), List(ast.IntLit(8) :: I32)) :: I32,
+            None, ast.IntLit(20) :: I32) :: U0).run.runA(CodegenState(registerBindings = Map(l('p) -> r(0, _.Ptr)), nextReg = 1)).value ==>
+            (Vector(
+              Inst.Do(Op.Store(r(0, _.Ptr), 8, 20))
+            ), Val.I(0, ir.Type.U0))
+        }
       }
       "App" - {
         "function" - {
@@ -140,7 +149,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
           compileExpr(ast.App(ast.Var(l('p)) :: Ptr(TypeName.Named(g('i32))), Nil) :: I32)
             .run.runA(CodegenState(registerBindings = Map(l('p) -> r(0, _.Ptr)), nextReg = 1)).value ==>
             (Vector(
-              Inst.Move(r(1, _.I32), Op.Load(r(0, _.Ptr), 0))
+              Inst.Move(r(1, _.I32), Op.Load(r(0, _.Ptr), Val.I(0, ir.Type.I64)))
             ), Val.R(r(1, _.I32)))
         }
       }

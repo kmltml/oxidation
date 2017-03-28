@@ -164,9 +164,9 @@ object Codegen {
       for {
         r <- genReg(translateType(t))
         ptrv <- compileExpr(ptr)
-        offv <- params.headOption.map(compileExpr).getOrElse(Res.pure(Val.I(0, Type.I32)))
+        offv <- params.headOption.traverse(compileExpr)
         _ <- Res.tell(Vector(
-          Inst.Move(r, Op.Load(ptrv, offv))
+          Inst.Move(r, Op.Load(ptrv, offv getOrElse Val.I(0, Type.I64)))
         ))
       } yield Val.R(r)
 
@@ -176,6 +176,16 @@ object Codegen {
         dest <- WriterT.lift(CodegenState.inspect(_.registerBindings(n))): Res[Register]
         _ <- Res.tell(Vector(
           Inst.Move(dest, Op.Copy(right))
+        ))
+      } yield Val.I(0, ir.Type.U0)
+
+    case Typed(ast.Assign(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), params), _), None, rval), _) =>
+      for {
+        right <- compileExpr(rval)
+        ptrv <- compileExpr(ptr)
+        offv <- params.headOption.traverse(compileExpr)
+        _ <- Res.tell(Vector(
+          Inst.Do(Op.Store(ptrv, offv getOrElse Val.I(0, Type.I64), right))
         ))
       } yield Val.I(0, ir.Type.U0)
   }

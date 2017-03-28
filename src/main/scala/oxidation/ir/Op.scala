@@ -17,6 +17,7 @@ sealed trait Op {
       case Op.Unary(_, v) => Set(v)
       case Op.Garbled => Set.empty
       case Op.Load(a, o) => Set(a, o)
+      case Op.Store(a, o, v) => Set(a, o, v)
     }
     vals.collect {
       case Val.R(r) => r

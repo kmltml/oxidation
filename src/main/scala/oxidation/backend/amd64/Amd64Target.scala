@@ -54,7 +54,7 @@ class Amd64Target { this: Output =>
       }.zipWithIndex.toMap
       val bindings = allocations.map {
         case (reg, allocator.R(r)) => reg -> Val.R(Reg(r, regSize(reg.typ)))
-        case (r, allocator.Spill) => r -> Val.m(RBP, -8 * spills(r))
+        case (r, allocator.Spill) => r -> Val.m(regSize(r.typ), RBP, -8 * spills(r))
       }
       val calleeSaved = allocations.values.collect {
         case allocator.R(l) if RegLoc.calleeSaved.contains(l) => l
@@ -84,6 +84,11 @@ class Amd64Target { this: Output =>
     case ir.Inst.Label(n) => S.tell(label(n))
 
     case ir.Inst.Do(ir.Op.Copy(_)) => S.pure(())
+
+    case ir.Inst.Do(ir.Op.Store(addr, offset, value)) =>
+      assert(regSize(addr.typ) == RegSize.QWord)
+      assert(regSize(offset.typ) == RegSize.QWord)
+      S.tell(move(Val.m(regSize(value.typ), toVal(addr), toVal(offset)), toVal(value)))
 
     case ir.Inst.Eval(_, ir.Op.Call(ir.Val.G(fun, _), params)) =>
       if(params.drop(4).nonEmpty) throw new NotImplementedError("passing parameters on stack is not yet supported")
@@ -115,9 +120,12 @@ class Amd64Target { this: Output =>
       case ir.Op.Copy(src) => S.tell(move(toVal(dest), toVal(src)))
       case ir.Op.Garbled => S.pure(())
 
-      case ir.Op.Load(addr, off) => S.tell(
-        mov(toVal(dest), Val.m(toVal(addr), toVal(off)))
-      )
+      case ir.Op.Load(addr, off) =>
+        assert(regSize(addr.typ) == RegSize.QWord)
+        assert(regSize(off.typ) == RegSize.QWord)
+        S.tell(
+          mov(toVal(dest), Val.m(regSize(dest.typ), toVal(addr), toVal(off)))
+        )
     }
   }
 

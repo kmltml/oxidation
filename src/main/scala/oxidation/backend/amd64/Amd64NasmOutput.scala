@@ -16,13 +16,19 @@ trait Amd64NasmOutput extends Output {
   private implicit val showVal: Show[Val] = {
     case Val.I(i) => i.show
     case Val.R(r) => r.toString.toLowerCase
-    case Val.M(regs, offset) =>
+    case Val.M(size, regs, offset) =>
       val rs = regs.map {
         case (r, 1) => r.toString.toLowerCase
         case (r, i) => s"${r.toString.toLowerCase} * $i"
       }
       val off = if(offset == 0) None else Some(offset)
-      show"[${(rs ++ off) mkString " + "}]"
+      val s = size match {
+        case RegSize.Byte => "byte"
+        case RegSize.Word => "word"
+        case RegSize.DWord => "dword"
+        case RegSize.QWord => "qword"
+      }
+      show"$s [${(rs ++ off) mkString " + "}]"
   }
 
   private implicit val showName: Show[Name] = {

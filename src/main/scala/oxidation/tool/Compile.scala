@@ -14,6 +14,8 @@ import oxidation.backend.amd64.{Amd64NasmOutput, Amd64Target}
 import oxidation.codegen.{Codegen, pass}
 import oxidation.codegen.pass.Pass
 
+import scala.sys.process.Process
+
 object Compile extends App {
 
   case class Options(infiles: Seq[File] = Seq.empty,
@@ -90,8 +92,8 @@ object Compile extends App {
         out.write('\n')
       }
       out.close()
-      sys.runtime.exec(Array("nasm", "-fwin64", "-o", objFile.getAbsolutePath, asmFile.getAbsolutePath))
-      sys.runtime.exec(Array("gcc", objFile.getAbsolutePath, "-Wl,-emain", "-o", exeFile.getAbsolutePath))
+      Process(Seq("nasm", "-fwin64", "-o", objFile.getAbsolutePath, asmFile.getAbsolutePath)).!
+      Process(Seq("gcc", objFile.getAbsolutePath, "-Wl,-emain", "-o", exeFile.getAbsolutePath)).!
     }
   }
 
