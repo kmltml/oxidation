@@ -22,8 +22,11 @@ def main(): u0 = {
     exit(p(5))
 }
 
-def printString(s: str): str = {
-    s
+def printString(s: str): u0 = {
+    var i: u32 = 0
+    while(i < s.length) {
+        putchar(s.data(i))
+    }
 }
 
 def fromCString(p: ptr[u8]): str = {

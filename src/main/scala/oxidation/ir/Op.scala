@@ -36,6 +36,7 @@ object Op {
   final case class Load(addr: Val, offset: Val) extends Op
   final case class Store(addr: Val, offset: Val, value: Val) extends Op
   final case class Widen(v: Val) extends Op
+  final case class Member(src: Val, index: Int) extends Op
   case object Garbled extends Op // Assigned to register to indicate, that some instruction also writes to this register as a side effect
 
   implicit val show: Show[Op] = {
@@ -46,6 +47,7 @@ object Op {
     case Load(addr, offset) => show"load [$addr + $offset]"
     case Store(addr, offset, value) => show"store [$addr + $offset] = $value"
     case Widen(v) => show"widen $v"
+    case Member(s, i) => show"member $s.$i"
     case Garbled => "garbled"
   }
 }

@@ -207,6 +207,15 @@ object Codegen {
           Inst.Do(Op.Store(ptrv, offv getOrElse Val.I(0, Type.I64), right))
         ))
       } yield Val.I(0, ir.Type.U0)
+
+    case Typed(ast.Select(src @ Typed(_, structType: analyze.Type.Struct), member), typ) =>
+      for {
+        srcv <- compileExpr(src)
+        r <- genReg(translateType(typ))
+        _ <- Res.tell(Vector(
+          Inst.Move(r, Op.Member(srcv, structType.indexOf(member)))
+        ))
+      } yield Val.R(r)
   }
 
   def compileDef(d: ast.Def): Def = d match {

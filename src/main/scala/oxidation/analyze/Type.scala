@@ -24,7 +24,12 @@ object Type {
 
   final case class Fun(params: Seq[Type], ret: Type) extends Type
 
-  final case class Struct(name: Symbol, members: Seq[StructMember]) extends Type
+  final case class Struct(name: Symbol, members: Seq[StructMember]) extends Type {
+
+    def indexOf(memberName: String): Int =
+      members.indexWhere(_.name == memberName)
+
+  }
 
   final case class StructMember(name: String, typ: Type)
 

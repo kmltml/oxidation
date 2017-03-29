@@ -30,6 +30,7 @@ object Tag {
     final val Store  = 1 + Load
     final val Widen  = 1 + Store
     final val Garbled  = 1 + Widen
+    final val Member = 1 + Garbled
   }
 
   object Val {

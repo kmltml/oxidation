@@ -89,6 +89,7 @@ class Serialize(val out: DataOutputStream) {
     case Op.Store(a, o, v) => writeTag(Tag.Op.Store); writeVal(a); writeVal(o); writeVal(v)
     case Op.Widen(v) => writeTag(Tag.Op.Widen); writeVal(v)
     case Op.Garbled => writeTag(Tag.Op.Garbled)
+    case Op.Member(src, index) => writeTag(Tag.Op.Member); writeVal(src); writeInt(index)
   }
 
   def writeInfixOp(o: InfixOp): Unit = writeTag(o match {
