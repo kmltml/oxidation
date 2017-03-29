@@ -12,7 +12,7 @@ trait Ast {
 
   sealed trait BlockStatement
 
-  sealed trait Expression extends BlockStatement
+  sealed trait Expression extends BlockStatement with Product with Serializable
 
   final case class IntLit(value: Int) extends Expression
   final case class BoolLit(value: Boolean) extends Expression

@@ -28,6 +28,16 @@ object Codegen {
       }
       Res.pure(Val.I(i, translateType(typ)))
     case Typed(ast.CharLit(c), typ) => Res.pure(Val.I(c.toInt, translateType(typ)))
+    case Typed(ast.StructLit(_, members), analyze.Type.Struct(_, memberTypes)) =>
+      for {
+        memberVals <- members.toVector.traverse {
+          case (name, value) => for {
+            v <- compileExpr(value)
+          } yield memberTypes.indexWhere(_.name == name) -> v
+        }
+        orderedMemberVals = memberVals.sortBy(_._1).map(_._2)
+      } yield Val.Struct(orderedMemberVals)
+
     case Typed(ast.Var(n), _) => WriterT.lift(State.inspect(s => Val.R(s.registerBindings(n))))
     case Typed(ast.InfixAp(op, left, right), valType) =>
       for {
@@ -247,7 +257,7 @@ object Codegen {
 
     case analyze.Type.Ptr(_) => ir.Type.Ptr
 
-//    case analyze.Type.Struct(name, members) =>
+    case analyze.Type.Struct(_, members) => ir.Type.Struct(members.map(m => translateType(m.typ)).toVector)
 
   }
 

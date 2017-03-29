@@ -1,14 +1,16 @@
 package oxidation
 package codegen
 
-import analyze.{TypedSyntax, ast}
+import analyze.{BuiltinSymbols, TypedSyntax, ast}
 import analyze.Type._
 import ir._
 import utest._
 
 object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
 
-  private def r(i: Int, t: ir.Type.type => ir.Type): Register = Codegen.register(i, t(ir.Type))
+  import Codegen.register
+
+  private def r(i: Int, t: ir.Type.type => ir.Type): Register = register(i, t(ir.Type))
 
   private implicit def vali(i: Int): Val = Val.I(i, ir.Type.I32)
   private implicit def valr(r: Register): Val = Val.R(r)
@@ -30,6 +32,14 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
       "CharLit" - {
         compileExpr(ast.CharLit('a') :: U8).run.runA(CodegenState()).value ==>
           (Vector.empty, Val.I(97, ir.Type.U8))
+      }
+      "StructLit" - {
+        val strType = ir.Type.Struct(Vector(ir.Type.Ptr, ir.Type.U32))
+        compileExpr(ast.StructLit(g('str), Seq(
+          "data" -> (ast.Var(l('x)) :: Ptr(TypeName.Named(g('u8)))),
+          "length" -> (ast.IntLit(10) :: U32)
+        )) :: BuiltinSymbols.StrType).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.Ptr)), nextReg = 1)).value ==>
+          (Vector.empty, Val.Struct(Vector(r(0, _.Ptr), Val.I(10, ir.Type.U32))))
       }
       "InfixAp" - {
         compileExpr(ast.InfixAp(InfixOp.Add, ast.IntLit(1) :: I32, ast.IntLit(2) :: I32) :: I32)

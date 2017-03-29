@@ -20,11 +20,15 @@ object Val {
   }
   final case class I(value: Int, typ: Type) extends Val
   final case class G(name: Name, typ: Type) extends Val
+  final case class Struct(members: Vector[Val]) extends Val {
+    lazy val typ: Type = Type.Struct(members.map(_.typ))
+  }
 
   implicit val show: Show[Val] = {
     case R(reg) => reg.show
     case I(value, typ) => show"($value)[$typ]"
     case G(n, typ) => show"(@$n)[$typ]"
+    case Struct(members) => members.map(_.show).mkString("{", ", ", "}")
   }
 
 }

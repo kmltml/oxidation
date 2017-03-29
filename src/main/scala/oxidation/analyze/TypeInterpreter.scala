@@ -43,6 +43,7 @@ object TypeInterpreter {
         ctxt <- S.get
         t <- if(ctxt.types.contains(s)) S.pure(ctxt.types(s)) else solveTypeDef(defs(s), defs)
       } yield t
+    case TypeName.App(TypeName.Named(Symbol.Global(Seq("ptr"))), Seq(pointee)) => S.pure(Type.Ptr(pointee))
   }
 
   private def solved(name: Symbol, t: Type): S[Unit] = S.modify { ctxt =>

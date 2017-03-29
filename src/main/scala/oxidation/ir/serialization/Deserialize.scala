@@ -64,6 +64,7 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Type.U64 => Type.U64
     case Tag.Type.Ptr => Type.Ptr
     case Tag.Type.Fun => Type.Fun(readSeq(readType).toList, readType())
+    case Tag.Type.Struct => Type.Struct(readSeq(readType).toVector)
   }
 
   def readOp(): Op = readTag() match {
@@ -108,6 +109,7 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Val.G => Val.G(readName(), readType())
     case Tag.Val.I => Val.I(readInt(), readType())
     case Tag.Val.R => Val.R(readRegister())
+    case Tag.Val.Struct => Val.Struct(readSeq(readVal).toVector)
   }
 
   def readName(): Name = readTag() match {

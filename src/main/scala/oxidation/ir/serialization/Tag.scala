@@ -36,6 +36,7 @@ object Tag {
     final val I = 0
     final val R = 1 + I
     final val G = 1 + R
+    final val Struct = 1 + G
   }
 
   object FlowControl {
@@ -57,6 +58,7 @@ object Tag {
     final val U64 = 1 + U32
     final val Ptr = 1 + U64
     final val Fun = 1 + Ptr
+    final val Struct = 1 + Fun
   }
 
   object InfixOp {

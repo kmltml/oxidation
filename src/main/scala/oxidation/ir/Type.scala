@@ -11,6 +11,7 @@ object Type {
 
   case object U0 extends Type
   case object U1 extends Type
+  case object Ptr extends Type
 
   sealed trait Num extends Type
 
@@ -28,8 +29,14 @@ object Type {
 
   final case class Fun(params: List[Type], ret: Type) extends Type
 
-  case object Ptr extends Type
+  final case class Struct(members: Vector[Type]) extends Type
 
-  implicit val show: Show[Type] = Show.fromToString
+  implicit val show: Show[Type] = new Show[Type] {
+    def show(t: Type): String = t match {
+      case Fun(params, ret) => show"(${params.map(show).mkString(", ")} => ${show(ret)}"
+      case Struct(members) => members.map(show).mkString("{", ", ", "}")
+      case t => t.toString.toLowerCase
+    }
+  }
 
 }
