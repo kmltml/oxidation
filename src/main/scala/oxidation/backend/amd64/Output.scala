@@ -23,6 +23,9 @@ trait Output {
   def extern(name: Name): M
 
   def mov(dest: Val, src: Val): M
+  def movzx(dest: Val, src: Val): M
+  def movsx(dest: Val, src: Val): M
+  def movsxd(dest: Val, src: Val): M
 
   def add(dest: Val, src: Val): M
   def sub(dest: Val, src: Val): M

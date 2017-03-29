@@ -51,6 +51,13 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
             Inst.Move(r(0, _.I32), Op.Unary(PrefixOp.Neg, 20))
           ), Val.R(r(0, _.I32)))
       }
+      "Widen" - {
+        compileExpr(ast.Widen(ast.Var(l('x)) :: I32) :: I64)
+          .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)), nextReg = 1)).value ==>
+          (Vector(
+            Inst.Move(r(1, _.I64), Op.Widen(r(0, _.I32)))
+          ), Val.R(r(1, _.I64)))
+      }
       "Var" - {
         compileExpr(ast.Var(l('x)) :: I32).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)))).value ==>
           (Vector.empty, Val.R(r(0, _.I32)))

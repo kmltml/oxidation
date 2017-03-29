@@ -39,6 +39,11 @@ class Amd64Target { this: Output =>
     case ir.Type.U64 | ir.Type.I64 | ir.Type.Ptr => RegSize.QWord
   }
 
+  def signedness(t: ir.Type): Signedness = t match {
+    case ir.Type.Ptr | ir.Type.U8 | ir.Type.U16 | ir.Type.U32 | ir.Type.U64 => Unsigned
+    case ir.Type.I8 | ir.Type.I16 | ir.Type.I32 | ir.Type.I64 => Signed
+  }
+
   def outputDefs(ds: Vector[ir.Def]): M = {
     text |+| ds.foldMap(outputDef)
   }
@@ -95,6 +100,20 @@ class Amd64Target { this: Output =>
       S.tell(call(fun))
 
     case ir.Inst.Move(dest, op) => op match {
+      case ir.Op.Widen(src) => (signedness(src.typ), regSize(dest.typ), regSize(src.typ)) match {
+        case (_, a, b) if a == b => S.tell(mov(toVal(dest), toVal(src)))
+
+        case (Unsigned, RegSize.QWord, RegSize.DWord) =>
+          val Val.R(Reg(destLoc, _)) = toVal(dest)
+          S.tell(mov(Reg(destLoc, RegSize.DWord), toVal(src)))
+
+        case (Signed, RegSize.QWord, RegSize.DWord) =>
+          S.tell(movsxd(toVal(dest), toVal(src)))
+
+        case (Unsigned, _, _) => S.tell(movzx(toVal(dest), toVal(src)))
+        case (Signed, _, _) => S.tell(movsx(toVal(dest), toVal(src)))
+      }
+
       case ir.Op.Arith(op @ (InfixOp.Add | InfixOp.Sub), left, right) =>
         S.tell(Vector(
           mov(toVal(dest), toVal(left)),

@@ -62,6 +62,7 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Type.U16 => Type.U16
     case Tag.Type.U32 => Type.U32
     case Tag.Type.U64 => Type.U64
+    case Tag.Type.Ptr => Type.Ptr
     case Tag.Type.Fun => Type.Fun(readSeq(readType).toList, readType())
   }
 
@@ -70,6 +71,10 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Op.Call => Op.Call(readVal(), readSeq(readRegister).toList)
     case Tag.Op.Copy => Op.Copy(readVal())
     case Tag.Op.Unary => Op.Unary(readPrefixOp(), readVal())
+    case Tag.Op.Load => Op.Load(readVal(), readVal())
+    case Tag.Op.Store => Op.Store(readVal(), readVal(), readVal())
+    case Tag.Op.Widen => Op.Widen(readVal())
+    case Tag.Op.Garbled => Op.Garbled
   }
 
   def readInfixOp(): InfixOp = readTag() match {

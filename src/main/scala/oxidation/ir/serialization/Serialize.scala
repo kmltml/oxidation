@@ -75,6 +75,7 @@ class Serialize(val out: DataOutputStream) {
     case Type.U16 => writeTag(Tag.Type.U16)
     case Type.U32 => writeTag(Tag.Type.U32)
     case Type.U64 => writeTag(Tag.Type.U64)
+    case Type.Ptr => writeTag(Tag.Type.Ptr)
     case Type.Fun(p, r) => writeTag(Tag.Type.Fun); writeSeq(p)(writeType); writeType(r)
   }
 
@@ -83,6 +84,10 @@ class Serialize(val out: DataOutputStream) {
     case Op.Call(f, p) => writeTag(Tag.Op.Call); writeVal(f); writeSeq(p)(writeRegister)
     case Op.Copy(s) => writeTag(Tag.Op.Copy); writeVal(s)
     case Op.Unary(o, r) => writeTag(Tag.Op.Unary); writePrefixOp(o); writeVal(r)
+    case Op.Load(a, o) => writeTag(Tag.Op.Load); writeVal(a); writeVal(o)
+    case Op.Store(a, o, v) => writeTag(Tag.Op.Store); writeVal(a); writeVal(o); writeVal(v)
+    case Op.Widen(v) => writeTag(Tag.Op.Widen); writeVal(v)
+    case Op.Garbled => writeTag(Tag.Op.Garbled)
   }
 
   def writeInfixOp(o: InfixOp): Unit = writeTag(o match {

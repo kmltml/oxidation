@@ -74,6 +74,7 @@ class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs
     val edges = f.written.runA(inputs).value
     val moves = instrs.collect {
       case (ir.Inst.Move(dest, ir.Op.Copy(ir.Val.R(src))), _) => dest <-> src
+      case (ir.Inst.Move(dest, ir.Op.Widen(ir.Val.R(src))), _) => dest <-> src // seems reasonable, but i'm not sure, should be tested further
     }
     val callVRegs = if(calls.isEmpty) Set() else virtualRegs.keySet
     InterferenceGraph(regs.toSet ++ callVRegs, Map.empty, edges, moves.toSet)

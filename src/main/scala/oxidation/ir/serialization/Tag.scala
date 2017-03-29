@@ -26,6 +26,10 @@ object Tag {
     final val Call  = 1 + Arith
     final val Copy  = 1 + Call
     final val Unary = 1 + Copy
+    final val Load  = 1 + Unary
+    final val Store  = 1 + Load
+    final val Widen  = 1 + Store
+    final val Garbled  = 1 + Widen
   }
 
   object Val {
@@ -51,7 +55,8 @@ object Tag {
     final val U16 = 1 + U8
     final val U32 = 1 + U16
     final val U64 = 1 + U32
-    final val Fun = 1 + U64
+    final val Ptr = 1 + U64
+    final val Fun = 1 + Ptr
   }
 
   object InfixOp {

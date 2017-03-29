@@ -48,6 +48,15 @@ object Codegen {
         ))
       } yield Val.R(r)
 
+    case Typed(ast.Widen(expr), valType) =>
+      for {
+        v <- compileExpr(expr)
+        r <- genReg(translateType(valType))
+        _ <- Res.tell(Vector(
+          Inst.Move(r, Op.Widen(v))
+        ))
+      } yield Val.R(r)
+
     case Typed(ast.Block(stmnts), typ) =>
       for {
         bindings <- storeBindings

@@ -8,9 +8,9 @@ def main(): u0 = {
     val p = malloc(8)
     var i: i8 = 0
     while(i < 8) {
-        p(i) = i
+        p(i) = i * 2
         i += 1
     }
 
-    exit(0)
+    exit(p(5))
 }
