@@ -12,12 +12,9 @@ import codegen.{Codegen, Name}
 import oxidation.backend.amd64.RegLoc._
 import utest._
 
-object Amd64BackendPassTest extends TestSuite {
+object Amd64BackendPassTest extends TestSuite with IrValSyntax {
 
   val pass = Amd64BackendPass
-
-  private implicit def vali(i: Int): ir.Val = ir.Val.I(i, I32)
-  private implicit def valr(r: Register): ir.Val = ir.Val.R(r)
 
   import Codegen.register
 
@@ -72,6 +69,23 @@ object Amd64BackendPassTest extends TestSuite {
             Inst.Move(register(5, I32), Op.Copy(register(4, I32)))
           ), FlowControl.Return(register(5, I32)))
         ))))
+      }
+      "return of small structs" - {
+        pass.txDef(Def.Fun(Name.Global(List("foo")), Nil, Struct(Vector(I8, I16, I32, I64, U64)), Vector(
+          Block(Name.Local("body", 0), Vector(
+            Inst.Move(register(0, I8), Op.Copy(ir.Val.I(0, I8))),
+            Inst.Move(register(1, I16), Op.Copy(ir.Val.I(0, I16))),
+            Inst.Move(register(2, I32), Op.Copy(ir.Val.I(0, I32))),
+            Inst.Move(register(3, I64), Op.Copy(ir.Val.I(0, I64))),
+            Inst.Move(register(4, U64), Op.Copy(ir.Val.I(0, U64)))
+          ), FlowControl.Return(ir.Val.Struct(Vector(register(0, I8), register(1, I16), register(2, I32), register(3, I64), register(4, U64)))))
+        ))).written.runEmptyA.value ==> Set(
+          register(0, I8) -> A,
+          register(1, I16) -> D,
+          register(2, I32) -> C,
+          register(3, I64) -> R8,
+          register(4, U64) -> R9
+        )
       }
     }
   }

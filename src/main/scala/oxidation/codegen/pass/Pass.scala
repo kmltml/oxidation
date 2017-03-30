@@ -11,7 +11,8 @@ trait Pass {
   type =?>[A, B] = PartialFunction[A, B]
 
   type F[A]
-  implicit val F: Monad[F]
+  val F: Monad[F]
+  private implicit def implicitF: Monad[F] = F
   def extract[A](f: F[A]): A
 
   def onDef: ir.Def =?> F[Vector[ir.Def]] = PartialFunction.empty
@@ -22,11 +23,15 @@ trait Pass {
 
   def onFlow: ir.FlowControl =?> F[ir.FlowControl] = PartialFunction.empty
 
+  def txInstruction(inst: ir.Inst): F[Vector[ir.Inst]] = {
+    onInstruction.lift(inst).getOrElse(F.pure(Vector(inst)))
+  }
+
   def txBlock(block: ir.Block): F[Vector[ir.Block]] = {
     val blocks = onBlock.lift(block).getOrElse(F.pure(Vector(block)))
     blocks.flatMap(_.traverse {
       case ir.Block(name, instrs, flow) =>
-        val newInstrs = instrs.traverse(i => onInstruction.lift(i).getOrElse(F.pure(Vector(i)))).map(_.flatten)
+        val newInstrs = instrs.traverse(txInstruction).map(_.flatten)
         val newFlow = onFlow.lift(flow).getOrElse(F.pure(flow))
         (newInstrs, newFlow).map2(ir.Block(name, _, _))
     })

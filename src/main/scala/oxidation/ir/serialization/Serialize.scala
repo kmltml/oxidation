@@ -5,6 +5,7 @@ package serialization
 import java.io.DataOutputStream
 
 import codegen.{Codegen, Name}
+import oxidation.codegen.pass.StructLowering
 
 class Serialize(val out: DataOutputStream) {
 
@@ -58,11 +59,13 @@ class Serialize(val out: DataOutputStream) {
   }
 
   def writeRegister(reg: Register): Unit = {
-    reg.ns match {
-      case Codegen.CodegenReg => Tag.RegisterNamespace.CodegenReg
-    }
-    writeInt(reg.index); writeType(reg.typ)
+    writeRegisterNS(reg.ns); writeInt(reg.index); writeType(reg.typ)
   }
+
+  def writeRegisterNS(ns: RegisterNamespace): Unit = writeTag(ns match {
+    case Codegen.CodegenReg => Tag.RegisterNamespace.CodegenReg
+    case StructLowering.StructLoweringReg => Tag.RegisterNamespace.StructLoweringReg
+  })
 
   def writeType(t: Type): Unit = t match {
     case Type.U0 => writeTag(Tag.Type.U0)

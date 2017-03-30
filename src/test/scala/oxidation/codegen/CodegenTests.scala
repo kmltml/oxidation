@@ -6,15 +6,11 @@ import analyze.Type._
 import ir._
 import utest._
 
-object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax {
+object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with IrValSyntax {
 
   import Codegen.register
 
   private def r(i: Int, t: ir.Type.type => ir.Type): Register = register(i, t(ir.Type))
-
-  private implicit def vali(i: Int): Val = Val.I(i, ir.Type.I32)
-  private implicit def valr(r: Register): Val = Val.R(r)
-
 
   val tests = apply {
     "compileExpr" - {

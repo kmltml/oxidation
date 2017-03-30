@@ -74,7 +74,8 @@ object Compile extends App {
       }
     }
     val passes: List[Pass] = List(
-      pass.ExplicitBlocks
+      pass.ExplicitBlocks,
+      pass.StructLowering
     )
     val passed = passes.foldLeft(irDefs)((defs, pass) => defs.flatMap(d => pass.extract(pass.txDef(d))))
     phase("asm-out") {

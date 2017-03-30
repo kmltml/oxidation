@@ -87,6 +87,7 @@ trait Amd64NasmOutput extends Output {
   def setg(dest: Val): M = ln(show"setg $dest")
   def setge(dest: Val): M = ln(show"setge $dest")
   def sete(dest: Val): M = ln(show"sete $dest")
+  def setne(dest: Val): M = ln(show"setne $dest")
 
   override def push(src: Val): M =
     ln(show"push $src")

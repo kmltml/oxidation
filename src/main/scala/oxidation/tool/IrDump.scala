@@ -30,7 +30,8 @@ object IrDump extends App {
 
 
   val AllPasses: List[(String, Pass)] = List(
-    "explicit-blocks" -> pass.ExplicitBlocks
+    "explicit-blocks" -> pass.ExplicitBlocks,
+    "struct-lowering" -> pass.StructLowering
   )
 
   implicit val passRead: scopt.Read[Pass] =

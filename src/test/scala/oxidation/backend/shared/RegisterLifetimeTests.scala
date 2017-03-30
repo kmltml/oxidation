@@ -7,12 +7,9 @@ import codegen.{Codegen, Name}
 import ir._
 import ir.Type._
 
-object RegisterLifetimeTests extends TestSuite {
+object RegisterLifetimeTests extends TestSuite with IrValSyntax {
 
   import RegisterLifetime._
-
-  private implicit def vali(i: Int): Val = Val.I(i, ir.Type.I32)
-  private implicit def valr(r: Register): Val = Val.R(r)
 
   import Codegen.register
 

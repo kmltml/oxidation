@@ -96,6 +96,7 @@ object Tag {
 
   object RegisterNamespace {
     final val CodegenReg = 0
+    final val StructLoweringReg = 1 + CodegenReg
   }
 
 }

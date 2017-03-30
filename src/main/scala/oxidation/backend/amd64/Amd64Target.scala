@@ -124,7 +124,7 @@ class Amd64Target { this: Output =>
         ).combineAll)
       case ir.Op.Arith(InfixOp.Div, _, right) => S.tell(div(toVal(right)))
       case ir.Op.Arith(InfixOp.Mul, _, right) => S.tell(mul(toVal(right)))
-      case ir.Op.Arith(op @ (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq), left, right) =>
+      case ir.Op.Arith(op @ (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq | InfixOp.Neq), left, right) =>
           S.tell(Vector(
             cmp(toVal(left), toVal(right)),
             op match {
@@ -133,6 +133,7 @@ class Amd64Target { this: Output =>
               case InfixOp.Geq => setge(toVal(dest))
               case InfixOp.Leq => setle(toVal(dest))
               case InfixOp.Eq => sete(toVal(dest))
+              case InfixOp.Neq => setne(toVal(dest))
             }
           ).combineAll)
 
@@ -151,7 +152,6 @@ class Amd64Target { this: Output =>
   def outputFlow(f: ir.FlowControl, localCount: Int, savedRegs: List[RegLoc])(implicit bindings: Map[ir.Register, Val]): S[Unit] = f match {
     case ir.FlowControl.Return(r) =>
       S.tell(Vector(
-        move(Reg(RegLoc.A, regSize(r.typ)), toVal(r)),
         epilogue(localCount, savedRegs),
         ret
       ).combineAll)

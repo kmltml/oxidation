@@ -5,6 +5,7 @@ package serialization
 import java.io.DataInputStream
 
 import codegen.{Codegen, Name}
+import oxidation.codegen.pass.StructLowering
 
 class Deserialize(val in: DataInputStream) {
 
@@ -49,6 +50,7 @@ class Deserialize(val in: DataInputStream) {
 
   def readRegisterNS(): RegisterNamespace = readTag() match {
     case Tag.RegisterNamespace.CodegenReg => Codegen.CodegenReg
+    case Tag.RegisterNamespace.StructLoweringReg => StructLowering.StructLoweringReg
   }
 
   def readType(): Type = readTag() match {

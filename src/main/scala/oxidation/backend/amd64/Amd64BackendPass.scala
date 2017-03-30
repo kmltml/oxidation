@@ -5,7 +5,6 @@ package amd64
 import cats._
 import cats.data._
 import cats.implicits._
-
 import codegen.pass.Pass
 import oxidation.ir._
 import Reg._
@@ -107,6 +106,18 @@ object Amd64BackendPass extends Pass {
       F.pure(Vector(
         inst, Inst.Do(Op.Copy(r))
       ))
+  }
+
+  override def onFlow: FlowControl =?> F[FlowControl] = {
+    case flow @ FlowControl.Return(ir.Val.Struct(members)) =>
+      val allocs = members.map { case ir.Val.R(r) => r }.zipWithIndex.map {
+        case (r, 0) => r -> RegLoc.A
+        case (r, 1) => r -> RegLoc.D
+        case (r, 2) => r -> RegLoc.C
+        case (r, 3) => r -> RegLoc.R8
+        case (r, 4) => r -> RegLoc.R9
+      }.toSet
+      F.tell(allocs).as(flow)
   }
 
   override def onBlock: Block =?> F[Vector[Block]] = {

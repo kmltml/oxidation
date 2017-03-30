@@ -29,6 +29,11 @@ object Inst {
 
   object Eval {
 
+    def apply(dest: Option[Register], op: Op): Inst = dest match {
+      case None => Do(op)
+      case Some(r) => Move(r, op)
+    }
+
     def unapply(i: Inst): Option[(Option[Register], Op)] = i match {
       case Move(r, o) => Some((Some(r), o))
       case Do(o) => Some((None, o))

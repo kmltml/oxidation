@@ -41,6 +41,7 @@ trait Output {
   def setg(dest: Val): M
   def setge(dest: Val): M
   def sete(dest: Val): M
+  def setne(dest: Val): M
 
   def push(src: Val): M
   def pop(dest: Val): M
