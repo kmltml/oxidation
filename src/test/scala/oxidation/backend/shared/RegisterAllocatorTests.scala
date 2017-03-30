@@ -37,7 +37,7 @@ object RegisterAllocatorTests extends TestSuite {
             Inst.Move(register(2, I32), Op.Copy(register(0, I32)))
           ), FlowControl.Goto(Name.Local("ifafter", 0))),
           Block(Name.Local("ifafter", 0), Vector.empty, FlowControl.Return(register(2, I32)))
-        ))
+        ), Set.empty)
         allocator.buildInterferenceGraph(fun) ==> InterferenceGraph[Register, Int](
           nodes = Set(register(0, I32), register(1, U1), register(2, I32), register(3, I32)),
           colours = Map.empty,
@@ -64,7 +64,7 @@ object RegisterAllocatorTests extends TestSuite {
             Inst.Move(register(7, I32), Op.Arith(InfixOp.Add, register(2, I32), register(6, I32))),
             Inst.Move(register(8, I32), Op.Copy(register(7, I32)))
           ), FlowControl.Return(register(8, I32)))
-        ))
+        ), Set.empty)
         allocator.buildInterferenceGraph(fun) ==> InterferenceGraph[Register, Int](
           nodes = Set(register(0, I32), register(1, I32), register(2, I32), register(3, I32),
             register(4, I32), register(5, I32), register(6, I32), register(7, I32), register(8, I32),

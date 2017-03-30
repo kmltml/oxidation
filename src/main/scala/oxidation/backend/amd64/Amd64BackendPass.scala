@@ -126,7 +126,7 @@ object Amd64BackendPass extends Pass {
   }
 
   override def onDef: Def =?> F[Vector[Def]] = {
-    case fun @ Def.Fun(_, params, _, _) =>
+    case fun @ Def.Fun(_, params, _, _, _) =>
       F.tell(params.zipWithIndex.collect {
         case (r, 0) => r -> RegLoc.C
         case (r, 1) => r -> RegLoc.D

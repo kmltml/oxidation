@@ -26,17 +26,22 @@ class Serialize(val out: DataOutputStream) {
   def writeDefs(ds: Seq[Def]): Unit = writeSeq(ds)(writeDef)
 
   def writeDef(d: Def): Unit = d match {
-    case Def.Fun(name, params, ret, body) =>
+    case Def.Fun(name, params, ret, body, constantPool) =>
       writeTag(Tag.Def.Fun)
       writeName(name)
       writeSeq(params)(writeRegister)
       writeType(ret)
       writeSeq(body)(writeBlock)
+      writeSeq(constantPool.toSeq)(writeConstantPoolEntry)
     case Def.ExternFun(name, params, ret) =>
       writeTag(Tag.Def.ExternFun)
       writeName(name)
       writeSeq(params)(writeType)
       writeType(ret)
+  }
+
+  def writeConstantPoolEntry(e: ConstantPoolEntry): Unit = e match {
+    case ConstantPoolEntry.Str(v) => writeTag(Tag.ConstantPoolEntry.Str); writeString(v)
   }
 
   def writeBlock(b: Block): Unit = {

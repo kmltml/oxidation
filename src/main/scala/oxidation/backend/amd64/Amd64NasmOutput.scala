@@ -16,6 +16,7 @@ trait Amd64NasmOutput extends Output {
   private implicit val showVal: Show[Val] = {
     case Val.I(i) => i.show
     case Val.R(r) => r.toString.toLowerCase
+    case Val.L(n) => n.show
     case Val.M(size, regs, offset) =>
       val rs = regs.map {
         case (r, 1) => r.toString.toLowerCase
@@ -45,6 +46,23 @@ trait Amd64NasmOutput extends Output {
 
   override def data: M =
     ln("section .data")
+
+
+  override def defstr(name: Name, str: String): M =
+    ln(show"$name db `${escapeString(str)}`")
+
+  private def escapeString(s: String): String = s.flatMap {
+    case '`' => "\\`"
+    case '\b' => "\\b"
+    case '\t' => "\\t"
+    case '\n' => "\\n"
+    case '\r' => "\\r"
+    case '\\' => "\\\\"
+    case c if c >= ' ' && c <= '~' => c.toString
+    case c =>
+      val hex = Integer.toHexString(c & 0xff)
+      "\\x" + ("0" * (2 - hex.length)) + hex
+  }
 
   override def label(name: Name): M = name match {
     case Name.Global(path) => ln(show"""${path.mkString(".")}:""")

@@ -25,9 +25,13 @@ class Deserialize(val in: DataInputStream) {
 
   def readDef(): Def = readTag() match {
     case Tag.Def.Fun =>
-      Def.Fun(readName(), readSeq(readRegister).toList, readType(), readSeq(readBlock).toVector)
+      Def.Fun(readName(), readSeq(readRegister).toList, readType(), readSeq(readBlock).toVector, readSeq(readConstantPoolEntry).toSet)
     case Tag.Def.ExternFun =>
       Def.ExternFun(readName(), readSeq(readType).toList, readType())
+  }
+
+  def readConstantPoolEntry(): ConstantPoolEntry = readTag() match {
+    case Tag.ConstantPoolEntry.Str => ConstantPoolEntry.Str(readString())
   }
 
   def readBlock(): Block =

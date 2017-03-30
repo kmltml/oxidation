@@ -1,11 +1,14 @@
 package oxidation.backend.amd64
 
+import oxidation.codegen.Name
+
 sealed trait Val extends Product with Serializable
 
 object Val {
 
   final case class R(reg: Reg) extends Val
   final case class I(int: Int) extends Val
+  final case class L(name: Name) extends Val
   final case class M(size: RegSize, regs: List[(Reg, Int)], offset: Int) extends Val
 
   def m(size: RegSize, offsets: MemOffset*): Val.M = offsets.foldLeft(M(size, List.empty, 0)) {

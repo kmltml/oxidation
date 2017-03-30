@@ -16,11 +16,11 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
   val tests = apply {
     "struct parameters" - {
       val r0 = register(0, Struct(Vector(I32, I64)))
-      pass.txDef(Def.Fun(Name.Global(List("foo")), List(r0), I64, Vector.empty))
+      pass.txDef(Def.Fun(Name.Global(List("foo")), List(r0), I64, Vector.empty, Set.empty))
         .run(pass.S()).value ==>
         (pass.S(nextReg = 2, bindings = Map(r0 -> Vector(sl(0, I32), sl(1, I64)))),
         Vector(
-          Def.Fun(Name.Global(List("foo")), List(sl(0, I32), sl(1, I64)), I64, Vector.empty)
+          Def.Fun(Name.Global(List("foo")), List(sl(0, I32), sl(1, I64)), I64, Vector.empty, Set.empty)
         ))
     }
     "struct register write and read" - {
@@ -31,7 +31,7 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
           Inst.Move(register(1, I32), Op.Member(r0, 0)),
           Inst.Move(register(2, U8), Op.Member(r0, 1))
         ), FlowControl.Return(Val.I(0, U0)))
-      ))).runA(pass.S()).value ==> Vector(
+      ), Set.empty)).runA(pass.S()).value ==> Vector(
         Def.Fun(Name.Global(List("foo")), Nil, U0, Vector(
           Block(Name.Local("body", 0), Vector(
             Inst.Move(sl(0, I32), Op.Copy(Val.I(0, I32))),
@@ -39,7 +39,7 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
             Inst.Move(register(1, I32), Op.Copy(sl(0, I32))),
             Inst.Move(register(2, U8), Op.Copy(sl(1, U8)))
           ), FlowControl.Return(Val.I(0, U0)))
-        ))
+        ), Set.empty)
       )
     }
     "call taking struct parameter" - {
@@ -50,14 +50,14 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
           Inst.Move(r0, Op.Copy(Val.Struct(Vector(Val.I(10, I32), Val.I(20, I64))))),
           Inst.Do(Op.Call(Val.G(Name.Global(List("bar")), Fun(List(struct), U0)), List(r0)))
         ), FlowControl.Return(Val.I(0, U0)))
-      ))).runA(pass.S()).value ==> Vector(
+      ), Set.empty)).runA(pass.S()).value ==> Vector(
         Def.Fun(Name.Global(List("foo")), Nil, U0, Vector(
           Block(Name.Local("body", 0), Vector(
             Inst.Move(sl(0, I32), Op.Copy(Val.I(10, I32))),
             Inst.Move(sl(1, I64), Op.Copy(Val.I(20, I64))),
             Inst.Do(Op.Call(Val.G(Name.Global(List("bar")), Fun(List(struct), U0)), List(sl(0, I32), sl(1, I64))))
           ), FlowControl.Return(Val.I(0, U0)))
-        ))
+        ), Set.empty)
       )
     }
     "struct copy" - {

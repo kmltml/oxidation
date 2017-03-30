@@ -1,17 +1,27 @@
 package oxidation
 package codegen
 
-import analyze.{Typed, ast}
+import analyze.{BuiltinSymbols, Typed, ast}
 import ir._
-
 import cats._
 import cats.data._
 import cats.implicits._
 
 object Codegen {
 
-  type Res[A] = WriterT[State[CodegenState, ?], Vector[Inst], A]
-  private val Res = MonadWriter[Res, Vector[Inst]]
+  final case class Log(insts: Vector[Inst], consts: Vector[ConstantPoolEntry] = Vector.empty)
+
+  implicit val logMonoid: Monoid[Log] = new Monoid[Log] {
+    override def empty: Log = Log(Vector.empty, Vector.empty)
+
+    override def combine(x: Log, y: Log): Log = Log(x.insts |+| y.insts, x.consts |+| y.consts)
+  }
+
+  type Res[A] = WriterT[State[CodegenState, ?], Log, A]
+  private val Res = MonadWriter[Res, Log]
+
+  def instructions(insts: Inst*): Res[Unit] = Res.tell(Log(insts.toVector))
+  def constants(consts: ConstantPoolEntry*): Res[Unit] = Res.tell(Log(Vector.empty, consts.toVector))
 
   object CodegenReg extends RegisterNamespace {
     override def prefix: String = "r"
@@ -38,33 +48,37 @@ object Codegen {
         orderedMemberVals = memberVals.sortBy(_._1).map(_._2)
       } yield Val.Struct(orderedMemberVals)
 
+    case Typed(ast.StringLit(v), BuiltinSymbols.StrType) =>
+      val cpe = ConstantPoolEntry.Str(v)
+      constants(cpe).as(Val.Struct(Vector(Val.Const(cpe, Type.Ptr), Val.I(v.length, Type.U32))))
+
     case Typed(ast.Var(n), _) => WriterT.lift(State.inspect(s => Val.R(s.registerBindings(n))))
     case Typed(ast.InfixAp(op, left, right), valType) =>
       for {
         lval <- compileExpr(left)
         rval <- compileExpr(right)
         res <- genReg(translateType(valType))
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Move(res, Op.Arith(op, lval, rval))
-        ))
+        )
       } yield Val.R(res)
 
     case Typed(ast.PrefixAp(op, expr), valType) =>
       for {
         v <- compileExpr(expr)
         r <- genReg(translateType(valType))
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Move(r, Op.Unary(op, v))
-        ))
+        )
       } yield Val.R(r)
 
     case Typed(ast.Widen(expr), valType) =>
       for {
         v <- compileExpr(expr)
         r <- genReg(translateType(valType))
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Move(r, Op.Widen(v))
-        ))
+        )
       } yield Val.R(r)
 
     case Typed(ast.Block(stmnts), typ) =>
@@ -76,9 +90,9 @@ object Codegen {
             for {
               v <- compileExpr(expr)
               r <- genReg(translateType(expr.typ))
-              _ <- Res.tell(Vector(
+              _ <- instructions(
                 Inst.Move(r, Op.Copy(v))
-              ))
+              )
               _ <- withBindings(name -> r)
             } yield Val.R(r): Val
 
@@ -86,9 +100,9 @@ object Codegen {
             for {
               v <- compileExpr(expr)
               r <- genReg(translateType(expr.typ))
-              _ <- Res.tell(Vector(
+              _ <- instructions(
                 Inst.Move(r, Op.Copy(v))
-              ))
+              )
               _ <- withBindings(name -> r)
             } yield Val.R(r): Val
         }
@@ -103,38 +117,38 @@ object Codegen {
         falseLbl = Name.Local("else", lbli)
         afterLbl = Name.Local("ifafter", lbli)
         res <- genReg(translateType(typ))
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Flow(FlowControl.Branch(condVal, trueLbl, neg match {
             case Some(_) => falseLbl
             case None => afterLbl
-          }))
+          })
         ))
 
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Label(trueLbl)
-        ))
+        )
         trueVal <- compileExpr(pos)
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Move(res, Op.Copy(trueVal)),
           Inst.Flow(FlowControl.Goto(afterLbl))
-        ))
+        )
 
         _ <- neg.map { neg =>
           for {
-            _ <- Res.tell(Vector(
+            _ <- instructions(
               Inst.Label(falseLbl)
-            ))
+            )
             falseVal <- compileExpr(neg)
-            _ <- Res.tell(Vector(
+            _ <- instructions(
               Inst.Move(res, Op.Copy(falseVal)),
               Inst.Flow(FlowControl.Goto(afterLbl))
-            ))
+            )
           } yield ()
         } getOrElse Res.pure(())
 
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Label(afterLbl)
-        ))
+        )
       } yield Val.R(res)
 
     case Typed(ast.While(cond, body), _) =>
@@ -143,19 +157,19 @@ object Codegen {
         condLbl = Name.Local("whilecond", lbli)
         bodyLbl = Name.Local("while", lbli)
         afterLbl = Name.Local("whileafter", lbli)
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Label(condLbl)
-        ))
+        )
         condVal <- compileExpr(cond)
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Flow(FlowControl.Branch(condVal, bodyLbl, afterLbl)),
           Inst.Label(bodyLbl)
-        ))
+        )
         _ <- compileExpr(body)
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Flow(FlowControl.Goto(condLbl)),
           Inst.Label(afterLbl)
-        ))
+        )
       } yield Val.I(0, ir.Type.U0)
 
     case Typed(ast.App(Typed(fn, fnType: analyze.Type.Fun), params), t) =>
@@ -168,15 +182,15 @@ object Codegen {
           for {
             v <- compileExpr(p)
             r <- genReg(translateType(p.typ))
-            _ <- Res.tell(Vector(
+            _ <- instructions(
               Inst.Move(r, Op.Copy(v))
-            ))
+            )
           } yield r
         }
         r <- genReg(translateType(t))
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Move(r, Op.Call(fnVal, paramVals))
-        ))
+        )
       } yield Val.R(r)
 
     case Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), params), t) =>
@@ -184,18 +198,18 @@ object Codegen {
         r <- genReg(translateType(t))
         ptrv <- compileExpr(ptr)
         offv <- params.headOption.traverse(compileExpr)
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Move(r, Op.Load(ptrv, offv getOrElse Val.I(0, Type.I64)))
-        ))
+        )
       } yield Val.R(r)
 
     case Typed(ast.Assign(Typed(ast.Var(n), _), None, rval), _) =>
       for {
         right <- compileExpr(rval)
         dest <- WriterT.lift(CodegenState.inspect(_.registerBindings(n))): Res[Register]
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Move(dest, Op.Copy(right))
-        ))
+        )
       } yield Val.I(0, ir.Type.U0)
 
     case Typed(ast.Assign(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), params), _), None, rval), _) =>
@@ -203,18 +217,18 @@ object Codegen {
         right <- compileExpr(rval)
         ptrv <- compileExpr(ptr)
         offv <- params.headOption.traverse(compileExpr)
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Do(Op.Store(ptrv, offv getOrElse Val.I(0, Type.I64), right))
-        ))
+        )
       } yield Val.I(0, ir.Type.U0)
 
     case Typed(ast.Select(src @ Typed(_, structType: analyze.Type.Struct), member), typ) =>
       for {
         srcv <- compileExpr(src)
         r <- genReg(translateType(typ))
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Move(r, Op.Member(srcv, structType.indexOf(member)))
-        ))
+        )
       } yield Val.R(r)
   }
 
@@ -230,21 +244,21 @@ object Codegen {
         paramTemps <- paramRegs.traverse {
           case (name, r) => for {
             temp <- genReg(r.typ)
-            _ <- Res.tell(Vector(
+            _ <- instructions(
               Inst.Move(temp, Op.Copy(Val.R(r)))
-            ))
+            )
           } yield name -> temp
         }
         _ <- withBindings(paramTemps: _*)
         v <- compileExpr(body)
         vtemp <- genReg(translateType(body.typ))
-        _ <- Res.tell(Vector(
+        _ <- instructions(
           Inst.Move(vtemp, Op.Copy(v))
-        ))
+        )
       } yield (paramRegs.map(_._2), vtemp)
-      val (instrs, (paramRegs, v)) = s.run.runA(CodegenState()).value
+      val (Log(instrs, consts), (paramRegs, v)) = s.run.runA(CodegenState()).value
       val retType = translateType(body.typ)
-      Def.Fun(Name.Global(name.toList), paramRegs, retType, Vector(Block(Name.Local("body", 0), instrs, FlowControl.Return(ir.Val.R(v)))))
+      Def.Fun(Name.Global(name.toList), paramRegs, retType, Vector(Block(Name.Local("body", 0), instrs, FlowControl.Return(ir.Val.R(v)))), consts.toSet)
   }
 
   private def translateType(t: analyze.Type): ir.Type = t match {

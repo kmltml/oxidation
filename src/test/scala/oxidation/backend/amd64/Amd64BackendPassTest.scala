@@ -28,8 +28,7 @@ object Amd64BackendPassTest extends TestSuite with IrValSyntax {
             Block(Name.Local("body", 0), Vector(
               Inst.Move(register(5, I32), Op.Copy(10))
             ), FlowControl.Return(register(5, I32)))
-          )
-        )).written.runEmptyA.value ==> Set(
+          ), Set.empty)).written.runEmptyA.value ==> Set(
           register(0, I32) -> C,
           register(1, I32) -> D,
           register(2, I32) -> R8,
@@ -45,7 +44,7 @@ object Amd64BackendPassTest extends TestSuite with IrValSyntax {
             Inst.Move(register(4, I32), Op.Arith(InfixOp.Div, register(2, I32), register(3, I32))),
             Inst.Move(register(5, I32), Op.Copy(register(4, I32)))
           ), FlowControl.Return(register(5, I32)))
-        ))).run.runEmptyA.value ==> (Set(
+        ), Set.empty)).run.runEmptyA.value ==> (Set(
           register(0, I32) -> C,
           register(1, I32) -> D,
           br(0, I32) -> A,
@@ -68,7 +67,7 @@ object Amd64BackendPassTest extends TestSuite with IrValSyntax {
 
             Inst.Move(register(5, I32), Op.Copy(register(4, I32)))
           ), FlowControl.Return(register(5, I32)))
-        ))))
+        ), Set.empty)))
       }
       "return of small structs" - {
         pass.txDef(Def.Fun(Name.Global(List("foo")), Nil, Struct(Vector(I8, I16, I32, I64, U64)), Vector(
@@ -79,7 +78,7 @@ object Amd64BackendPassTest extends TestSuite with IrValSyntax {
             Inst.Move(register(3, I64), Op.Copy(ir.Val.I(0, I64))),
             Inst.Move(register(4, U64), Op.Copy(ir.Val.I(0, U64)))
           ), FlowControl.Return(ir.Val.Struct(Vector(register(0, I8), register(1, I16), register(2, I32), register(3, I64), register(4, U64)))))
-        ))).written.runEmptyA.value ==> Set(
+        ), Set.empty)).written.runEmptyA.value ==> Set(
           register(0, I8) -> A,
           register(1, I16) -> D,
           register(2, I32) -> C,

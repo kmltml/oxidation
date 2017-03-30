@@ -12,19 +12,15 @@ struct str = {
 }
 
 def main(): u0 = {
-    val p = malloc(8)
-    var i: i8 = 0
-    while(i < 8) {
-        i += 1
-    }
-
-    exit(p(5))
+    println("Hello, world!")
+    exit(0)
 }
 
 def printString(s: str): u0 = {
     var i: u32 = 0
     while(i < s.length) {
         putchar(s.data(i))
+        i += 1
     }
 }
 

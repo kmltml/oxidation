@@ -26,6 +26,8 @@ object Typer {
 
     case P.CharLit(c) => unifyType(Typed(ast.CharLit(c), U8), expected)
 
+    case P.StringLit(s) => unifyType(Typed(ast.StringLit(s), BuiltinSymbols.StrType), expected)
+
     case P.Extern() => expected match {
       case ExpectedType.Specific(t) => Right(Typed(ast.Extern(), t))
       case _ => Left(TyperError.ExternNoExplicitType())

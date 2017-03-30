@@ -5,6 +5,7 @@ package pass
 import cats._
 import cats.data._
 import cats.implicits._
+import oxidation.ir.Block
 
 trait Pass {
 
@@ -40,9 +41,9 @@ trait Pass {
   def txDef(d: ir.Def): F[Vector[ir.Def]] = {
     val defs = onDef.lift(d).getOrElse(F.pure(Vector(d)))
     defs.flatMap(_.traverse {
-      case ir.Def.Fun(name, params, ret, body) =>
+      case ir.Def.Fun(name, params, ret, body, cp) =>
         val newBody = body.traverse(txBlock).map(_.flatten)
-        newBody.map(ir.Def.Fun(name, params, ret, _))
+        newBody.map((body: Vector[Block]) => ir.Def.Fun(name, params, ret, body, cp))
       case efun: ir.Def.ExternFun => F.pure(efun)
     })
   }

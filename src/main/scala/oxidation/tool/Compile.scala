@@ -11,8 +11,9 @@ import cats._
 import cats.data._
 import cats.implicits._
 import oxidation.backend.amd64.{Amd64NasmOutput, Amd64Target}
-import oxidation.codegen.{Codegen, pass}
+import oxidation.codegen.{Codegen, Name, pass}
 import oxidation.codegen.pass.Pass
+import oxidation.ir.ConstantPoolEntry
 
 import scala.sys.process.Process
 
@@ -78,6 +79,13 @@ object Compile extends App {
       pass.StructLowering
     )
     val passed = passes.foldLeft(irDefs)((defs, pass) => defs.flatMap(d => pass.extract(pass.txDef(d))))
+    val constants: Set[ConstantPoolEntry] = passed.flatMap {
+      case ir.Def.Fun(_, _, _, _, c) => c
+      case _ => Set.empty[ConstantPoolEntry]
+    }
+    val namedConstants = constants.toVector.zipWithIndex.map {
+      case (c, i) => c -> Name.Global(List("$const", i.toString))
+    }.toMap
     phase("asm-out") {
       val target = new Amd64Target with Amd64NasmOutput
       val baseInFile = options.infiles.head
@@ -88,7 +96,11 @@ object Compile extends App {
       val objFile = new File(targetFolder, baseName + ".obj")
       val exeFile = new File(targetFolder, baseName + ".exe")
       val out = new FileWriter(asmFile)
-      target.outputDefs(passed.toVector).foreach { l =>
+      target.outputDefs(passed.toVector)(namedConstants).foreach { l =>
+        out.write(l)
+        out.write('\n')
+      }
+      target.outputConstants(namedConstants).foreach { l =>
         out.write(l)
         out.write('\n')
       }

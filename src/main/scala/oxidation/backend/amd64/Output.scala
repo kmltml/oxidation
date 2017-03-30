@@ -17,6 +17,8 @@ trait Output {
   def text: M
   def data: M
 
+  def defstr(name: Name, str: String): M
+
   def label(name: Name): M
 
   def global(name: Name): M

@@ -35,7 +35,7 @@ object StructLowering extends Pass {
     F.modify(s => s.copy(bindings = s.bindings.updated(before, after)))
 
   override def onDef: Def =?> F[Vector[Def]] = {
-    case fun @ Def.Fun(_, params, _, _) => for {
+    case fun @ Def.Fun(_, params, _, _, _) => for {
       _ <- F.set(S())
       newParams <- params.traverse {
         case r @ Register(_, _, t: Type.Struct) => for {

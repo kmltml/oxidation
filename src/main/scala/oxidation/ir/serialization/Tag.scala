@@ -14,6 +14,10 @@ object Tag {
     final val ExternFun = 1 + Fun
   }
 
+  object ConstantPoolEntry {
+    final val Str = 0
+  }
+
   object Inst {
     final val Move  = 0
     final val Do    = 1 + Move

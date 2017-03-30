@@ -7,6 +7,8 @@ import cats._
 import cats.data._
 import cats.implicits._
 import oxidation.backend.shared.RegisterAllocator
+import oxidation.codegen.Name
+import oxidation.ir.ConstantPoolEntry
 
 class Amd64Target { this: Output =>
 
@@ -44,15 +46,21 @@ class Amd64Target { this: Output =>
     case ir.Type.I8 | ir.Type.I16 | ir.Type.I32 | ir.Type.I64 => Signed
   }
 
-  def outputDefs(ds: Vector[ir.Def]): M = {
-    text |+| ds.foldMap(outputDef)
+  def outputConstants(cs: Map[ir.ConstantPoolEntry, Name]): M =
+    data |+| cs.toVector.foldMap((outputConstant _).tupled)
+
+  def outputConstant(c: ConstantPoolEntry, name: Name): M = c match {
+    case ConstantPoolEntry.Str(v) => defstr(name, v)
   }
 
-  def outputDef(d: ir.Def): M = d match {
+  def outputDefs(ds: Vector[ir.Def])(implicit constants: Map[ir.ConstantPoolEntry, Name]) : M =
+    text |+| ds.foldMap(outputDef)
+
+  def outputDef(d: ir.Def)(implicit constants: Map[ir.ConstantPoolEntry, Name]): M = d match {
     case ir.Def.ExternFun(name, _, _) =>
       extern(name)
-    case ir.Def.Fun(name, _, _, _) =>
-      val (precolours, Vector(fun @ ir.Def.Fun(_, _, _, blocks))) = Amd64BackendPass.txDef(d).run.runEmptyA.value
+    case ir.Def.Fun(name, _, _, _, _) =>
+      val (precolours, Vector(fun @ ir.Def.Fun(_, _, _, blocks, _))) = Amd64BackendPass.txDef(d).run.runEmptyA.value
       val allocations = allocator.allocate(fun, precolours.toMap)
       val spills = allocations.collect {
         case (r, allocator.Spill) => r
@@ -69,8 +77,8 @@ class Amd64Target { this: Output =>
         case ir.Block(name, instructions, flow) =>
           for {
             _ <- S.tell(label(name))
-            _ <- instructions.traverse(outputInstruction(_)(bindings))
-            _ <- outputFlow(flow, requiredStackSpace, calleeSaved)(bindings)
+            _ <- instructions.traverse(outputInstruction(_)(bindings, constants))
+            _ <- outputFlow(flow, requiredStackSpace, calleeSaved)(bindings, constants)
           } yield ()
       }
       val m = res.written
@@ -85,7 +93,7 @@ class Amd64Target { this: Output =>
   def move(dest: Val, src: Val): M =
     if(dest == src) M.empty else mov(dest, src)
 
-  def outputInstruction(i: ir.Inst)(implicit bindings: Map[ir.Register, Val]): S[Unit] = i match {
+  def outputInstruction(i: ir.Inst)(implicit bindings: Map[ir.Register, Val], constants: Map[ir.ConstantPoolEntry, Name]): S[Unit] = i match {
     case ir.Inst.Label(n) => S.tell(label(n))
 
     case ir.Inst.Do(ir.Op.Copy(_)) => S.pure(())
@@ -149,7 +157,7 @@ class Amd64Target { this: Output =>
     }
   }
 
-  def outputFlow(f: ir.FlowControl, localCount: Int, savedRegs: List[RegLoc])(implicit bindings: Map[ir.Register, Val]): S[Unit] = f match {
+  def outputFlow(f: ir.FlowControl, localCount: Int, savedRegs: List[RegLoc])(implicit bindings: Map[ir.Register, Val], constants: Map[ir.ConstantPoolEntry, Name]): S[Unit] = f match {
     case ir.FlowControl.Return(r) =>
       S.tell(Vector(
         epilogue(localCount, savedRegs),
@@ -178,9 +186,10 @@ class Amd64Target { this: Output =>
     pop(RBP)
   ).combineAll
 
-  private def toVal(v: ir.Val)(implicit bindings: Map[ir.Register, Val]): Val = v match {
+  private def toVal(v: ir.Val)(implicit bindings: Map[ir.Register, Val], constants: Map[ir.ConstantPoolEntry, Name]): Val = v match {
     case ir.Val.I(i, _) => Val.I(i)
     case ir.Val.R(r) => bindings(r)
+    case ir.Val.Const(entry, _) => Val.L(constants(entry))
   }
   private def toVal(r: ir.Register)(implicit bindings: Map[ir.Register, Val]): Val = bindings(r)
 

@@ -106,8 +106,15 @@ object IrDump extends App {
       case Textual =>
         val writer = new PrintWriter(options.out, true)
         passed.foreach {
-          case ir.Def.Fun(name, params, ret, body) =>
+          case ir.Def.Fun(name, params, ret, body, constants) =>
             writer.println(show"def $name(${params.map(_.show).mkString(", ")}): $ret {")
+            if(constants.nonEmpty) {
+              writer.println("  constants {")
+              constants.foreach { e =>
+                writer.println(show"    $e")
+              }
+              writer.println("  }")
+            }
             body.foreach { block =>
               writer.println(show"  ${block.name} {")
               block.instructions.foreach { instr =>
