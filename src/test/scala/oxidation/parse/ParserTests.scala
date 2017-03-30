@@ -268,6 +268,30 @@ object ParserTests extends TestSuite {
         tld.parse("import foo.{ bar, baz }").get.value ==> Import(Seq("foo"), ImportSpecifier.Members(Seq("bar", "baz")))
       }
     }
+
+    "WS" - {
+      val ws = p.whole(p.WS)
+      "line comment" - {
+        ws.parse("  // asdeef\n").get
+      }
+      "block comment" - {
+        ws.parse(
+          """/*
+            | * this is a block comment
+            | / it's neat
+            | and it ends with */
+            |
+          """.stripMargin).get
+      }
+      "nested block comments" - {
+        ws.parse("""/*
+          |Cool
+          |/*
+          |block comments can be nested
+          |*/*/
+        """.stripMargin).get
+      }
+    }
   }
 
 }

@@ -16,6 +16,9 @@ def main(): u0 = {
     exit(0)
 }
 
+/**
+ * Uses putchar to print every character of the string
+ */
 def printString(s: str): u0 = {
     var i: u32 = 0
     while(i < s.length) {
@@ -24,6 +27,9 @@ def printString(s: str): u0 = {
     }
 }
 
+/**
+ * Converts a c-style zero-terminated string into a civilised ptr-length string
+ */
 def fromCString(p: ptr[u8]): str = {
     var i: u32 = 0
     while(p(i) != 0) {
@@ -35,6 +41,9 @@ def fromCString(p: ptr[u8]): str = {
     }
 }
 
+/**
+ * print given string followed by the '\n' newline character
+ */
 def println(s: str): u0 = {
     printString(s)
     putchar('\n')

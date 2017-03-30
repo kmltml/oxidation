@@ -13,13 +13,19 @@ import cats.implicits._
 //noinspection ForwardReference
 class Parser {
 
-  val WS: P0 = {
+  val blockComment: P0 = {
     import fastparse.all._
-    CharsWhile(_.isWhitespace, min = 0)
+    P("/*" ~/ (CharsWhile(c => c != '/' && c != '*') | ("*" ~ !"/") | ("/" ~ !"*") | blockComment).rep ~ "*/")
   }
+
   val WSNoNL: P0 = {
     import fastparse.all._
-    CharsWhile(c => c.isWhitespace && !"\r\n".contains(c), min = 0) ~ !CharPred("\r\n".contains(_))
+    (CharsWhile(c => c.isWhitespace && !"\r\n".contains(c), min = 1) | blockComment).rep ~ !CharPred("\r\n".contains(_))
+  }
+  val WS: P0 = {
+    import fastparse.all._
+    val lineComment = "//" ~/ CharsWhile(!"\r\n".contains(_), min = 0)
+    (CharsWhile(_.isWhitespace) | "\n" | "\r" | lineComment | blockComment).rep
   }
 
   val White: WhitespaceApi.Wrapper = WhitespaceApi.Wrapper(WS)
