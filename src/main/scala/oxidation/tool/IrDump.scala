@@ -20,7 +20,7 @@ object IrDump extends App {
 
   case class Options(infiles: Seq[File] = Seq.empty,
                      passes: List[Pass] = List.empty,
-                     verbose: Boolean = false,
+                     timing: Boolean = false,
                      out: OutputStream = Console.out,
                      format: Format = Textual) extends LogOptions
 
@@ -43,7 +43,7 @@ object IrDump extends App {
     head("irdump", "Compiles a program and prints the resulting intermediate representation")
 
     opt[Unit]('v', "verbose")
-      .action((_, o) => o.copy(verbose = true))
+      .action((_, o) => o.copy(timing = true))
 
     arg[File]("infiles")
       .required().unbounded()

@@ -9,6 +9,8 @@ import oxidation.ir._
 
 object StructLowering extends Pass {
 
+  def name = "strruct-lowering"
+
   object StructLoweringReg extends RegisterNamespace {
     def prefix: String = "sl"
   }

@@ -9,6 +9,8 @@ import oxidation.ir.Block
 
 trait Pass {
 
+  def name: String
+
   type =?>[A, B] = PartialFunction[A, B]
 
   type F[A]

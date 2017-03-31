@@ -11,6 +11,8 @@ import Reg._
 
 object Amd64BackendPass extends Pass {
 
+  def name = "amd64-backend"
+
   object BackendReg extends RegisterNamespace {
     val prefix = "br"
   }

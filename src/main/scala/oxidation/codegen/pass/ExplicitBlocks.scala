@@ -4,6 +4,8 @@ package pass
 
 object ExplicitBlocks extends IdPass {
 
+  def name = "explicit-blocks"
+
   override def onBlock: ir.Block =?> Vector[ir.Block] = {
     case ir.Block(name, instructions, flow) =>
       divide(name, instructions, flow) ensuring { blocks => blocks.forall(_.instructions.forall {
