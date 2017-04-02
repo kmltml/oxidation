@@ -46,6 +46,10 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
       "UnitLit" - {
         solveType(P.UnitLit(), ExpectedType.Undefined, Ctxt.default) ==> Right(ast.UnitLit() :: U0)
       }
+      "implicit unit conversion" - {
+        solveType(P.IntLit(42), ExpectedType.Specific(U0), Ctxt.default) ==>
+          Right(ast.Ignore(ast.IntLit(42) :: I32) :: U0)
+      }
       "operator expressions" - {
         findType(P.InfixAp(InfixOp.Add, P.IntLit(5), P.IntLit(10)), ExpectedType.Undefined, Ctxt.empty) ==>
           Right(I32)

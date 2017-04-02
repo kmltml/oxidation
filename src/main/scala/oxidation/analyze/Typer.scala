@@ -19,7 +19,7 @@ object Typer {
         case ExpectedType.Specific(t @ (I8 | I16 | I32 | I64)) => Right(Typed(ast.IntLit(i), t))
         case ExpectedType.Specific(t @ (U8 | U16 | U32 | U64)) =>
           if(i >= 0) Right(Typed(ast.IntLit(i), t)) else Left(TyperError.CantMatch(expected, I32))
-        case _ => Left(TyperError.CantMatch(expected, I32))
+        case _ => unifyType(Typed(ast.IntLit(i), I32), expected)
       }
 
     case P.BoolLit(b) => unifyType(Typed(ast.BoolLit(b), U1), expected)
@@ -300,6 +300,9 @@ object Typer {
     case (f: Fun, ExpectedType.Appliable) => Right(t)
     case (p: Ptr, ExpectedType.Appliable) => Right(t)
     case (_, ExpectedType.Appliable) => Left(TyperError.CantMatch(expected, t.typ))
+
+    case (typ, ExpectedType.Specific(U0))
+      if typ != U0 => Right(Typed(ast.Ignore(t), U0))
 
     case (typ, ExpectedType.Specific(u)) =>
       if(typ == u) Right(t) else Left(TyperError.CantMatch(expected, typ))

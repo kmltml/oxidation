@@ -83,6 +83,11 @@ object Codegen {
         )
       } yield Val.R(r)
 
+    case Typed(ast.Ignore(expr), analyze.Type.U0) =>
+      for {
+        _ <- compileExpr(expr)
+      } yield Val.I(0, Type.U0)
+
     case Typed(ast.Block(stmnts), typ) =>
       for {
         bindings <- storeBindings

@@ -34,6 +34,7 @@ trait Ast {
 
   // Synthetic expressions (not created by the parser)
   final case class Widen(expr: Typed[Expression]) extends Expression
+  final case class Ignore(expr: Typed[Expression]) extends Expression
 
 
   sealed trait TLD
@@ -83,6 +84,8 @@ trait Ast {
       case DefDef(_, _, _, b) => traverse(b)(f)
       case ValDef(_, _, v) => traverse(v)(f)
       case VarDef(_, _, v) => traverse(v)(f)
+
+      case Ignore(e) => traverse(e)(f)
     }
     (result ++ more).toVector
   }

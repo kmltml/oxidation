@@ -132,6 +132,8 @@ object SymbolResolver {
 
     case _: parse.ast.IntLit | _: parse.ast.BoolLit | _: parse.ast.StringLit | _: parse.ast.CharLit |
          _: parse.ast.Extern | _: parse.ast.UnitLit => Right(e)
+
+    case parse.ast.Widen(_) | parse.ast.Ignore(_) => ??? // theese should only be present after the typer
   }
 
   private def solveType(t: TypeName, scope: Scope): Res[TypeName] = t match {
