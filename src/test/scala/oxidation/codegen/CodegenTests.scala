@@ -43,6 +43,10 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
           (Codegen.Log(Vector.empty, Vector(ConstantPoolEntry.Str("Hello, world!"))),
             Val.Struct(Vector(Val.Const(ConstantPoolEntry.Str("Hello, world!"), ir.Type.Ptr), Val.I(13, ir.Type.U32))))
       }
+      "UnitLit" - {
+        compileExpr(ast.UnitLit() :: U0).run.runA(CodegenState()).value ==>
+          (Codegen.Log(Vector.empty), Val.I(0, ir.Type.U0))
+      }
       "InfixAp" - {
         compileExpr(ast.InfixAp(InfixOp.Add, ast.IntLit(1) :: I32, ast.IntLit(2) :: I32) :: I32)
           .run.runA(CodegenState()).value ==> (insts(

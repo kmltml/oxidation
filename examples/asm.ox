@@ -47,5 +47,5 @@ def fromCString(p: ptr[u8]): str = {
 def println(s: str): u0 = {
     printString(s)
     putchar('\n')
-    {}
+    ()
 }

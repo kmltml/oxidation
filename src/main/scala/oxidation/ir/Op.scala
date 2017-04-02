@@ -19,6 +19,7 @@ sealed trait Op {
       case Op.Load(a, o) => Set(a, o)
       case Op.Store(a, o, v) => Set(a, o, v)
       case Op.Widen(v) => Set(v)
+      case Op.Member(s, _) => Set(s)
     }
     vals.collect {
       case Val.R(r) => r

@@ -131,7 +131,7 @@ object SymbolResolver {
       }.map(parse.ast.Block)
 
     case _: parse.ast.IntLit | _: parse.ast.BoolLit | _: parse.ast.StringLit | _: parse.ast.CharLit |
-         _: parse.ast.Extern => Right(e)
+         _: parse.ast.Extern | _: parse.ast.UnitLit => Right(e)
   }
 
   private def solveType(t: TypeName, scope: Scope): Res[TypeName] = t match {

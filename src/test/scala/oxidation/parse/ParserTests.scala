@@ -52,6 +52,9 @@ object ParserTests extends TestSuite {
             "y" -> IntLit(20)
           ))
       }
+      "unit literal" - {
+        expr.parse("()").get.value ==> UnitLit()
+      }
       "addition" - {
         expr.parse("2 + 3").get.value ==> InfixAp(InfixOp.Add, IntLit(2), IntLit(3))
         expr.parse("2 + 3 + 4").get.value ==>

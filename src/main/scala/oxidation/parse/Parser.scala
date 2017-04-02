@@ -40,7 +40,7 @@ class Parser {
   val compilationUnit: P[Seq[TLD]] = P((WS ~~ tld).repX(sep = semi) ~~ End)
 
   private val expression0: P[Expression] = P(
-    stringLiteral | intLiteral | structLit | charLiteral | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
+    stringLiteral | intLiteral | structLit | charLiteral | unitLiteral | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
   )
   private val expression1: P[Expression] = P(
     expression0 ~~ postfix.repX
@@ -197,6 +197,9 @@ class Parser {
     | CharPred(_ != '\'').!.map(_.head)
     ) ~~ "'"
   ).map(CharLit)
+
+  private val unitLiteral: P[UnitLit] =
+    P("()").as(UnitLit())
 
   private val stringLiteral: P[StringLit] = {
     val escapeSequence =

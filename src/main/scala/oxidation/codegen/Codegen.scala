@@ -52,6 +52,8 @@ object Codegen {
       val cpe = ConstantPoolEntry.Str(v)
       constants(cpe).as(Val.Struct(Vector(Val.Const(cpe, Type.Ptr), Val.I(v.length, Type.U32))))
 
+    case Typed(ast.UnitLit(), analyze.Type.U0) => Res.pure(Val.I(0, Type.U0))
+
     case Typed(ast.Var(n), _) => WriterT.lift(State.inspect(s => Val.R(s.registerBindings(n))))
     case Typed(ast.InfixAp(op, left, right), valType) =>
       for {

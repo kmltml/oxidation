@@ -19,6 +19,7 @@ trait Ast {
   final case class CharLit(value: Char) extends Expression
   final case class StringLit(value: String) extends Expression
   final case class StructLit(name: Symbol, members: Seq[(String, Typed[Expression])]) extends Expression
+  final case class UnitLit() extends Expression
   final case class InfixAp(operator: InfixOp, left: Typed[Expression], right: Typed[Expression]) extends Expression
   final case class PrefixAp(operator: PrefixOp, expr: Typed[Expression]) extends Expression
   final case class Var(name: Symbol) extends Expression
@@ -66,7 +67,8 @@ trait Ast {
     val result = f.lift(stmnt)
     val more = stmnt match {
       case _: IntLit | _: StringLit | _: BoolLit | _: Var | _: Extern |
-           _: TypeAliasDef | _: StructDef | _: EnumDef | _: CharLit => Vector.empty[A]
+           _: TypeAliasDef | _: StructDef | _: EnumDef | _: CharLit |
+           _: UnitLit => Vector.empty[A]
       case InfixAp(_, left, right) => traverse(left)(f) ++ traverse(right)(f)
       case PrefixAp(_, e) => traverse(e)(f)
       case Block(stmnts) => stmnts.toList.foldMap(traverse(_)(f))

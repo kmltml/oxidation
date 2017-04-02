@@ -110,6 +110,8 @@ trait AstPrettyprint {
 
     case ast.Extern() => s"Extern$typeInfo"
 
+    case ast.UnitLit() => s"Unit$typeInfo"
+
     case ast.StringLit(s) => "\"" + s.flatMap {
       case '\n' => "\\n"
       case '"' => "\\\""

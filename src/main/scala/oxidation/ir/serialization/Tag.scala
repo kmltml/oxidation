@@ -42,6 +42,7 @@ object Tag {
     final val R = 1 + I
     final val G = 1 + R
     final val Struct = 1 + G
+    final val Const = 1 + Struct
   }
 
   object FlowControl {
