@@ -42,12 +42,12 @@ object ParserTests extends TestSuite {
             |  x = 10
             |  y = 20
             |}
-          """.stripMargin).get.value ==> StructLit("Vector", Seq(
+          """.stripMargin).get.value ==> StructLit("Vector", List(
             "x" -> IntLit(10),
             "y" -> IntLit(20)
           ))
         expr.parse(
-          "Vector { x = 10, y = 20 }").get.value ==> StructLit("Vector", Seq(
+          "Vector { x = 10, y = 20 }").get.value ==> StructLit("Vector", List(
             "x" -> IntLit(10),
             "y" -> IntLit(20)
           ))
@@ -94,14 +94,14 @@ object ParserTests extends TestSuite {
             PrefixAp(PrefixOp.Inv, IntLit(2)))
       }
       "a block expression" - {
-        expr.parse("{ 1 }").get.value ==> Block(Seq(IntLit(1)))
+        expr.parse("{ 1 }").get.value ==> Block(Vector(IntLit(1)))
         expr.parse(
           """{
             |  foo
             |  bar; baz
             |}
           """.stripMargin).get.value ==>
-            Block(Seq(
+            Block(Vector(
               Var("foo"), Var("bar"), Var("baz")
             ))
         assertFail(expr.parse("""{ foo bar }"""))
@@ -111,7 +111,7 @@ object ParserTests extends TestSuite {
             |  (bar)
             |}
           """.stripMargin).get.value ==>
-            Block(Seq(
+            Block(Vector(
               Var("foo"), Var("bar")
             ))
         expr.parse(
@@ -120,7 +120,7 @@ object ParserTests extends TestSuite {
             |  x + 1
             |}
           """.stripMargin).get.value ==>
-            Block(Seq(
+            Block(Vector(
               ValDef("x", None, IntLit(10)),
               InfixAp(InfixOp.Add, Var("x"), IntLit(1))
             ))
@@ -131,31 +131,31 @@ object ParserTests extends TestSuite {
             |  x + y
             |}
           """.stripMargin).get.value ==>
-            Block(Seq(
+            Block(Vector(
               ValDef("x", None, IntLit(10)),
               ValDef("y", None, IntLit(20)),
               InfixAp(InfixOp.Add, Var("x"), Var("y"))
             ))
       }
       "a function call" - {
-        expr.parse("foo()").get.value ==> App(Var("foo"), Seq.empty)
-        expr.parse("foo(1, 2)").get.value ==> App(Var("foo"), Seq(IntLit(1), IntLit(2)))
-        expr.parse("foo(1)(2)").get.value ==> App(App(Var("foo"), Seq(IntLit(1))), Seq(IntLit(2)))
+        expr.parse("foo()").get.value ==> App(Var("foo"), Nil)
+        expr.parse("foo(1, 2)").get.value ==> App(Var("foo"), List(IntLit(1), IntLit(2)))
+        expr.parse("foo(1)(2)").get.value ==> App(App(Var("foo"), List(IntLit(1))), List(IntLit(2)))
       }
       "a member access" - {
         expr.parse("foo.bar").get.value ==> Select(Var("foo"), "bar")
       }
       "an if expression" - {
         expr.parse("if(true) 1 else 0").get.value ==> If(BoolLit(true), IntLit(1), Some(IntLit(0)))
-        expr.parse("if(foo) bar()").get.value ==> If(Var("foo"), App(Var("bar"), Seq()), None)
+        expr.parse("if(foo) bar()").get.value ==> If(Var("foo"), App(Var("bar"), Nil), None)
       }
       "a while loop" - {
-        expr.parse("while(foo) bar()").get.value ==> While(Var("foo"), App(Var("bar"), Seq.empty))
+        expr.parse("while(foo) bar()").get.value ==> While(Var("foo"), App(Var("bar"), Nil))
       }
       "a variable assignment" - {
         expr.parse("foo = 42").get.value ==> Assign(Var("foo"), None, IntLit(42))
         expr.parse("foo.bar(32).baz += 6").get.value ==>
-          Assign(Select(App(Select(Var("foo"), "bar"), Seq(IntLit(32))), "baz"), Some(InfixOp.Add), IntLit(6))
+          Assign(Select(App(Select(Var("foo"), "bar"), List(IntLit(32))), "baz"), Some(InfixOp.Add), IntLit(6))
 
         expr.parse("foo = bar").get.value ==> Assign(Var("foo"), None, Var("bar"))
         expr.parse("foo += bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Add), Var("bar"))
@@ -204,7 +204,7 @@ object ParserTests extends TestSuite {
             |  y: u16; z: bool
             |}
           """.stripMargin).get.value ==>
-          StructDef("foo", None, Seq(
+          StructDef("foo", None, List(
             StructMemberDef("x", TypeName.Named("i32")),
             StructMemberDef("y", TypeName.Named("u16")),
             StructMemberDef("z", TypeName.Named("bool"))
@@ -215,9 +215,9 @@ object ParserTests extends TestSuite {
             |  contents: ptr[x]
             |}
           """.stripMargin).get.value ==>
-          StructDef("arr", Some(Seq("x")), Seq(
+          StructDef("arr", Some(List("x")), List(
             StructMemberDef("length", TypeName.Named("usize")),
-            StructMemberDef("contents", TypeName.App(TypeName.Named("ptr"), Seq(TypeName.Named("x"))))
+            StructMemberDef("contents", TypeName.App(TypeName.Named("ptr"), List(TypeName.Named("x"))))
           ))
       }
       "an enum definition" - {
@@ -227,9 +227,9 @@ object ParserTests extends TestSuite {
             |  False
             |}
           """.stripMargin).get.value ==>
-          EnumDef("bool", None, Seq(
-            EnumVariant("True", Seq()),
-            EnumVariant("False", Seq())
+          EnumDef("bool", None, List(
+            EnumVariant("True", Nil),
+            EnumVariant("False", Nil)
           ))
         defn.parse(
           """enum Option[A] = {
@@ -239,14 +239,14 @@ object ParserTests extends TestSuite {
             |  None
             |}
           """.stripMargin).get.value ==>
-          EnumDef("Option", Some(Seq("A")), Seq(
-            EnumVariant("Some", Seq(StructMemberDef("value", TypeName.Named("A")))),
-            EnumVariant("None", Seq())
+          EnumDef("Option", Some(List("A")), List(
+            EnumVariant("Some", List(StructMemberDef("value", TypeName.Named("A")))),
+            EnumVariant("None", Nil)
           ))
       }
       "a type alias" - {
         defn.parse("type unit = u0").get.value ==> TypeAliasDef("unit", None, TypeName.Named(Symbol.Unresolved("u0")))
-        defn.parse("type id[a] = a").get.value ==> TypeAliasDef("id", Some(Seq("a")), TypeName.Named(Symbol.Unresolved("a")))
+        defn.parse("type id[a] = a").get.value ==> TypeAliasDef("id", Some(List("a")), TypeName.Named(Symbol.Unresolved("a")))
       }
     }
 
@@ -256,19 +256,19 @@ object ParserTests extends TestSuite {
         tpe.parse("i32").get.value ==> TypeName.Named("i32")
       }
       "a type constructor application" - {
-        tpe.parse("ptr[i8]").get.value ==> TypeName.App(TypeName.Named("ptr"), Seq(TypeName.Named("i8")))
+        tpe.parse("ptr[i8]").get.value ==> TypeName.App(TypeName.Named("ptr"), List(TypeName.Named("i8")))
       }
     }
 
     "top-level definition should parse" - {
       val tld = p.whole(p.tld)
       "a module specifier" - {
-        tld.parse("module foo.bar").get.value ==> Module(Seq("foo", "bar"))
+        tld.parse("module foo.bar").get.value ==> Module(List("foo", "bar"))
       }
       "an import" - {
-        tld.parse("import foo._").get.value ==> Import(Seq("foo"), ImportSpecifier.All)
-        tld.parse("import foo.bar").get.value ==> Import(Seq("foo"), ImportSpecifier.Members(Seq("bar")))
-        tld.parse("import foo.{ bar, baz }").get.value ==> Import(Seq("foo"), ImportSpecifier.Members(Seq("bar", "baz")))
+        tld.parse("import foo._").get.value ==> Import(List("foo"), ImportSpecifier.All)
+        tld.parse("import foo.bar").get.value ==> Import(List("foo"), ImportSpecifier.Members(List("bar")))
+        tld.parse("import foo.{ bar, baz }").get.value ==> Import(List("foo"), ImportSpecifier.Members(List("bar", "baz")))
       }
     }
 

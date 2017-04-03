@@ -21,7 +21,7 @@ case class Symbols(types: Multimap[String, Symbol], terms: Multimap[String, Symb
 
   def isEmpty: Boolean = types.isEmpty && terms.isEmpty
 
-  def findPrefixed(path: Seq[String]): Symbols = {
+  def findPrefixed(path: List[String]): Symbols = {
     val newTerms = terms.values.flatten.collect {
       case s @ Symbol.Global(`path` :+ _) => s.name -> Set(s: Symbol)
     }.toMap

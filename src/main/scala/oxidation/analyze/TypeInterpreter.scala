@@ -28,7 +28,7 @@ object TypeInterpreter {
           } yield t
         case untyped.StructDef(_, None, members) =>
           for {
-            typedMembers <- members.toVector.traverse {
+            typedMembers <- members.traverse {
               case StructMemberDef(name, tpe) => findType(tpe, defs).map(Type.StructMember(name, _))
             }
             struct = Type.Struct(d.name, typedMembers)

@@ -9,7 +9,7 @@ sealed trait Symbol {
 object Symbol {
 
   final case class Unresolved(name: String) extends Symbol
-  final case class Global(path: Seq[String]) extends Symbol {
+  final case class Global(path: List[String]) extends Symbol {
     require(path.nonEmpty)
     def name: String = path.last
   }

@@ -14,10 +14,10 @@ object SymbolResolver {
   sealed trait Error extends AnalysisError
   final case class SymbolNotFound(name: String) extends Error
   final case class AmbiguousSymbolReference(name: String, candidates: Set[Symbol]) extends Error
-  final case class SymbolNotFoundInImport(path: Seq[String]) extends Error
+  final case class SymbolNotFoundInImport(path: List[String]) extends Error
 
   sealed trait DefContext
-  final case class TopLevel(module: Seq[String]) extends DefContext
+  final case class TopLevel(module: List[String]) extends DefContext
   case object Local extends DefContext
 
   def resolveSymbols(compilationUnit: Vector[parse.ast.TLD], global: Symbols): Res[Vector[parse.ast.TLD]] = {
@@ -25,9 +25,9 @@ object SymbolResolver {
       case parse.ast.Module(path) => path
     }
     val moduleImports = modulePaths
-      .scanLeft(Vector.empty[String])(_ ++ _)
+      .scanLeft(List.empty[String])(_ ++ _)
       .foldMap(prefix => global.findPrefixed(prefix))
-    val modulePath = modulePaths.flatten
+    val modulePath = modulePaths.toList.flatten
     for {
       explicitImports <- compilationUnit.collect {
         case parse.ast.Import(path, ImportSpecifier.All) => Right(global.findPrefixed(path))
@@ -58,21 +58,21 @@ object SymbolResolver {
     case parse.ast.DefDef(name, params, tpe, value) =>
 //      def f[F[_], G](x: F[G]): F[G] = x
 //      val x = f(solveExpr(value, scope): Either[Error, parse.ast.Expression])
-      val newScope = params.getOrElse(Seq.empty)
+      val newScope = params.getOrElse(Nil)
         .foldLeft(scope)((s, p) => s.shadowTerm(Symbol.Local(p.name)))
-      (params.traverse(_.toVector.traverse {
+      (params.traverse(_.traverse {
         case parse.ast.Param(name, tpe) => solveType(tpe, scope).map(parse.ast.Param(name, _))
       }), tpe.traverse(solveType(_, scope)), solveExpr(value, newScope))
         .map3(parse.ast.DefDef(solveDefName(name, ctxt), _, _, _))
 
     case parse.ast.StructDef(name, params, members) =>
-      val localScope = params.getOrElse(Seq.empty).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
-      members.toVector.traverse {
+      val localScope = params.getOrElse(Nil).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
+      members.traverse {
         case StructMemberDef(name, tpe) => solveType(tpe, localScope).map(StructMemberDef(name, _))
       }.map(parse.ast.StructDef(solveDefName(name, ctxt), params, _))
 
     case parse.ast.TypeAliasDef(name, params, body) =>
-      val localScope = params.getOrElse(Seq.empty).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
+      val localScope = params.getOrElse(Nil).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
       solveType(body, localScope).map(parse.ast.TypeAliasDef(solveDefName(name, ctxt), params, _))
   }
 
@@ -87,7 +87,7 @@ object SymbolResolver {
       getOnlyOneSymbol(n, scope.terms).map(parse.ast.Var)
 
     case parse.ast.StructLit(Symbol.Unresolved(name), members) =>
-      (getOnlyOneSymbol(name, scope.types), members.toVector.traverse {
+      (getOnlyOneSymbol(name, scope.types), members.traverse {
         case (n, e) => solveExpr(e, scope).map(n -> _)
       }).map2(parse.ast.StructLit(_, _))
 
@@ -100,7 +100,7 @@ object SymbolResolver {
         .map(parse.ast.PrefixAp.apply(op, _))
 
     case parse.ast.App(expr, params) =>
-      (solveExpr(expr, scope), params.toVector.traverse(solveExpr(_, scope)))
+      (solveExpr(expr, scope), params.traverse(solveExpr(_, scope)))
         .map2(parse.ast.App(_, _))
 
     case parse.ast.Select(expr, member) =>
@@ -141,7 +141,7 @@ object SymbolResolver {
       getOnlyOneSymbol(sym, scope.types).map(TypeName.Named)
 
     case TypeName.App(const, params) =>
-      (solveType(const, scope), params.toVector.traverse(solveType(_, scope)))
+      (solveType(const, scope), params.traverse(solveType(_, scope)))
         .map2(TypeName.App)
 
   }

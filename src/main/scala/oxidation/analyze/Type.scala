@@ -22,9 +22,9 @@ object Type {
   // pointee is an unresolved type, to allow for self-referencing structs (eg. `enum List[A] = { Cons { head: A; tail: ptr[List[A]] }; Nil }`)
   final case class Ptr(pointee: TypeName) extends Type
 
-  final case class Fun(params: Seq[Type], ret: Type) extends Type
+  final case class Fun(params: List[Type], ret: Type) extends Type
 
-  final case class Struct(name: Symbol, members: Seq[StructMember]) extends Type {
+  final case class Struct(name: Symbol, members: List[StructMember]) extends Type {
 
     def indexOf(memberName: String): Int =
       members.indexWhere(_.name == memberName)

@@ -5,8 +5,8 @@ import Type._
 
 object BuiltinSymbols {
 
-  val StrType: Type = Struct(Symbol.Global(Seq("str")), Seq(
-    StructMember("data", Ptr(TypeName.Named(Symbol.Global(Seq("u8"))))),
+  val StrType: Type = Struct(Symbol.Global(List("str")), List(
+    StructMember("data", Ptr(TypeName.Named(Symbol.Global(List("u8"))))),
     StructMember("length", U32)
   ))
 
@@ -15,7 +15,7 @@ object BuiltinSymbols {
     "u0" -> U0, "u1" -> U1, "u8" -> U8, "u16" -> U16, "u32" -> U32, "u64" -> U64,
     "ptr" -> U64, "arr" -> U64,
     "str" -> StrType)
-  val types: Map[Symbol, Type] = typeNames.map { case (s, v) => Symbol.Global(Seq(s)) -> v }
+  val types: Map[Symbol, Type] = typeNames.map { case (s, v) => Symbol.Global(List(s)) -> v }
 
   val symbols: Symbols = Symbols.types(types.keys.toSeq: _*)
 

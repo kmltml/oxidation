@@ -32,7 +32,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
           (insts(), Val.I(97, ir.Type.U8))
       }
       "StructLit" - {
-        compileExpr(ast.StructLit(g('str), Seq(
+        compileExpr(ast.StructLit(g('str), List(
           "data" -> (ast.Var(l('x)) :: Ptr(TypeName.Named(g('u8)))),
           "length" -> (ast.IntLit(10) :: U32)
         )) :: BuiltinSymbols.StrType).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.Ptr)), nextReg = 1)).value ==>
@@ -75,7 +75,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
           ), Val.R(r(1, _.I64)))
       }
       "Ignore" - {
-        compileExpr(ast.Ignore(ast.App(ast.Var(g('foo)) :: Fun(Seq(I32), I32), Seq(ast.IntLit(42) :: I32)) :: I32) :: U0)
+        compileExpr(ast.Ignore(ast.App(ast.Var(g('foo)) :: Fun(List(I32), I32), List(ast.IntLit(42) :: I32)) :: I32) :: U0)
           .run.runA(CodegenState()).value ==>
           (insts(
             Inst.Move(r(0, _.I32), Op.Copy(42)),
@@ -116,9 +116,9 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             ), Val.R(r(1, _.I32)))
         }
         "whithout else branch" - {
-          val fooType = Fun(Seq.empty, U0)
+          val fooType = Fun(Nil, U0)
           compileExpr(ast.If(ast.Var(l('x)) :: U1,
-            ast.App(ast.Var(g('foo)) :: fooType, Seq.empty) :: U0, None) :: U0)
+            ast.App(ast.Var(g('foo)) :: fooType, Nil) :: U0, None) :: U0)
             .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.U1)), nextReg = 1)).value ==>
             (insts(
               Inst.Flow(FlowControl.Branch(r(0, _.U1), Name.Local("if", 0), Name.Local("ifafter", 0))),
@@ -169,7 +169,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
       }
       "Select" - {
         "Member" - {
-          val fooStruct = Struct(g('foo), Seq(
+          val fooStruct = Struct(g('foo), List(
             StructMember("x", I32),
             StructMember("y", I64)
           ))
@@ -183,7 +183,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
       }
       "App" - {
         "function" - {
-          compileExpr(ast.App(ast.Var(g('f)) :: Fun(Seq(I32), U1), Seq(ast.IntLit(10) :: I32)) :: I32)
+          compileExpr(ast.App(ast.Var(g('f)) :: Fun(List(I32), U1), List(ast.IntLit(10) :: I32)) :: I32)
             .run.runA(CodegenState()).value ==>
             (insts(
               Inst.Move(r(0, _.I32), Op.Copy(10)),

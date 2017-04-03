@@ -30,7 +30,7 @@ object SymbolSearch {
   def findSymbols(compilationUnit: Vector[parse.ast.TLD]): Either[DuplicatedSymbolError, Symbols] = {
     val pathPrefix = compilationUnit.collect {
       case parse.ast.Module(path) => path
-    }.flatten
+    }.toList.flatten
     def insertOnly(sym: Symbol, set: Set[Symbol]): Option[Set[Symbol]] =
       if(set(sym)) None else Some(set + sym)
     def rec(defs: List[parse.ast.TLD], types: Set[Symbol], terms: Set[Symbol]): Either[DuplicatedSymbolError, Symbols] = defs match {

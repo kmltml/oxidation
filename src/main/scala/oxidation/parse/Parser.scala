@@ -37,7 +37,8 @@ class Parser {
 
   def whole[A](p: P[A]): P[A] = p ~ End
 
-  val compilationUnit: P[Seq[TLD]] = P((WS ~~ tld).repX(sep = semi) ~~ End)
+  val compilationUnit: P[Vector[TLD]] =
+    P((WS ~~ tld).repX(sep = semi).map(_.toVector) ~~ End)
 
   private val expression0: P[Expression] = P(
     stringLiteral | intLiteral | structLit | charLiteral | unitLiteral | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
@@ -74,16 +75,16 @@ class Parser {
     P(definition | module | imprt)
 
   val module: P[Module] =
-    P(K("module") ~ id.!.rep(sep = ".")).map(Module)
+    P(K("module") ~ id.!.rep(sep = ".").map(_.toList)).map(Module)
 
   val imprt: P[Import] = P {
-    val path = id.!.rep(sep = ".", min = 1)
-    val membersSelector = ("." ~ "{" ~/ id.!.rep(sep = ",", min = 1) ~ "}").map(ImportSpecifier.Members)
+    val path = id.!.rep(sep = ".", min = 1).map(_.toList)
+    val membersSelector = ("." ~ "{" ~/ id.!.rep(sep = ",", min = 1).map(_.toList) ~ "}").map(ImportSpecifier.Members)
     val selector = membersSelector
     (K("import") ~ path ~ selector.?).map {
       case (path, Some(s)) => Import(path, s)
       case (path :+ "_", None) => Import(path, ImportSpecifier.All)
-      case (path :+ last, None) => Import(path, ImportSpecifier.Members(Seq(last)))
+      case (path :+ last, None) => Import(path, ImportSpecifier.Members(List(last)))
     }
   }
 
@@ -91,7 +92,7 @@ class Parser {
   private val postfix: P[Postfix] =
     P(apply | select)
   private val apply: P[Expression => App] =
-    P(WSNoNL ~~ "(" ~/ expression.rep(sep = ",") ~ ")").map(params => App(_, params))
+    P(WSNoNL ~~ "(" ~/ expression.rep(sep = ",").map(_.toList) ~ ")").map(params => App(_, params))
   private val select: P[Expression => Select] =
     P(WS ~~ "." ~/ id.!).map(id => Select(_, id))
 
@@ -132,12 +133,12 @@ class Parser {
 
   private val namedType: P[TypeName.Named] = sym.map(TypeName.Named)
 
-  private val typeApply: P[Seq[TypeName]] =
-    P("[" ~/ typ.rep(sep = ",", min = 1) ~ "]")
+  private val typeApply: P[List[TypeName]] =
+    P("[" ~/ typ.rep(sep = ",", min = 1).map(_.toList) ~ "]")
 
   private val defdef: P[DefDef] = {
     val param = (id.! ~ ":" ~ typ).map(Param.tupled)
-    val paramList = "(" ~ param.rep(sep = ",") ~ ")"
+    val paramList = "(" ~ param.rep(sep = ",").map(_.toList) ~ ")"
 
     val extern = K("extern").as(Extern())
 
@@ -155,23 +156,23 @@ class Parser {
   private val structMember = (WS ~~ id.! ~~ WSNoNL ~~ ":" ~ typ).map(StructMemberDef.tupled)
 
   private val structdef: P[StructDef] = {
-    val body = "{" ~~ structMember.repX(sep = semi) ~ "}"
-    val typeParams = "[" ~/ id.!.rep(sep = ",") ~ "]"
+    val body = "{" ~~ structMember.repX(sep = semi).map(_.toList) ~ "}"
+    val typeParams = "[" ~/ id.!.rep(sep = ",").map(_.toList) ~ "]"
     P(K("struct") ~/ sym ~ typeParams.? ~ O("=") ~ body).map(StructDef.tupled)
   }
 
   private val enumdef: P[EnumDef] = {
-    val typeParams = "[" ~/ id.!.rep(sep = ",") ~ "]"
-    val variantMembers = "{" ~/ structMember.repX(sep = semi) ~ "}"
+    val typeParams = "[" ~/ id.!.rep(sep = ",").map(_.toList) ~ "]"
+    val variantMembers = "{" ~/ structMember.repX(sep = semi).map(_.toList) ~ "}"
     val variant: P[EnumVariant] = (WS ~~ id.! ~ variantMembers.?).map {
-      case (n, m) => EnumVariant(n, m getOrElse Seq.empty)
+      case (n, m) => EnumVariant(n, m getOrElse Nil)
     }
-    val body = "{" ~~ variant.repX(sep = semi) ~ "}"
+    val body = "{" ~~ variant.repX(sep = semi).map(_.toList) ~ "}"
     P(K("enum") ~/ sym ~ typeParams.? ~ O("=") ~/ body).map(EnumDef.tupled)
   }
 
   private val typedef: P[TypeAliasDef] = {
-    val params = "[" ~/ id.!.rep(sep = ",") ~ "]"
+    val params = "[" ~/ id.!.rep(sep = ",").map(_.toList) ~ "]"
     P(K("type") ~ sym ~ params.? ~ "=" ~/ typ).map(TypeAliasDef.tupled)
   }
 
@@ -213,7 +214,7 @@ class Parser {
 
   private val structLit: P[StructLit] = {
     val member = P(id.! ~ "=" ~ expression)
-    P(sym ~ "{" ~/ member.repX(sep = semiOrComa) ~ "}").map(StructLit.tupled)
+    P(sym ~ "{" ~/ member.repX(sep = semiOrComa).map(_.toList) ~ "}").map(StructLit.tupled)
   }
 
   private val varacc: P[Var] =
@@ -223,7 +224,7 @@ class Parser {
     P("(" ~/ expression ~ ")")
 
   private val blockexpr: P[Block] =
-    P("{" ~/ (expression | definition).repX(sep = semi) ~ "}").map(Block)
+    P("{" ~/ (expression | definition).repX(sep = semi) ~ "}").map(s => Block(s.toVector))
 
   private val ifexp: P[If] = {
     val els = P(K("else") ~/ expression)

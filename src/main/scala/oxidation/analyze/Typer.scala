@@ -44,7 +44,7 @@ object Typer {
         _ <- Either.cond(members.map(_._1).toSet == struct.members.map(_.name).toSet, (),
                           TyperError.WrongStructMembers(expected = struct.members.map(_.name).toSet, found = members.map(_._1).toSet))
         typesMap = struct.members.map(m => m.name -> m.typ).toMap
-        typedMembers <- members.toVector.traverse {
+        typedMembers <- members.traverse {
           case (name, expr) =>
             val expectedType = ExpectedType.Specific(typesMap(name))
             solveType(expr, expectedType, ctxt).map(name -> _)
@@ -132,13 +132,13 @@ object Typer {
         typedParams <- fnTyped.typ match {
           case Fun(paramTypes, _) =>
             if (paramTypes.size != pars.size) Left(TyperError.WrongNumberOfArguments(paramTypes.size, pars.size))
-            else (pars zip paramTypes).toVector.traverse {
+            else (pars zip paramTypes).traverse {
               case (e, t) => solveType(e, ExpectedType.Specific(t), ctxt)
             }
           case Ptr(_) =>
             pars match {
-              case Seq() => Right(Seq.empty)
-              case Seq(off) => solveType(off, ExpectedType.Specific(I64), ctxt).map(Seq(_))
+              case Nil => Right(Nil)
+              case List(off) => solveType(off, ExpectedType.Specific(I64), ctxt).map(List(_))
               case s => Left(TyperError.TooManyParamsForPointerDereference(s.size))
             }
         }
@@ -199,8 +199,8 @@ object Typer {
         t <- unifyType(Typed(ast.While(condTyped, bodyTyped), U0), expected)
       } yield t
 
-    case P.Block(Seq()) =>
-      unifyType(Typed(ast.Block(Seq.empty), U0), expected)
+    case P.Block(Vector()) =>
+      unifyType(Typed(ast.Block(Vector.empty), U0), expected)
 
     case P.Block(stmnts) =>
       type S[A] = StateT[TyperResult, Ctxt, A]
@@ -256,7 +256,7 @@ object Typer {
   }
 
   def lookupType(t: TypeName, ctxt: Ctxt): Type = t match {
-    case TypeName.App(TypeName.Named(Symbol.Global(Seq("ptr"))), Seq(pointee)) => Type.Ptr(pointee)
+    case TypeName.App(TypeName.Named(Symbol.Global(List("ptr"))), List(pointee)) => Type.Ptr(pointee)
     case TypeName.Named(s) => ctxt.types(s)
   }
 
@@ -268,7 +268,7 @@ object Typer {
         val newParams = params.map(_.map {
           case P.Param(name, tpe) => ast.Param(name, lookupType(tpe, ctxt))
         })
-        val paramTypes: Seq[(Symbol, Ctxt.Term)] = newParams.getOrElse(Seq.empty) map {
+        val paramTypes: List[(Symbol, Ctxt.Term)] = newParams.getOrElse(Nil) map {
           case ast.Param(name, tpe) => Symbol.Local(name) -> Ctxt.Immutable(tpe)
         }
         val localCtxt = ctxt.withTerms(paramTypes.toMap)

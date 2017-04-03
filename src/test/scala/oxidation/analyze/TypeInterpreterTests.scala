@@ -24,11 +24,11 @@ object TypeInterpreterTests extends TestSuite with SymbolSyntax {
       }
       "a struct def" - {
         solveTree(Vector(
-          StructDef(g('foo), None, Seq(
+          StructDef(g('foo), None, List(
             StructMemberDef("x", TypeName.Named(g('i32))),
             StructMemberDef("y", TypeName.Named(g('u1)))
           ))
-        ), ctxt) ==> Right(ctxt.withTypes(Map(g('foo) -> Struct(g('foo), Seq(
+        ), ctxt) ==> Right(ctxt.withTypes(Map(g('foo) -> Struct(g('foo), List(
           StructMember("x", I32),
           StructMember("y", U1)
         )))))

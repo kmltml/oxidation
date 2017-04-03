@@ -11,8 +11,8 @@ object DependencyGraphTests extends TestSuite with SymbolSyntax {
     "DependencyEntry.build" - {
       "a def with inferred type" - {
         DependencyEntry.build(DefDef(
-          g('foo), Some(Seq(Param("x", T.Named(g('i32))))), None, Block(Seq(
-            App(Var(g('mod, 'fun)), Seq(Var(g('mod, 'foo)), Var(l('x))))
+          g('foo), Some(List(Param("x", T.Named(g('i32))))), None, Block(Vector(
+            App(Var(g('mod, 'fun)), List(Var(g('mod, 'foo)), Var(l('x))))
           ))
         )) ==> DependencyEntry(Set(g('mod, 'fun), g('mod, 'foo)), None)
       }
@@ -26,13 +26,13 @@ object DependencyGraphTests extends TestSuite with SymbolSyntax {
     "DependencyGraph.build" - {
       "a few defs" - {
         DependencyGraph.build(Vector(
-          Import(Seq("a", "b"), ImportSpecifier.All),
-          Module(Seq("foo")),
-          StructDef(g('foo, 'unit), None, Seq.empty),
-          EnumDef(g('foo, 'nothing), None, Seq.empty),
+          Import(List("a", "b"), ImportSpecifier.All),
+          Module(List("foo")),
+          StructDef(g('foo, 'unit), None, Nil),
+          EnumDef(g('foo, 'nothing), None, Nil),
           TypeAliasDef(g('foo, 'int), None, T.Named(g('i32))),
-          DefDef(g('foo, 'fun), None, None, Block(Seq(
-            App(Var(g('a, 'b, 'f)), Seq(Var(g('foo, 'const)), Var(g('foo, 'mut))))
+          DefDef(g('foo, 'fun), None, None, Block(Vector(
+            App(Var(g('a, 'b, 'f)), List(Var(g('foo, 'const)), Var(g('foo, 'mut))))
           ))),
           ValDef(g('foo, 'const), Some(T.Named(g('i32))), IntLit(2)),
           VarDef(g('foo, 'mut), None, IntLit(3))

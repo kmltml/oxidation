@@ -18,13 +18,13 @@ trait Ast {
   final case class BoolLit(value: Boolean) extends Expression
   final case class CharLit(value: Char) extends Expression
   final case class StringLit(value: String) extends Expression
-  final case class StructLit(name: Symbol, members: Seq[(String, Typed[Expression])]) extends Expression
+  final case class StructLit(name: Symbol, members: List[(String, Typed[Expression])]) extends Expression
   final case class UnitLit() extends Expression
   final case class InfixAp(operator: InfixOp, left: Typed[Expression], right: Typed[Expression]) extends Expression
   final case class PrefixAp(operator: PrefixOp, expr: Typed[Expression]) extends Expression
   final case class Var(name: Symbol) extends Expression
-  final case class Block(body: Seq[Typed[BlockStatement]]) extends Expression
-  final case class App(expr: Typed[Expression], params: Seq[Typed[Expression]]) extends Expression
+  final case class Block(body: Vector[Typed[BlockStatement]]) extends Expression
+  final case class App(expr: Typed[Expression], params: List[Typed[Expression]]) extends Expression
   final case class Select(expr: Typed[Expression], member: String) extends Expression
   final case class If(cond: Typed[Expression], positive: Typed[Expression], negative: Option[Typed[Expression]]) extends Expression
   final case class While(cond: Typed[Expression], body: Typed[Expression]) extends Expression
@@ -48,7 +48,7 @@ trait Ast {
     def body: Typed[Expression]
   }
 
-  final case class DefDef(name: Symbol, params: Option[Seq[Param]], typ: Option[TypeName], body: Typed[Expression]) extends TermDef
+  final case class DefDef(name: Symbol, params: Option[List[Param]], typ: Option[TypeName], body: Typed[Expression]) extends TermDef
 
   final case class Param(name: String, typ: TypeInfo)
 
@@ -57,12 +57,12 @@ trait Ast {
 
   sealed trait TypeDef extends Def
 
-  final case class StructDef(name: Symbol, typeParameters: Option[Seq[String]], members: Seq[StructMemberDef]) extends TypeDef
-  final case class EnumDef(name: Symbol, typeParameters: Option[Seq[String]], variants: Seq[EnumVariant]) extends TypeDef
-  final case class TypeAliasDef(name: Symbol, typeParameters: Option[Seq[String]], body: TypeName) extends TypeDef
+  final case class StructDef(name: Symbol, typeParameters: Option[List[String]], members: List[StructMemberDef]) extends TypeDef
+  final case class EnumDef(name: Symbol, typeParameters: Option[List[String]], variants: List[EnumVariant]) extends TypeDef
+  final case class TypeAliasDef(name: Symbol, typeParameters: Option[List[String]], body: TypeName) extends TypeDef
 
-  final case class Module(path: Seq[String]) extends TLD
-  final case class Import(path: Seq[String], names: ImportSpecifier) extends TLD
+  final case class Module(path: List[String]) extends TLD
+  final case class Import(path: List[String], names: ImportSpecifier) extends TLD
 
   def traverse[A](stmnt: Typed[BlockStatement])(f: PartialFunction[Typed[BlockStatement], A]): Vector[A] = {
     val result = f.lift(stmnt)
@@ -72,14 +72,14 @@ trait Ast {
            _: UnitLit => Vector.empty[A]
       case InfixAp(_, left, right) => traverse(left)(f) ++ traverse(right)(f)
       case PrefixAp(_, e) => traverse(e)(f)
-      case Block(stmnts) => stmnts.toList.foldMap(traverse(_)(f))
-      case App(e, params) => traverse(e)(f) ++ params.toList.foldMap(traverse(_)(f))
+      case Block(stmnts) => stmnts.foldMap(traverse(_)(f))
+      case App(e, params) => traverse(e)(f) ++ params.foldMap(traverse(_)(f))
       case Select(e, _) => traverse(e)(f)
       case If(c, p, n) =>
         traverse(c)(f) ++ traverse(p)(f) ++ n.map(traverse(_)(f)).orEmpty
       case While(c, b) => traverse(c)(f) ++ traverse(b)(f)
       case Assign(l, _, r) => traverse(l)(f) ++ traverse(r)(f)
-      case StructLit(_, members) => members.map(_._2).toVector.foldMap(traverse(_)(f))
+      case StructLit(_, members) => members.map(_._2).foldMap(traverse(_)(f))
 
       case DefDef(_, _, _, b) => traverse(b)(f)
       case ValDef(_, _, v) => traverse(v)(f)
@@ -90,11 +90,11 @@ trait Ast {
     (result ++ more).toVector
   }
 
-  def listTermSymbols(stmnt: Typed[BlockStatement]): Seq[Symbol] = traverse(stmnt) {
+  def listTermSymbols(stmnt: Typed[BlockStatement]): Vector[Symbol] = traverse(stmnt) {
     case Var(s) => s
   }
 
 }
 
 final case class StructMemberDef(name: String, typ: TypeName)
-final case class EnumVariant(name: String, members: Seq[StructMemberDef])
+final case class EnumVariant(name: String, members: List[StructMemberDef])

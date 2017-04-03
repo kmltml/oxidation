@@ -5,43 +5,40 @@ import utest._
 import parse.ast._
 import SymbolSearch._
 
-object SymbolSearchTests extends TestSuite {
-
-  def g(path: String*): Symbol = Symbol.Global(path)
-  implicit def u(sym: scala.Symbol): Symbol = Symbol.Unresolved(sym.name)
+object SymbolSearchTests extends TestSuite with SymbolSyntax {
 
   val tests = apply {
     "findSymbols" - {
       "symbols in default module" - {
         findSymbols(Vector(
-          DefDef('main, None, None, Block(Seq())),
-          ValDef('foo, None, IntLit(2)),
-          VarDef('bar, None, IntLit(2)),
-          StructDef('baz, None, Seq.empty),
-          EnumDef('foobar, None, Seq.empty)
+          DefDef(u('main), None, None, Block(Vector.empty)),
+          ValDef(u('foo), None, IntLit(2)),
+          VarDef(u('bar), None, IntLit(2)),
+          StructDef(u('baz), None, Nil),
+          EnumDef(u('foobar), None, Nil)
         )) ==> Right(Symbols(
-          terms = Map("main" -> Set(g("main")), "foo" -> Set(g("foo")), "bar" -> Set(g("bar"))),
-          types = Map("baz" -> Set(g("baz")), "foobar" -> Set(g("foobar")))
+          terms = Map("main" -> Set(g('main)), "foo" -> Set(g('foo)), "bar" -> Set(g('bar))),
+          types = Map("baz" -> Set(g('baz)), "foobar" -> Set(g('foobar)))
         ))
       }
       "error on duplicate symbols" - {
         findSymbols(Vector(
-          DefDef('main, None, None, Block(Seq())),
-          ValDef('main, None, IntLit(2))
+          DefDef(u('main), None, None, Block(Vector.empty)),
+          ValDef(u('main), None, IntLit(2))
         )).isLeft ==> true
       }
       "symbols in a module" - {
         findSymbols(Vector(
-          Module(Seq("foo", "bar")),
-          DefDef('main, None, None, Block(Seq()))
-        )) ==> Right(Symbols.terms(g("foo", "bar", "main")))
+          Module(List("foo", "bar")),
+          DefDef(u('main), None, None, Block(Vector.empty))
+        )) ==> Right(Symbols.terms(g('foo, 'bar, 'main)))
       }
       "nested modules" - {
         findSymbols(Vector(
-          Module(Seq("foo")),
-          Module(Seq("bar")),
-          DefDef('main, None, None, Block(Seq()))
-        )) ==> Right(Symbols.terms(g("foo", "bar", "main")))
+          Module(List("foo")),
+          Module(List("bar")),
+          DefDef(u('main), None, None, Block(Vector.empty))
+        )) ==> Right(Symbols.terms(g('foo, 'bar, 'main)))
       }
     }
   }
