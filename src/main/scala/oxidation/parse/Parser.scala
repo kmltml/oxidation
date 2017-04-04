@@ -90,9 +90,11 @@ class Parser {
 
   type Postfix = Expression => Expression
   private val postfix: P[Postfix] =
-    P(apply | select)
+    P(typeApply | apply | select)
   private val apply: P[Expression => App] =
     P(WSNoNL ~~ "(" ~/ expression.rep(sep = ",").map(_.toList) ~ ")").map(params => App(_, params))
+  private val typeApply: P[Expression => TypeApp] =
+    P(WSNoNL ~~ typeParams).map(params => TypeApp(_, params))
   private val select: P[Expression => Select] =
     P(WS ~~ "." ~/ id.!).map(id => Select(_, id))
 
@@ -125,7 +127,7 @@ class Parser {
   private val sym: P[Symbol] = P(id.!).map(Symbol.Unresolved)
 
   val typ: P[TypeName] = P(
-    (namedType ~ typeApply.rep).map {
+    (namedType ~ typeParams.rep).map {
       case (t, paramLists) =>
         paramLists.foldLeft(t: TypeName)(TypeName.App(_, _))
     }
@@ -133,7 +135,7 @@ class Parser {
 
   private val namedType: P[TypeName.Named] = sym.map(TypeName.Named)
 
-  private val typeApply: P[List[TypeName]] =
+  private val typeParams: P[List[TypeName]] =
     P("[" ~/ typ.rep(sep = ",", min = 1).map(_.toList) ~ "]")
 
   private val defdef: P[DefDef] = {

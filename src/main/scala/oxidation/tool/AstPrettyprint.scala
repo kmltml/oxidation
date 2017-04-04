@@ -144,6 +144,11 @@ trait AstPrettyprint {
         expr => prettyprintTypedExp(expr)
       }.sep(",".nl).indent + ")").indent
 
+    case ast.TypeApp(e, ps) =>
+      s"TypeApp$typeInfo(".nl + (prettyprintTypedExp(e) + ",".nl + "Params(".nl + ps.map {
+        tn => prettyprintTypeName(tn).p
+      }.sep(",".nl).indent + ")").indent
+
     case ast.Assign(left, op, right) =>
       s"Assign$typeInfo($op, ".nl + (prettyprintTypedExp(left) + ",".nl + prettyprintTypedExp(right)).indent + ")"
 
@@ -158,6 +163,9 @@ trait AstPrettyprint {
 
     case ast.Widen(expr) =>
       s"Widen$typeInfo(".p + prettyprintTypedExp(expr) + ")"
+
+    case ast.Ignore(expr) =>
+      s"Ignore$typeInfo(".p + prettyprintTypedExp(expr) + ")"
   }
 
   def stringify(p: P): String = {

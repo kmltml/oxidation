@@ -25,6 +25,7 @@ trait Ast {
   final case class Var(name: Symbol) extends Expression
   final case class Block(body: Vector[Typed[BlockStatement]]) extends Expression
   final case class App(expr: Typed[Expression], params: List[Typed[Expression]]) extends Expression
+  final case class TypeApp(expr: Typed[Expression], params: List[TypeName]) extends Expression
   final case class Select(expr: Typed[Expression], member: String) extends Expression
   final case class If(cond: Typed[Expression], positive: Typed[Expression], negative: Option[Typed[Expression]]) extends Expression
   final case class While(cond: Typed[Expression], body: Typed[Expression]) extends Expression
@@ -74,6 +75,7 @@ trait Ast {
       case PrefixAp(_, e) => traverse(e)(f)
       case Block(stmnts) => stmnts.foldMap(traverse(_)(f))
       case App(e, params) => traverse(e)(f) ++ params.foldMap(traverse(_)(f))
+      case TypeApp(e, _) => traverse(e)(f)
       case Select(e, _) => traverse(e)(f)
       case If(c, p, n) =>
         traverse(c)(f) ++ traverse(p)(f) ++ n.map(traverse(_)(f)).orEmpty

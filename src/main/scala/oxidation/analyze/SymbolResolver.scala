@@ -101,7 +101,11 @@ object SymbolResolver {
 
     case parse.ast.App(expr, params) =>
       (solveExpr(expr, scope), params.traverse(solveExpr(_, scope)))
-        .map2(parse.ast.App(_, _))
+        .map2(parse.ast.App)
+
+    case parse.ast.TypeApp(expr, params) =>
+      (solveExpr(expr, scope), params.traverse(solveType(_, scope)))
+        .map2(parse.ast.TypeApp)
 
     case parse.ast.Select(expr, member) =>
       solveExpr(expr, scope).map(parse.ast.Select(_, member))

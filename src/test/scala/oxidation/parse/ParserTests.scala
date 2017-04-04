@@ -142,6 +142,11 @@ object ParserTests extends TestSuite {
         expr.parse("foo(1, 2)").get.value ==> App(Var("foo"), List(IntLit(1), IntLit(2)))
         expr.parse("foo(1)(2)").get.value ==> App(App(Var("foo"), List(IntLit(1))), List(IntLit(2)))
       }
+      "a template application" - {
+        expr.parse("foo[i32]").get.value ==> TypeApp(Var("foo"), List(TypeName.Named("i32")))
+        expr.parse("identity[i32](42)").get.value ==>
+          App(TypeApp(Var("identity"), List(TypeName.Named("i32"))), List(IntLit(42)))
+      }
       "a member access" - {
         expr.parse("foo.bar").get.value ==> Select(Var("foo"), "bar")
       }
