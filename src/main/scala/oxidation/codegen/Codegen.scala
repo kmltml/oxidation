@@ -83,6 +83,24 @@ object Codegen {
         )
       } yield Val.R(r)
 
+    case Typed(ast.Trim(expr), valType) =>
+      for {
+        v <- compileExpr(expr)
+        r <- genReg(translateType(valType))
+        _ <- instructions(
+          Inst.Move(r, Op.Trim(v))
+        )
+      } yield Val.R(r)
+
+    case Typed(ast.Reinterpret(expr), valType) =>
+      for {
+        v <- compileExpr(expr)
+        r <- genReg(translateType(valType))
+        _ <- instructions(
+          Inst.Move(r, Op.Copy(v))
+        )
+      } yield Val.R(r)
+
     case Typed(ast.Ignore(expr), analyze.Type.U0) =>
       for {
         _ <- compileExpr(expr)

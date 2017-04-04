@@ -35,6 +35,9 @@ object Typer {
       case _ => Left(TyperError.ExternNoExplicitType())
     }
 
+    case P.App(P.TypeApp(P.Var(Symbol.Global(List("cast"))), List(target)), List(src)) =>
+      solveType(src, ExpectedType.Undefined, ctxt).map(cast(target, _, ctxt))
+
     case P.StructLit(name, members) =>
       for {
         struct <- lookupType(TypeName.Named(name), ctxt) match {
@@ -255,6 +258,16 @@ object Typer {
       } yield t
   }
 
+  private def cast(target: TypeName, src: Typed[ast.Expression], ctxt: Ctxt): Typed[ast.Expression] =
+    (lookupType(target, ctxt), src.typ) match {
+      case (a, b) if a == b => src
+      case (t: Num, s: Num) =>
+        val w = wider(t, s)
+        if(w == t) widen(src, t)
+        else trim(src, t)
+      case (t @ Ptr(_), Ptr(_) | U64) => Typed(ast.Reinterpret(src), t)
+    }
+
   def lookupType(t: TypeName, ctxt: Ctxt): Type = t match {
     case TypeName.App(TypeName.Named(Symbol.Global(List("ptr"))), List(pointee)) => Type.Ptr(pointee)
     case TypeName.Named(s) => ctxt.types(s)
@@ -331,6 +344,12 @@ object Typer {
     case Typed(l: ast.IntLit, _) => Typed(l, t)
     case Typed(ast.Widen(e), _) => widen(e, t)
     case _ => Typed(ast.Widen(expr), t)
+  }
+
+  private def trim(expr: Typed[ast.Expression], t: Type): Typed[ast.Expression] = expr match {
+    case Typed(l: ast.IntLit, _) => Typed(l, t)
+    case Typed(ast.Trim(e), _) => trim(e, t)
+    case _ => Typed(ast.Trim(expr), t)
   }
 
   private def bitwidth(t: Type): Int = t match {

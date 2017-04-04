@@ -19,6 +19,7 @@ sealed trait Op {
       case Op.Load(a, o) => Set(a, o)
       case Op.Store(a, o, v) => Set(a, o, v)
       case Op.Widen(v) => Set(v)
+      case Op.Trim(v) => Set(v)
       case Op.Member(s, _) => Set(s)
     }
     vals.collect {
@@ -37,6 +38,7 @@ object Op {
   final case class Load(addr: Val, offset: Val) extends Op
   final case class Store(addr: Val, offset: Val, value: Val) extends Op
   final case class Widen(v: Val) extends Op
+  final case class Trim(v: Val) extends Op
   final case class Member(src: Val, index: Int) extends Op
   case object Garbled extends Op // Assigned to register to indicate, that some instruction also writes to this register as a side effect
 
@@ -48,6 +50,7 @@ object Op {
     case Load(addr, offset) => show"load [$addr + $offset]"
     case Store(addr, offset, value) => show"store [$addr + $offset] = $value"
     case Widen(v) => show"widen $v"
+    case Trim(v) => show"trim $v"
     case Member(s, i) => show"member $s.$i"
     case Garbled => "garbled"
   }

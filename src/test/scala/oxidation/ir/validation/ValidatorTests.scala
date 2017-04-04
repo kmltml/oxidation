@@ -38,6 +38,16 @@ object ValidatorTests extends TestSuite with IrValSyntax {
             .value.runEmptyA.value ==> Left(ValidationError.NotANumericType(loc, Struct(Vector.empty)))
         }
       }
+      "Trim" - {
+        "valid" - {
+          validateInstruction(loc, Inst.Move(r(0, U8), Op.Trim(r(1, U32))))
+            .value.runA(Set(r(0, U8), r(1, U32))).value ==> Right(())
+        }
+        "invalid" - {
+          validateInstruction(loc, Inst.Move(r(0, Struct(Vector(I32))), Op.Trim(r(1, U32))))
+            .value.runA(Set(r(0, U8), r(1, U32))).value ==> Left(ValidationError.NotANumericType(loc, Struct(Vector(I32))))
+        }
+      }
       "Garbled" - {
         "valid" - {
           validateInstruction(loc, Inst.Move(r(0, I32), Op.Garbled))

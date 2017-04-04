@@ -22,15 +22,19 @@ final case class Reg(loc: RegLoc, size: RegSize) {
       case RegSize.DWord => "d"
       case RegSize.QWord => ""
     }
+    def extraSuffix(s: RegSize) = s match {
+      case RegSize.Byte => "l"
+      case RegSize.Word | RegSize.DWord | RegSize.QWord => ""
+    }
     loc match {
       case RegLoc.A => prefix(size) + "a" + suffix(size)
       case RegLoc.B => prefix(size) + "b" + suffix(size)
       case RegLoc.C => prefix(size) + "c" + suffix(size)
       case RegLoc.D => prefix(size) + "d" + suffix(size)
-      case RegLoc.SP => prefix(size) + "sp"
-      case RegLoc.BP => prefix(size) + "bp"
-      case RegLoc.SI => prefix(size) + "si"
-      case RegLoc.DI => prefix(size) + "di"
+      case RegLoc.SP => prefix(size) + "sp" + extraSuffix(size)
+      case RegLoc.BP => prefix(size) + "bp" + extraSuffix(size)
+      case RegLoc.SI => prefix(size) + "si" + extraSuffix(size)
+      case RegLoc.DI => prefix(size) + "di" + extraSuffix(size)
       case RegLoc.R8 => "r8" + newSuffix(size) 
       case RegLoc.R9 => "r9" + newSuffix(size)
       case RegLoc.R10 => "r10" + newSuffix(size)

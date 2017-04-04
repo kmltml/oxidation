@@ -12,7 +12,13 @@ struct str = {
 }
 
 def main(): u0 = {
-    println("Hello, world!")
+    var i: u8 = 0
+    val s = cast[ptr[u8]](malloc(10))
+    while(i <= 9) {
+        s(i) = '0' + i
+        i += 1
+    }
+    println(str { data = s, length = 10 })
     exit(0)
 }
 

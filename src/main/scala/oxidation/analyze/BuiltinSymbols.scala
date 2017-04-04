@@ -17,6 +17,9 @@ object BuiltinSymbols {
     "str" -> StrType)
   val types: Map[Symbol, Type] = typeNames.map { case (s, v) => Symbol.Global(List(s)) -> v }
 
-  val symbols: Symbols = Symbols.types(types.keys.toSeq: _*)
+  val intrinsicNames: Set[String] = Set("cast")
+  val intrinsics: Set[Symbol] = intrinsicNames.map(n => Symbol.Global(List(n)))
+
+  val symbols: Symbols = Symbols.types(types.keys.toSeq: _*).withTerms(intrinsics.toSeq: _*)
 
 }

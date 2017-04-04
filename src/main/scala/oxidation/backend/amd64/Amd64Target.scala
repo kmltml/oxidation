@@ -122,6 +122,9 @@ class Amd64Target { this: Output =>
         case (Signed, _, _) => S.tell(movsx(toVal(dest), toVal(src)))
       }
 
+      case ir.Op.Trim(src) =>
+        S.tell(mov(toVal(dest), toVal(src)))
+
       case ir.Op.Arith(op @ (InfixOp.Add | InfixOp.Sub), left, right) =>
         S.tell(Vector(
           mov(toVal(dest), toVal(left)),

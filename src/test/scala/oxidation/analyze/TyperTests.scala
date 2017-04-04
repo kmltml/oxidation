@@ -190,6 +190,26 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
             Left(TyperError.ExternNoExplicitType())
         }
       }
+      "Cast" - {
+        "widen" - {
+          solveType(P.App(P.TypeApp(P.Var(g('cast)), List(TypeName.Named(g('i64)))), List(P.Var(l('x)))),
+            ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> Ctxt.Immutable(I8)))) ==>
+            Right(ast.Widen(ast.Var(l('x)) :: I8) :: I64)
+        }
+        "trim" - {
+          solveType(P.App(P.TypeApp(P.Var(g('cast)), List(TypeName.Named(g('i8)))), List(P.Var(l('x)))),
+            ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> Ctxt.Immutable(I64)))) ==>
+            Right(ast.Trim(ast.Var(l('x)) :: I64) :: I8)
+        }
+        "reinterpret" - {
+          "pointer to pointer" - {
+            solveType(P.App(P.TypeApp(P.Var(g('cast)),
+              List(TypeName.ptr(TypeName.Named(g('i32))))), List(P.Var(l('x)))),
+              ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> Ctxt.Immutable(Ptr(TypeName.Named(g('i8))))))) ==>
+              Right(ast.Reinterpret(ast.Var(l('x)) :: Ptr(TypeName.Named(g('i8)))) :: Ptr(TypeName.Named(g('i32))))
+          }
+        }
+      }
     }
   }
 

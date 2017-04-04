@@ -30,7 +30,7 @@ object DependencyEntry {
 
   def build(d: parse.ast.TermDef): DependencyEntry =
     DependencyEntry(parse.ast.listTermSymbols(d).collect {
-      case s: Symbol.Global => s
+      case s: Symbol.Global if !BuiltinSymbols.intrinsics.contains(s) => s
     }.toSet, d match {
       case parse.ast.DefDef(_, _, t, _) => t
       case parse.ast.ValDef(_, t, _) => t

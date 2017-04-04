@@ -47,6 +47,13 @@ object Validator {
         _ <- cond(v.typ.isInstanceOf[Type.Num], ValidationError.NotANumericType(loc, v.typ))
         _ <- S.modify(_ + dest)
       } yield ()
+    case Inst.Move(dest, op @ Op.Trim(v)) =>
+      for {
+        _ <- validateOp(loc, op)
+        _ <- cond(v.typ.isInstanceOf[Type.Num], ValidationError.NotANumericType(loc, v.typ))
+        _ <- cond(dest.typ.isInstanceOf[Type.Num], ValidationError.NotANumericType(loc, dest.typ))
+        _ <- S.modify(_ + dest)
+      } yield ()
     case Inst.Move(dest, Op.Garbled) => S.modify(_ + dest)
     case Inst.Move(dest, op) => for {
       opType <- validateOp(loc, op)
@@ -63,6 +70,7 @@ object Validator {
   def validateOp(loc: Location, op: Op): ES[Option[Type]] = op match {
     case Op.Copy(src) => valType(loc, src).map(Some(_))
     case Op.Widen(v)  => valType(loc, v).as(None)
+    case Op.Trim(v)  => valType(loc, v).as(None)
     case Op.Garbled  => ES.pure(None)
     case Op.Call(fn, params) =>
       def flatten(p: List[Type]): List[Type] = p flatMap {

@@ -164,6 +164,12 @@ trait AstPrettyprint {
     case ast.Widen(expr) =>
       s"Widen$typeInfo(".p + prettyprintTypedExp(expr) + ")"
 
+    case ast.Trim(expr) =>
+      s"Trim$typeInfo(".p + prettyprintTypedExp(expr) + ")"
+
+    case ast.Reinterpret(expr) =>
+      s"Reinterpret$typeInfo(".p + prettyprintTypedExp(expr) + ")"
+
     case ast.Ignore(expr) =>
       s"Ignore$typeInfo(".p + prettyprintTypedExp(expr) + ")"
   }
