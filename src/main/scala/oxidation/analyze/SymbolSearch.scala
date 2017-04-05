@@ -7,7 +7,7 @@ import cats.implicits._
 
 object SymbolSearch {
 
-  final case class DuplicatedSymbolError(symbol: Symbol, second: parse.ast.Def)
+  final case class DuplicatedSymbolError(symbol: Symbol, second: parse.ast.Def) extends AnalysisError
 
   object TypeDef {
     def unapply(d: parse.ast.Def): Option[String] = d match {

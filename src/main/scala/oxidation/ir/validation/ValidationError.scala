@@ -2,7 +2,7 @@ package oxidation
 package ir
 package validation
 
-sealed trait ValidationError extends Product with Serializable
+sealed trait ValidationError extends CompileError with Product with Serializable
 
 object ValidationError {
 

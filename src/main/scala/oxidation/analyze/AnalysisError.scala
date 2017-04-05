@@ -1,3 +1,4 @@
-package oxidation.analyze
+package oxidation
+package analyze
 
-trait AnalysisError
+trait AnalysisError extends CompileError

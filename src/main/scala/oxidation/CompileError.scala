@@ -1,0 +1,3 @@
+package oxidation
+
+trait CompileError
