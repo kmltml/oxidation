@@ -7,22 +7,22 @@ import analyze._
 import parse.Parser
 
 import scala.io.Source
-
 import cats._
 import cats.data._
 import cats.implicits._
-
 import ir.serialization.Serialize
 import codegen.pass.Pass
 import codegen.{Codegen, pass}
+import oxidation.backend.amd64.Amd64BackendPass
 
 object IrDump extends App {
 
   case class Options(infiles: Seq[File] = Seq.empty,
                      passes: List[Pass] = List.empty,
                      timing: Boolean = false,
-                     out: OutputStream = Console.out,
-                     format: Format = Textual) extends LogOptions
+                     out: Option[File] = None,
+                     format: Format = Textual,
+                     dumpAfterEachPass: Boolean = false) extends LogOptions
 
   sealed trait Format
   case object Textual extends Format
@@ -31,7 +31,8 @@ object IrDump extends App {
 
   val AllPasses: List[(String, Pass)] = List(
     "explicit-blocks" -> pass.ExplicitBlocks,
-    "struct-lowering" -> pass.StructLowering
+    "struct-lowering" -> pass.StructLowering,
+    "amd64-backend"   -> Amd64BackendPass
   )
 
   implicit val passRead: scopt.Read[Pass] =
@@ -55,10 +56,13 @@ object IrDump extends App {
       .action((p, o) => o.copy(passes = upTo(p)))
 
     opt[File]('o', "outfile")
-      .action((f, o) => o.copy(out = new FileOutputStream(f)))
+      .action((f, o) => o.copy(out = Some(f)))
 
     opt[Unit]('b', "binary")
       .action((_, o) => o.copy(format = Binary))
+
+    opt[Unit]('a', "dump-after-each-pass")
+      .action((_, o) => o.copy(dumpAfterEachPass = true))
 
   }
 
@@ -101,38 +105,71 @@ object IrDump extends App {
         case d: analyze.ast.TermDef => Codegen.compileDef(d)
       }
     }
-    val passed = options.passes.foldLeft(irDefs)((defs, pass) => defs.flatMap(d => pass.extract(pass.txDef(d))))
-    options.format match {
-      case Textual =>
-        val writer = new PrintWriter(options.out, true)
-        passed.foreach {
-          case ir.Def.Fun(name, params, ret, body, constants) =>
-            writer.println(show"def $name(${params.map(_.show).mkString(", ")}): $ret {")
-            if(constants.nonEmpty) {
-              writer.println("  constants {")
-              constants.foreach { e =>
-                writer.println(show"    $e")
-              }
-              writer.println("  }")
-            }
-            body.foreach { block =>
-              writer.println(show"  ${block.name} {")
-              block.instructions.foreach { instr =>
-                writer.println(show"    $instr")
-              }
-              writer.println(show"    ${block.flow}")
-              writer.println("  }")
-            }
-            writer.println("}")
 
-          case ir.Def.ExternFun(name, params, ret) =>
-            writer.println(show"def $name(${params.map(_.show).mkString(", ")}): $ret = extern")
-        }
-
-      case Binary =>
-        val s = new Serialize(new DataOutputStream(options.out))
-        s.writeDefs(passed.toSeq)
+    def fileAfterPhase(out: File, phase: String): File = {
+      val (name, ext) = out.getName.splitAt(out.getName.lastIndexOf('.'))
+      new File(out.getParentFile, s"$name-$phase$ext")
     }
+
+    def dumpAfter(phase: String, defs: Set[ir.Def]): Unit = options.out match {
+      case None =>
+        println(s"--- Ir after phase $phase ---")
+        dump(defs, options.format, System.out)
+      case Some(f) =>
+        val out = fileAfterPhase(f, phase)
+        dump(defs, options.format, new FileOutputStream(out))
+    }
+
+    if(options.dumpAfterEachPass) {
+      dumpAfter("codegen", irDefs)
+    }
+    val passed = options.passes.foldLeft(irDefs) { (defs, pass) =>
+      val res = defs.flatMap(d => pass.extract(pass.txDef(d)))
+      if(options.dumpAfterEachPass) {
+        dumpAfter(pass.name, res)
+      }
+      res
+    }
+    if(!options.dumpAfterEachPass) {
+      options.out match {
+        case None =>
+          dump(passed, options.format, System.out)
+        case Some(f) =>
+          dump(passed, options.format, new FileOutputStream(f))
+      }
+    }
+  }
+
+  def dump(defs: Set[ir.Def], format: Format, out: OutputStream): Unit = format match {
+    case Textual =>
+      val writer = new PrintWriter(out, true)
+      defs.foreach {
+        case ir.Def.Fun(name, params, ret, body, constants) =>
+          writer.println(show"def $name(${params.map(_.show).mkString(", ")}): $ret {")
+          if(constants.nonEmpty) {
+            writer.println("  constants {")
+            constants.foreach { e =>
+              writer.println(show"    $e")
+            }
+            writer.println("  }")
+          }
+          body.foreach { block =>
+            writer.println(show"  ${block.name} {")
+            block.instructions.foreach { instr =>
+              writer.println(show"    $instr")
+            }
+            writer.println(show"    ${block.flow}")
+            writer.println("  }")
+          }
+          writer.println("}")
+
+        case ir.Def.ExternFun(name, params, ret) =>
+          writer.println(show"def $name(${params.map(_.show).mkString(", ")}): $ret = extern")
+      }
+
+    case Binary =>
+      val s = new Serialize(new DataOutputStream(out))
+      s.writeDefs(defs.toSeq)
   }
 
 }
