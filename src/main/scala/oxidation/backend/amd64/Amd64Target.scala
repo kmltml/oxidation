@@ -134,6 +134,7 @@ class Amd64Target { this: Output =>
           }
         ).combineAll)
       case ir.Op.Arith(InfixOp.Div, _, right) => S.tell(div(toVal(right)))
+      case ir.Op.Arith(InfixOp.Mod, _, right) => S.tell(div(toVal(right)))
       case ir.Op.Arith(InfixOp.Mul, _, right) => S.tell(mul(toVal(right)))
       case ir.Op.Arith(op @ (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq | InfixOp.Neq), left, right) =>
           S.tell(Vector(

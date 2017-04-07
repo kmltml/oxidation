@@ -16,7 +16,7 @@ import oxidation.codegen.pass.Pass
 import oxidation.ir.ConstantPoolEntry
 import oxidation.ir.validation.{ValidationError, Validator}
 
-import scala.sys.process.Process
+import scala.sys.process.{Process, ProcessLogger}
 
 object Compile {
 
@@ -42,8 +42,8 @@ object Compile {
 
   final case class ParseError(message: String) extends CompileError
   final case class ValidatorError(err: ValidationError, after: String) extends CompileError
-  case object AssemblerError extends CompileError
-  case object LinkerError extends CompileError
+  final case class AssemblerError(message: String) extends CompileError
+  final case class LinkerError(message: String) extends CompileError
 
   def get[L, R](e: Either[L, R]): R = e.fold(l => {
     Console.err.println(l)
@@ -119,11 +119,26 @@ object Compile {
         }
         out.close()
       }
-      _ <- Either.cond(Process(Seq("nasm", "-fwin64", "-o", objFile.getAbsolutePath, asmFile.getAbsolutePath)).! == 0,
-        (), AssemblerError)
-      _ <- Either.cond(Process(Seq("gcc", objFile.getAbsolutePath, "-Wl,-emain", "-o", exeFile.getAbsolutePath)).! == 0,
-        (), LinkerError)
+      _ <- run("nasm", "-fwin64", "-o", objFile.getAbsolutePath, asmFile.getAbsolutePath)
+        .left.map(AssemblerError)
+      _ <- run("gcc", objFile.getAbsolutePath, "-Wl,-emain", "-o", exeFile.getAbsolutePath)
+        .left.map(LinkerError)
     } yield exeFile
+  }
+
+  private def run(commandline: String*): Either[String, Unit] = {
+    val builder = new StringBuilder
+    val log = new ProcessLogger {
+      override def buffer[T](f: => T) = f
+
+      override def out(s: => String) =
+        builder ++= s += '\n'
+
+      override def err(s: => String) =
+        builder ++= s += '\n'
+    }
+    val res = Process(commandline) ! log
+    if(res == 0) Right(()) else Left(builder.toString)
   }
 
   def main(args: Array[String]): Unit = {

@@ -18,3 +18,5 @@ libraryDependencies ++=
 testFrameworks += new TestFramework("utest.runner.Framework")
 
 scalacOptions += "-Ypartial-unification"
+
+watchSources += baseDirectory.value / "compiled-test"
