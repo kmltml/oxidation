@@ -9,7 +9,7 @@ import oxidation.ir._
 
 object StructLowering extends Pass {
 
-  def name = "strruct-lowering"
+  def name = "struct-lowering"
 
   object StructLoweringReg extends RegisterNamespace {
     def prefix: String = "sl"
@@ -57,7 +57,17 @@ object StructLowering extends Pass {
             F.inspect(_.bindings).map(_(reg).toList)
           case reg => F.pure(List(reg))
         }
-      } yield Vector(Inst.Eval(dest, Op.Call(fn, newParams.flatten))) // TODO handle functions returning structs
+        retDeconstruction <- dest match {
+          case Some(destReg @ Register(_, _, Type.Struct(members))) =>
+            for {
+              regs <- members.traverse(genReg)
+              _ <- saveBinding(destReg, regs)
+            } yield regs.zipWithIndex.map {
+              case (r, i) => Inst.Move(r, Op.Member(Val.R(destReg), i))
+            }
+          case _ => F.pure(Vector.empty)
+        }
+      } yield Inst.Eval(dest, Op.Call(fn, newParams.flatten)) +: retDeconstruction
 
     case Inst.Move(dest, Op.Copy(Val.Struct(memVals))) =>
       for {

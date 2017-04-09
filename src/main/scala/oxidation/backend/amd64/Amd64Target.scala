@@ -60,7 +60,7 @@ class Amd64Target { this: Output =>
     case ir.Def.ExternFun(name, _, _) =>
       extern(name)
     case ir.Def.Fun(name, _, _, _, _) =>
-      val (precolours, Vector(fun @ ir.Def.Fun(_, _, _, blocks, _))) = Amd64BackendPass.txDef(d).run.runEmptyA.value
+      val (precolours, Vector(fun @ ir.Def.Fun(_, _, _, blocks, _))) = Amd64BackendPass.txDef(d).run.runA(Amd64BackendPass.St()).value
       val allocations = allocator.allocate(fun, precolours.toMap)
       val spills = allocations.collect {
         case (r, allocator.Spill) => r

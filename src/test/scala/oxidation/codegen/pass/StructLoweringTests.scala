@@ -60,6 +60,22 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
         ), Set.empty)
       )
     }
+    "call returning a struct" - {
+      val struct = Struct(Vector(I32, I64))
+      val r0 = register(0, struct)
+      pass.txInstruction(Inst.Move(r0, Op.Call(Val.G(Name.Global(List("foo")), Fun(Nil, struct)), Nil)))
+        .run(pass.S()).value ==>
+        (pass.S(
+          nextReg = 2,
+          bindings = Map(
+            r0 -> Vector(sl(0, I32), sl(1, I64))
+          )
+        ), Vector(
+          Inst.Move(r0, Op.Call(Val.G(Name.Global(List("foo")), Fun(Nil, struct)), Nil)),
+          Inst.Move(sl(0, I32), Op.Member(r0, 0)),
+          Inst.Move(sl(1, I64), Op.Member(r0, 1))
+        ))
+    }
     "struct copy" - {
       val struct = Struct(Vector(I32, I64))
       val r0 = register(0, struct)

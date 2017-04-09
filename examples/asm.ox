@@ -13,12 +13,13 @@ struct str = {
 
 def main(): u0 = {
     var i: u8 = 0
-    val s = cast[ptr[u8]](malloc(10))
+    val s = cast[ptr[u8]](malloc(20))
     while(i <= 9) {
         s(i) = '0' + i
         i += 1
     }
-    println(str { data = s, length = 10 })
+    s(10) = 0
+    println(fromCString(s))
     exit(0)
 }
 

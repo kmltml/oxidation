@@ -17,12 +17,14 @@ object Amd64BackendPass extends Pass {
     val prefix = "br"
   }
 
-  type F[A] = WriterT[State[Int, ?], Set[(Register, RegLoc)], A]
-  val F = MonadWriter[F, Set[(Register, RegLoc)]]
-  val S = new MonadState[F, Int] {
-    override def get: F[Int] = WriterT.lift(State.get)
+  final case class St(nextReg: Int = 0, returnedStructs: Set[Register] = Set.empty)
 
-    override def set(s: Int): F[Unit] = WriterT.lift(State.set(s))
+  type F[A] = WriterT[State[St, ?], Set[(Register, RegLoc)], A]
+  val F = MonadWriter[F, Set[(Register, RegLoc)]]
+  val S = new MonadState[F, St] {
+    override def get: F[St] = WriterT.lift(State.get)
+
+    override def set(s: St): F[Unit] = WriterT.lift(State.set(s))
 
     override def pure[A](x: A): F[A] = F.pure(x)
 
@@ -30,9 +32,14 @@ object Amd64BackendPass extends Pass {
 
     override def tailRecM[A, B](a: A)(f: A => F[Either[A, B]]): F[B] = F.tailRecM(a)(f)
   }
-  def extract[A](f: F[A]) = f.run.runA(0).value._2
+  def extract[A](f: F[A]) = f.run.runA(St()).value._2
 
-  private def nextReg(typ: Type): F[Register] = WriterT.lift(State { s => (s + 1, Register(BackendReg, s, typ))} )
+  private def nextReg(typ: Type): F[Register] = WriterT.lift(State {
+    s => (s.copy(nextReg = s.nextReg + 1), Register(BackendReg, s.nextReg, typ))
+  })
+
+  private def saveReturnedStruct(reg: Register): F[Unit] =
+    S.modify(s => s.copy(returnedStructs = s.returnedStructs + reg))
 
   override def onInstruction: Inst =?> F[Vector[Inst]] = {
     case Inst.Move(dest, Op.Arith(op @ (InfixOp.Div | InfixOp.Mod) , l, r)) => // TODO handle signed case; deduplicate?
@@ -85,8 +92,7 @@ object Amd64BackendPass extends Pass {
         Inst.Move(dest, Op.Copy(ir.Val.R(destTemp)))
       )
 
-    case inst @ Inst.Eval(dest, Op.Call(_, params)) =>
-      val destColour = dest.map(_ -> RegLoc.A)
+    case Inst.Eval(dest, call @ Op.Call(_, params)) =>
       val paramColours = params.zipWithIndex.collect {
         case (r, 0) => r -> RegLoc.C
         case (r, 1) => r -> RegLoc.D
@@ -95,14 +101,32 @@ object Amd64BackendPass extends Pass {
       }
       for {
         _ <- F.tell(paramColours.toSet)
-        destInst <- dest match {
+        destInsts <- dest match {
+          case Some(r @ Register(_, _, Type.Struct(_))) => saveReturnedStruct(r).as(Vector.empty)
           case Some(r) => F.tell(Set(r -> RegLoc.A)).as(Vector())
           case None => for {
             r <- nextReg(Type.U0)
             _ <- F.tell(Set(r -> RegLoc.A))
           } yield Vector(Inst.Move(r, Op.Garbled))
         }
-      } yield inst +: destInst
+        newDest = dest match {
+          case Some(Register(_, _, Type.Struct(_))) => None
+          case x => x
+        }
+      } yield Inst.Eval(newDest, call) +: destInsts
+
+    case Inst.Move(dest, Op.Member(ir.Val.R(src), member)) =>
+      for {
+        returnedStructs <- S.inspect(_.returnedStructs)
+        _ = assert(returnedStructs contains src)
+        _ <- F.tell(Set(dest -> (member match {
+          case 0 => RegLoc.A
+          case 1 => RegLoc.D
+          case 2 => RegLoc.C
+          case 3 => RegLoc.R8
+          case 4 => RegLoc.R9
+        })))
+      } yield Vector(Inst.Move(dest, Op.Garbled))
 
     case inst @ Inst.Move(dest, Op.Arith(InfixOp.Add | InfixOp.Sub, l, r)) =>
       F.pure(Vector(
