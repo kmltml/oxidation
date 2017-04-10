@@ -113,7 +113,7 @@ object Typer {
           for {
             ltyped <- solveType(left, ExpectedType.Specific(U1), ctxt)
             rtyped <- solveType(right, ExpectedType.Specific(U1), ctxt)
-            t <- unifyType(Typed(ast.InfixAp(op, ltyped, rtyped): ast.Expression, U1), expected)
+            t <- unifyType(Typed(ast.InfixAp(op, ltyped, rtyped), U1), expected)
           } yield t
 
         case InfixOp.Xor =>

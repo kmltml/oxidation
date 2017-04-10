@@ -63,6 +63,13 @@ object ParserTests extends TestSuite {
       "multiplication" - {
         expr.parse("2 * 3").get.value ==> InfixAp(InfixOp.Mul, IntLit(2), IntLit(3))
       }
+      "InfixAp" - {
+        "And"    - { expr.parse("true && true").get.value ==> InfixAp(InfixOp.And, BoolLit(true), BoolLit(true)) }
+        "Or"     - { expr.parse("true || true").get.value ==> InfixAp(InfixOp.Or, BoolLit(true), BoolLit(true)) }
+        "BitOr"  - { expr.parse("true | true").get.value  ==> InfixAp(InfixOp.BitOr, BoolLit(true), BoolLit(true)) }
+        "BitAnd" - { expr.parse("true & true").get.value  ==> InfixAp(InfixOp.BitAnd, BoolLit(true), BoolLit(true)) }
+        "Xor"    - { expr.parse("true ^ true").get.value  ==> InfixAp(InfixOp.Xor, BoolLit(true), BoolLit(true)) }
+      }
       "mixed priorities" - {
         expr.parse("2 + 3 * 4").get.value ==>
           InfixAp(InfixOp.Add, IntLit(2), InfixAp(InfixOp.Mul, IntLit(3), IntLit(4)))

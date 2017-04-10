@@ -59,13 +59,18 @@ class Parser {
   private val expression5: P[Expression] = infixl(expression4, op5)
   private val expression6: P[Expression] = infixl(expression5, op6)
   private val expression7: P[Expression] = infixl(expression6, op7)
-  private val expression8: P[Expression] =
-    P(expression7 ~ (assignOp ~ expression).?).map {
+  private val expression8: P[Expression] = infixl(expression7, op8)
+  private val expression9: P[Expression] = infixl(expression8, op9)
+  private val expression10: P[Expression] = infixl(expression9, op10)
+  private val expression11: P[Expression] = infixl(expression10, op11)
+  private val expression12: P[Expression] = infixl(expression11, op12)
+  private val expression13: P[Expression] =
+    P(expression12 ~ (assignOp ~ expression).?).map {
       case (e, None) => e
       case (lval, Some((op, rval))) => Assign(lval, op, rval)
     }
 
-  val expression: P[Expression] = P(expression8)
+  val expression: P[Expression] = P(expression13)
 
   val definition: P[Def] = P(
     defdef | valdef | vardef | structdef | enumdef | typedef
@@ -279,5 +284,10 @@ class Parser {
     O("==").as(InfixOp.Eq)
   | O("!=").as(InfixOp.Neq)
   )
+  private val op8: P[InfixOp] = P(O("&") as InfixOp.BitAnd)
+  private val op9: P[InfixOp] = P(O("^") as InfixOp.Xor)
+  private val op10: P[InfixOp] = P(O("|") as InfixOp.BitOr)
+  private val op11: P[InfixOp] = P(O("&&") as InfixOp.And)
+  private val op12: P[InfixOp] = P(O("||") as InfixOp.Or)
 
 }

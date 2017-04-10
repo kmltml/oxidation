@@ -55,6 +55,13 @@ object Codegen {
     case Typed(ast.UnitLit(), analyze.Type.U0) => Res.pure(Val.I(0, Type.U0))
 
     case Typed(ast.Var(n), _) => WriterT.lift(State.inspect(s => Val.R(s.registerBindings(n))))
+
+    case Typed(ast.InfixAp(InfixOp.And, left, right), analyze.Type.U1) =>
+      compileExpr(Typed(ast.If(left, right, Some(Typed(ast.BoolLit(false), analyze.Type.U1))), analyze.Type.U1))
+
+    case Typed(ast.InfixAp(InfixOp.Or, left, right), analyze.Type.U1) =>
+      compileExpr(Typed(ast.If(left, Typed(ast.BoolLit(true), analyze.Type.U1), Some(right)), analyze.Type.U1))
+
     case Typed(ast.InfixAp(op, left, right), valType) =>
       for {
         lval <- compileExpr(left)

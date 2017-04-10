@@ -75,6 +75,18 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
               Right(ast.InfixAp(InfixOp.Add, ast.Widen(ast.Var(l('x)) :: I8) :: I64, ast.Widen(ast.Var(l('y)) :: I32) :: I64) :: I64)
           }
         }
+        "Short-Circuit Boolean Ops" - {
+          "valid" - {
+            solveType(P.InfixAp(InfixOp.And, P.Var(l('x)), P.Var(l('y))), ExpectedType.Undefined,
+              Ctxt.default.withTerms(Map(l('x) -> imm(U1), l('y) -> imm(U1)))) ==>
+              Right(ast.InfixAp(InfixOp.And, ast.Var(l('x)) :: U1, ast.Var(l('y)) :: U1) :: U1)
+          }
+          "invalid" - {
+            solveType(P.InfixAp(InfixOp.Or, P.Var(l('x)), P.Var(l('y))), ExpectedType.Undefined,
+              Ctxt.default.withTerms(Map(l('x) -> imm(U1), l('y) -> imm(U16)))) ==>
+              Left(TyperError.CantMatch(ExpectedType.Specific(U1), U16))
+          }
+        }
       }
       "unary prefix operator expressions" - {
         findType(P.PrefixAp(PrefixOp.Inv, P.IntLit(64)), ExpectedType.Numeric(None)) ==> Right(I32)

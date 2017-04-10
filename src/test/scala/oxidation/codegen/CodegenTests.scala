@@ -59,6 +59,48 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             Inst.Move(r(0, _.I32), Op.Arith(InfixOp.Sub, 3, 2)),
             Inst.Move(r(1, _.I32), Op.Arith(InfixOp.Add, r(0, _.I32), 1))
           ), Val.R(r(1, _.I32)))
+        "Or" - {
+          compileExpr(ast.InfixAp(InfixOp.Or,
+            ast.App(ast.Var(g('foo)) :: Fun(Nil, U1), Nil) :: U1,
+            ast.App(ast.Var(g('bar)) :: Fun(Nil, U1), Nil) :: U1
+          ) :: U1).run.runA(CodegenState()).value ==> (insts(
+            Inst.Move(r(0, _.U1), Op.Call(Val.G(Name.Global(List("foo")), ir.Type.Fun(Nil, ir.Type.U1)), Nil)),
+            Inst.Flow(FlowControl.Branch(Val.R(r(0, _.U1)), Name.Local("if", 0), Name.Local("else", 0))),
+
+            Inst.Label(Name.Local("if", 0)),
+            Inst.Move(r(1, _.U1), Op.Copy(Val.I(1, ir.Type.U1))),
+            Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
+
+            Inst.Label(Name.Local("else", 0)),
+            Inst.Move(r(2, _.U1), Op.Call(Val.G(Name.Global(List("bar")), ir.Type.Fun(Nil, ir.Type.U1)), Nil)),
+            Inst.Move(r(1, _.U1), Op.Copy(Val.R(r(2, _.U1)))),
+            Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
+
+            Inst.Label(Name.Local("ifafter", 0))
+
+          ), Val.R(r(1, _.U1)))
+        }
+        "And" - {
+          compileExpr(ast.InfixAp(InfixOp.And,
+            ast.App(ast.Var(g('foo)) :: Fun(Nil, U1), Nil) :: U1,
+            ast.App(ast.Var(g('bar)) :: Fun(Nil, U1), Nil) :: U1
+          ) :: U1).run.runA(CodegenState()).value ==> (insts(
+            Inst.Move(r(0, _.U1), Op.Call(Val.G(Name.Global(List("foo")), ir.Type.Fun(Nil, ir.Type.U1)), Nil)),
+            Inst.Flow(FlowControl.Branch(Val.R(r(0, _.U1)), Name.Local("if", 0), Name.Local("else", 0))),
+
+            Inst.Label(Name.Local("if", 0)),
+            Inst.Move(r(2, _.U1), Op.Call(Val.G(Name.Global(List("bar")), ir.Type.Fun(Nil, ir.Type.U1)), Nil)),
+            Inst.Move(r(1, _.U1), Op.Copy(Val.R(r(2, _.U1)))),
+            Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
+
+            Inst.Label(Name.Local("else", 0)),
+            Inst.Move(r(1, _.U1), Op.Copy(Val.I(0, ir.Type.U1))),
+            Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
+
+            Inst.Label(Name.Local("ifafter", 0))
+
+          ), Val.R(r(1, _.U1)))
+        }
       }
       "PrefixAp" - {
         compileExpr(ast.PrefixAp(PrefixOp.Neg, ast.IntLit(20) :: I32) :: I32)
