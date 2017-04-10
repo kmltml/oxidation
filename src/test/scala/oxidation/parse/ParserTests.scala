@@ -143,6 +143,40 @@ object ParserTests extends TestSuite {
               ValDef("y", None, IntLit(20)),
               InfixAp(InfixOp.Add, Var("x"), Var("y"))
             ))
+        "whitespace before semicolon" - {
+          expr.parse(
+            """{
+              |  val x = 10 // hello
+              |  x + 20
+              |}
+            """.stripMargin).get.value ==>
+            Block(Vector(
+              ValDef("x", None, IntLit(10)),
+              InfixAp(InfixOp.Add, Var("x"), IntLit(20))
+            ))
+          // Notice extra whitespace following the val declaration line
+          // It has to stay there for this test to fulfill it's purpose
+          expr.parse(
+            """{
+              |  val x = 10
+              |  x + 20
+              |}
+            """.stripMargin).get.value ==>
+            Block(Vector(
+              ValDef("x", None, IntLit(10)),
+              InfixAp(InfixOp.Add, Var("x"), IntLit(20))
+            ))
+          expr.parse(
+            """{
+              |  val x = 10 /* hidere */
+              |  x + 20
+              |}
+            """.stripMargin).get.value ==>
+            Block(Vector(
+              ValDef("x", None, IntLit(10)),
+              InfixAp(InfixOp.Add, Var("x"), IntLit(20))
+            ))
+        }
       }
       "a function call" - {
         expr.parse("foo()").get.value ==> App(Var("foo"), Nil)

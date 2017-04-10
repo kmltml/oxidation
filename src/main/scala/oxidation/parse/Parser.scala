@@ -20,12 +20,16 @@ class Parser {
 
   val WSNoNL: P0 = {
     import fastparse.all._
-    (CharsWhile(c => c.isWhitespace && !"\r\n".contains(c), min = 1) | blockComment).rep ~ !CharPred("\r\n".contains(_))
+    P((CharsWhile(c => c.isWhitespace && !"\r\n".contains(c), min = 1) | NoCut(blockComment)).rep(min = 0))
+  }
+  val NL: P0 = {
+    import fastparse.all._
+    val lineComment = "//" ~/ CharsWhile(!"\r\n".contains(_), min = 0)
+    P("\r\n" | "\r" | "\n" | lineComment)
   }
   val WS: P0 = {
     import fastparse.all._
-    val lineComment = "//" ~/ CharsWhile(!"\r\n".contains(_), min = 0)
-    (CharsWhile(_.isWhitespace) | "\n" | "\r" | lineComment | blockComment).rep
+    (CharsWhile(_.isWhitespace) | NL | blockComment).rep
   }
 
   val White: WhitespaceApi.Wrapper = WhitespaceApi.Wrapper(WS)
@@ -104,10 +108,10 @@ class Parser {
     P(WS ~~ "." ~/ id.!).map(id => Select(_, id))
 
   private val semi: P0 =
-    P((";" | "\n" | "\r" | "\r\n") ~~ WS)
+    P(WSNoNL ~~ (";" | NL) ~~ WS)
 
   private val semiOrComa: P0 =
-    P((";" | "," | "\n" | "\r" | "\r\n") ~~ WS)
+    P((";" | "," | NL) ~~ WS)
 
   private def infixl(exp: => P[Expression], op: => P[InfixOp]): P[Expression] = P(
     exp ~ (op ~/ exp).rep
