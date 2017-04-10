@@ -125,6 +125,12 @@ class Amd64Target { this: Output =>
       case ir.Op.Trim(src) =>
         S.tell(mov(toVal(dest), toVal(src)))
 
+      case ir.Op.Unary(PrefixOp.Not, src) =>
+        S.tell(Vector(
+          mov(toVal(dest), toVal(src)),
+          xor(toVal(dest), 1)
+        ).combineAll)
+
       case ir.Op.Arith(op @ (InfixOp.Add | InfixOp.Sub), left, right) =>
         S.tell(Vector(
           mov(toVal(dest), toVal(left)),

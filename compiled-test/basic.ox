@@ -4,6 +4,7 @@ def basicTests() = {
     assert(5 * 2 == 10, "Multiplication")
     assert(8 / 2 == 4, "Division")
     assert(9 % 2 == 1, "Modulo")
+    assert(!false && (!true == false), "Not")
 
     shortcircuit()
 }
@@ -12,7 +13,7 @@ def shortcircuit(): u0 = {
     assert({
         var x = 0
         val b = (x == 1) && { x = 5; false }
-        (b == false) && x == 0 // TODO Not unary operator
+        !b && x == 0
     }, "Short-circuit And")
     assert({
         var x = 0
