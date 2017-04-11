@@ -27,7 +27,7 @@ object RegisterAllocatorTests extends TestSuite {
       "simple graph" - {
         val fun = Def.Fun(Name.Global(List("abs")), List(register(0, I32)), I32, Vector(
           Block(Name.Local("body", 0), Vector(
-            Inst.Move(register(1, U1), Op.Arith(InfixOp.Lt, register(0, I32), 0))
+            Inst.Move(register(1, U1), Op.Binary(InfixOp.Lt, register(0, I32), 0))
           ), FlowControl.Branch(register(1, U1), Name.Local("if", 0), Name.Local("else", 0))),
           Block(Name.Local("if", 0), Vector(
             Inst.Move(register(3, I32), Op.Unary(PrefixOp.Neg, register(0, I32))),
@@ -61,7 +61,7 @@ object RegisterAllocatorTests extends TestSuite {
               Op.Call(Val.G(Name.Global(List("add")), Fun(List(I32, I32), I32)),
                 List(register(3, I32), register(4, I32)))),
             Inst.Move(register(6, I32), Op.Copy(register(5, I32))),
-            Inst.Move(register(7, I32), Op.Arith(InfixOp.Add, register(2, I32), register(6, I32))),
+            Inst.Move(register(7, I32), Op.Binary(InfixOp.Add, register(2, I32), register(6, I32))),
             Inst.Move(register(8, I32), Op.Copy(register(7, I32)))
           ), FlowControl.Return(register(8, I32)))
         ), Set.empty)

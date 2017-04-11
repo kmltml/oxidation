@@ -17,7 +17,7 @@ object RegisterLifetimeTests extends TestSuite with IrValSyntax {
     "inputs" - {
       "just read" - {
         inputs(Block(Name.Local("test", 0), Vector(
-          Inst.Do(Op.Arith(InfixOp.Add, register(0, I32), register(1, I32))),
+          Inst.Do(Op.Binary(InfixOp.Add, register(0, I32), register(1, I32))),
           Inst.Do(Op.Copy(register(2, I32))),
           Inst.Do(Op.Unary(PrefixOp.Neg, register(3, I32))),
           Inst.Do(Op.Call(register(4, I8), List(register(5, I32))))
@@ -39,7 +39,7 @@ object RegisterLifetimeTests extends TestSuite with IrValSyntax {
       }
       "read and write in one instruction" - {
         inputs(Block(Name.Local("test", 6), Vector(
-          Inst.Move(register(0, I32), Op.Arith(InfixOp.Add, register(0, I32), 1))
+          Inst.Move(register(0, I32), Op.Binary(InfixOp.Add, register(0, I32), 1))
         ), FlowControl.Goto(Name.Local("test", 7)))) ==> Set(register(0, I32))
       }
       "read in flow" - {
@@ -51,7 +51,7 @@ object RegisterLifetimeTests extends TestSuite with IrValSyntax {
       "simple graph" - {
         val blocks = Vector(
           Block(Name.Local("body", 0), Vector(
-            Inst.Move(register(1, U1), Op.Arith(InfixOp.Lt, register(0, I32), 0))
+            Inst.Move(register(1, U1), Op.Binary(InfixOp.Lt, register(0, I32), 0))
           ), FlowControl.Branch(register(1, U1), Name.Local("if", 0), Name.Local("else", 0))),
           Block(Name.Local("if", 0), Vector(
             Inst.Move(register(3, I32), Op.Unary(PrefixOp.Neg, register(0, I32))),
@@ -88,7 +88,7 @@ object RegisterLifetimeTests extends TestSuite with IrValSyntax {
           0 -> Inst.Move(register(0, I32), Op.Copy(2)),
           1 -> Inst.Move(register(1, I32), Op.Copy(register(3, I32))),
           2 -> Inst.Move(register(5, I32), Op.Copy(5)),
-          3 -> Inst.Move(register(2, I32), Op.Arith(InfixOp.Add, register(0, I32), register(2, I32))),
+          3 -> Inst.Move(register(2, I32), Op.Binary(InfixOp.Add, register(0, I32), register(2, I32))),
           4 -> Inst.Flow(FlowControl.Branch(register(0, I32), null, null))
         ).map(_.swap)
         val ins = Set(register(2, I32), register(4, I32))

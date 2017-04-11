@@ -131,7 +131,7 @@ class Amd64Target { this: Output =>
           xor(toVal(dest), 1)
         ).combineAll)
 
-      case ir.Op.Arith(op @ (InfixOp.Add | InfixOp.Sub), left, right) =>
+      case ir.Op.Binary(op @ (InfixOp.Add | InfixOp.Sub), left, right) =>
         S.tell(Vector(
           mov(toVal(dest), toVal(left)),
           op match {
@@ -139,10 +139,10 @@ class Amd64Target { this: Output =>
             case InfixOp.Sub => sub(toVal(dest), toVal(right))
           }
         ).combineAll)
-      case ir.Op.Arith(InfixOp.Div, _, right) => S.tell(div(toVal(right)))
-      case ir.Op.Arith(InfixOp.Mod, _, right) => S.tell(div(toVal(right)))
-      case ir.Op.Arith(InfixOp.Mul, _, right) => S.tell(mul(toVal(right)))
-      case ir.Op.Arith(op @ (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq | InfixOp.Neq), left, right) =>
+      case ir.Op.Binary(InfixOp.Div, _, right) => S.tell(div(toVal(right)))
+      case ir.Op.Binary(InfixOp.Mod, _, right) => S.tell(div(toVal(right)))
+      case ir.Op.Binary(InfixOp.Mul, _, right) => S.tell(mul(toVal(right)))
+      case ir.Op.Binary(op @ (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq | InfixOp.Neq), left, right) =>
           S.tell(Vector(
             cmp(toVal(left), toVal(right)),
             op match {

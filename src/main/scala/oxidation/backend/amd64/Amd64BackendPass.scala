@@ -42,7 +42,7 @@ object Amd64BackendPass extends Pass {
     S.modify(s => s.copy(returnedStructs = s.returnedStructs + reg))
 
   override def onInstruction: Inst =?> F[Vector[Inst]] = {
-    case Inst.Move(dest, Op.Arith(op @ (InfixOp.Div | InfixOp.Mod) , l, r)) => // TODO handle signed case; deduplicate?
+    case Inst.Move(dest, Op.Binary(op @ (InfixOp.Div | InfixOp.Mod) , l, r)) => // TODO handle signed case; deduplicate?
       for {
         ltemp <- nextReg(l.typ)
         sextTemp <- nextReg(l.typ)
@@ -66,11 +66,11 @@ object Amd64BackendPass extends Pass {
         Inst.Move(sextTemp, Op.Copy(ir.Val.I(0, l.typ))),
         Inst.Move(rtemp, Op.Copy(r)),
         Inst.Do(Op.Copy(ir.Val.R(sextTemp))),
-        Inst.Move(destTemp, Op.Arith(op, ir.Val.R(ltemp), ir.Val.R(rtemp))),
+        Inst.Move(destTemp, Op.Binary(op, ir.Val.R(ltemp), ir.Val.R(rtemp))),
         Inst.Move(otherTemp, Op.Garbled),
         Inst.Move(dest, Op.Copy(ir.Val.R(destTemp)))
       )
-    case Inst.Move(dest, Op.Arith(InfixOp.Mul , l, r)) => // TODO handle signed case
+    case Inst.Move(dest, Op.Binary(InfixOp.Mul , l, r)) => // TODO handle signed case
       for {
         ltemp <- nextReg(l.typ)
         sextTemp <- nextReg(l.typ)
@@ -87,7 +87,7 @@ object Amd64BackendPass extends Pass {
         Inst.Move(ltemp, Op.Copy(l)),
         Inst.Move(sextTemp, Op.Copy(ir.Val.I(0, l.typ))),
         Inst.Move(rtemp, Op.Copy(r)),
-        Inst.Move(destTemp, Op.Arith(InfixOp.Mul, ir.Val.R(ltemp), ir.Val.R(rtemp))),
+        Inst.Move(destTemp, Op.Binary(InfixOp.Mul, ir.Val.R(ltemp), ir.Val.R(rtemp))),
         Inst.Move(otherTemp, Op.Garbled),
         Inst.Move(dest, Op.Copy(ir.Val.R(destTemp)))
       )
@@ -128,7 +128,7 @@ object Amd64BackendPass extends Pass {
         })))
       } yield Vector(Inst.Move(dest, Op.Garbled))
 
-    case inst @ Inst.Move(dest, Op.Arith(InfixOp.Add | InfixOp.Sub, l, r)) =>
+    case inst @ Inst.Move(dest, Op.Binary(InfixOp.Add | InfixOp.Sub, l, r)) =>
       F.pure(Vector(
         inst, Inst.Do(Op.Copy(r))
       ))

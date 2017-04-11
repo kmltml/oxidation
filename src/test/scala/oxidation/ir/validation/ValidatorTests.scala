@@ -174,56 +174,56 @@ object ValidatorTests extends TestSuite with IrValSyntax {
       "Arith" - {
         "Arithmetic" - {
           "valid" - {
-            validateInstruction(loc, Inst.Move(r(2, I32), Op.Arith(InfixOp.Add, r(0, I32), r(1, I32))))
+            validateInstruction(loc, Inst.Move(r(2, I32), Op.Binary(InfixOp.Add, r(0, I32), r(1, I32))))
               .value.runA(Set(r(0, I32), r(1, I32))).value ==> Right(())
           }
           "invalid" - {
             "not numeric" - {
-              validateInstruction(loc, Inst.Move(r(2, I32), Op.Arith(InfixOp.Add, r(0, U1), r(1, U1))))
+              validateInstruction(loc, Inst.Move(r(2, I32), Op.Binary(InfixOp.Add, r(0, U1), r(1, U1))))
                 .value.runA(Set(r(0, U1), r(1, U1))).value ==> Left(ValidationError.NotANumericType(loc, U1))
             }
             "different operand types" - {
-              validateInstruction(loc, Inst.Move(r(2, I32), Op.Arith(InfixOp.Add, r(0, I32), r(1, I64))))
+              validateInstruction(loc, Inst.Move(r(2, I32), Op.Binary(InfixOp.Add, r(0, I32), r(1, I64))))
                 .value.runA(Set(r(0, I32), r(1, I64))).value ==> Left(ValidationError.WrongType(loc, I32, I64))
             }
             "wrong dest type" - {
-              validateInstruction(loc, Inst.Move(r(2, I64), Op.Arith(InfixOp.Add, r(0, I32), r(1, I32))))
+              validateInstruction(loc, Inst.Move(r(2, I64), Op.Binary(InfixOp.Add, r(0, I32), r(1, I32))))
                 .value.runA(Set(r(0, I32), r(1, I32))).value ==> Left(ValidationError.WrongType(loc, I64, I32))
             }
           }
         }
         "Comparison" - {
           "valid" - {
-            validateInstruction(loc, Inst.Move(r(2, U1), Op.Arith(InfixOp.Lt, r(0, I32), r(1, I32))))
+            validateInstruction(loc, Inst.Move(r(2, U1), Op.Binary(InfixOp.Lt, r(0, I32), r(1, I32))))
               .value.runA(Set(r(0, I32), r(1, I32))).value ==> Right(())
           }
           "invalid" - {
             "not numeric" - {
-              validateInstruction(loc, Inst.Move(r(2, U1), Op.Arith(InfixOp.Lt, r(0, U1), r(1, U1))))
+              validateInstruction(loc, Inst.Move(r(2, U1), Op.Binary(InfixOp.Lt, r(0, U1), r(1, U1))))
                 .value.runA(Set(r(0, U1), r(1, U1))).value ==> Left(ValidationError.NotANumericType(loc, U1))
             }
             "different operand types" - {
-              validateInstruction(loc, Inst.Move(r(2, U1), Op.Arith(InfixOp.Lt, r(0, I32), r(1, I64))))
+              validateInstruction(loc, Inst.Move(r(2, U1), Op.Binary(InfixOp.Lt, r(0, I32), r(1, I64))))
                 .value.runA(Set(r(0, I32), r(1, I64))).value ==> Left(ValidationError.WrongType(loc, I32, I64))
             }
             "wrong dest type" - {
-              validateInstruction(loc, Inst.Move(r(2, Ptr), Op.Arith(InfixOp.Lt, r(0, I32), r(1, I32))))
+              validateInstruction(loc, Inst.Move(r(2, Ptr), Op.Binary(InfixOp.Lt, r(0, I32), r(1, I32))))
                 .value.runA(Set(r(0, I32), r(1, I32))).value ==> Left(ValidationError.WrongType(loc, Ptr, U1))
             }
           }
         }
         "Equality" - {
           "valid" - {
-            validateInstruction(loc, Inst.Move(r(2, U1), Op.Arith(InfixOp.Eq, r(0, I32), r(1, I32))))
+            validateInstruction(loc, Inst.Move(r(2, U1), Op.Binary(InfixOp.Eq, r(0, I32), r(1, I32))))
               .value.runA(Set(r(0, I32), r(1, I32))).value ==> Right(())
           }
           "invalid" - {
             "different operand types" - {
-              validateInstruction(loc, Inst.Move(r(2, U1), Op.Arith(InfixOp.Eq, r(0, I32), r(1, I64))))
+              validateInstruction(loc, Inst.Move(r(2, U1), Op.Binary(InfixOp.Eq, r(0, I32), r(1, I64))))
                 .value.runA(Set(r(0, I32), r(1, I64))).value ==> Left(ValidationError.WrongType(loc, I32, I64))
             }
             "wrong dest type" - {
-              validateInstruction(loc, Inst.Move(r(2, Ptr), Op.Arith(InfixOp.Eq, r(0, I32), r(1, I32))))
+              validateInstruction(loc, Inst.Move(r(2, Ptr), Op.Binary(InfixOp.Eq, r(0, I32), r(1, I32))))
                 .value.runA(Set(r(0, I32), r(1, I32))).value ==> Left(ValidationError.WrongType(loc, Ptr, U1))
             }
           }
@@ -231,25 +231,25 @@ object ValidatorTests extends TestSuite with IrValSyntax {
         "Bit" - {
           "valid" - {
             "numeric" - {
-              validateInstruction(loc, Inst.Move(r(2, I32), Op.Arith(InfixOp.Xor, r(0, I32), r(1, I32))))
+              validateInstruction(loc, Inst.Move(r(2, I32), Op.Binary(InfixOp.Xor, r(0, I32), r(1, I32))))
                 .value.runA(Set(r(0, I32), r(1, I32))).value ==> Right(())
             }
             "boolean" - {
-              validateInstruction(loc, Inst.Move(r(2, U1), Op.Arith(InfixOp.Xor, r(0, U1), r(1, U1))))
+              validateInstruction(loc, Inst.Move(r(2, U1), Op.Binary(InfixOp.Xor, r(0, U1), r(1, U1))))
                 .value.runA(Set(r(0, U1), r(1, U1))).value ==> Right(())
             }
           }
           "invalid" - {
             "not numeric or boolean" - {
-              validateInstruction(loc, Inst.Move(r(2, Ptr), Op.Arith(InfixOp.Xor, r(0, Ptr), r(1, Ptr))))
+              validateInstruction(loc, Inst.Move(r(2, Ptr), Op.Binary(InfixOp.Xor, r(0, Ptr), r(1, Ptr))))
                 .value.runA(Set(r(0, Ptr), r(1, Ptr))).value ==> Left(ValidationError.NotANumericType(loc, Ptr))
             }
             "different operand types" - {
-              validateInstruction(loc, Inst.Move(r(2, I32), Op.Arith(InfixOp.BitAnd, r(0, I32), r(1, I64))))
+              validateInstruction(loc, Inst.Move(r(2, I32), Op.Binary(InfixOp.BitAnd, r(0, I32), r(1, I64))))
                 .value.runA(Set(r(0, I32), r(1, I64))).value ==> Left(ValidationError.WrongType(loc, I32, I64))
             }
             "wrong dest type" - {
-              validateInstruction(loc, Inst.Move(r(2, Ptr), Op.Arith(InfixOp.BitOr, r(0, I32), r(1, I32))))
+              validateInstruction(loc, Inst.Move(r(2, Ptr), Op.Binary(InfixOp.BitOr, r(0, I32), r(1, I32))))
                 .value.runA(Set(r(0, I32), r(1, I32))).value ==> Left(ValidationError.WrongType(loc, Ptr, I32))
             }
           }

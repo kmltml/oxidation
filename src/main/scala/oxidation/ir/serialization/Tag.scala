@@ -26,8 +26,8 @@ object Tag {
   }
 
   object Op {
-    final val Arith = 0
-    final val Call  = 1 + Arith
+    final val Binary = 0
+    final val Call  = 1 + Binary
     final val Copy  = 1 + Call
     final val Unary = 1 + Copy
     final val Load  = 1 + Unary

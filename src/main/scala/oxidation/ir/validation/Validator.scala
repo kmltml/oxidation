@@ -128,7 +128,7 @@ object Validator {
         _ <- cond(rightType == Type.U1, ValidationError.WrongType(loc, Type.U1, rightType))
       } yield Some(Type.U1)
     }
-    case Op.Arith(InfixOp.Add | InfixOp.Sub | InfixOp.Mul | InfixOp.Div | InfixOp.Mod | InfixOp.Shl | InfixOp.Shr, left, right) =>
+    case Op.Binary(InfixOp.Add | InfixOp.Sub | InfixOp.Mul | InfixOp.Div | InfixOp.Mod | InfixOp.Shl | InfixOp.Shr, left, right) =>
       for {
         ltype <- valType(loc, left)
         _ <- cond(ltype.isInstanceOf[Type.Num], ValidationError.NotANumericType(loc, ltype))
@@ -136,21 +136,21 @@ object Validator {
         _ <- cond(ltype == rtype, ValidationError.WrongType(loc, ltype, rtype))
       } yield Some(ltype)
 
-    case Op.Arith(InfixOp.Eq | InfixOp.Neq, left, right) =>
+    case Op.Binary(InfixOp.Eq | InfixOp.Neq, left, right) =>
       for {
         ltype <- valType(loc, left)
         rtype <- valType(loc, right)
         _ <- cond(ltype == rtype, ValidationError.WrongType(loc, ltype, rtype))
       } yield Some(Type.U1)
 
-    case Op.Arith(InfixOp.Lt | InfixOp.Leq | InfixOp.Gt | InfixOp.Geq, left, right) =>
+    case Op.Binary(InfixOp.Lt | InfixOp.Leq | InfixOp.Gt | InfixOp.Geq, left, right) =>
       for {
         ltype <- valType(loc, left)
         _ <- cond(ltype.isInstanceOf[Type.Num], ValidationError.NotANumericType(loc, ltype))
         rtype <- valType(loc, right)
         _ <- cond(ltype == rtype, ValidationError.WrongType(loc, ltype, rtype))
       } yield Some(Type.U1)
-    case Op.Arith(InfixOp.Xor | InfixOp.BitAnd | InfixOp.BitOr, left, right) =>
+    case Op.Binary(InfixOp.Xor | InfixOp.BitAnd | InfixOp.BitOr, left, right) =>
       for {
         ltype <- valType(loc, left)
         _ <- cond(ltype.isInstanceOf[Type.Num] || ltype == Type.U1, ValidationError.NotANumericType(loc, ltype))

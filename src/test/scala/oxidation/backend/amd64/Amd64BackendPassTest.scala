@@ -61,7 +61,7 @@ object Amd64BackendPassTest extends TestSuite with IrValSyntax {
           Block(Name.Local("body", 0), Vector(
             Inst.Move(register(2, I32), Op.Copy(register(0, I32))),
             Inst.Move(register(3, I32), Op.Copy(register(1, I32))),
-            Inst.Move(register(4, I32), Op.Arith(InfixOp.Div, register(2, I32), register(3, I32))),
+            Inst.Move(register(4, I32), Op.Binary(InfixOp.Div, register(2, I32), register(3, I32))),
             Inst.Move(register(5, I32), Op.Copy(register(4, I32)))
           ), FlowControl.Return(register(5, I32)))
         ), Set.empty)).run.runA(pass.St()).value ==> (Set(
@@ -81,7 +81,7 @@ object Amd64BackendPassTest extends TestSuite with IrValSyntax {
             Inst.Move(br(1, I32), Op.Copy(0)),
             Inst.Move(br(2, I32), Op.Copy(register(3, I32))),
             Inst.Do(Op.Copy(br(1, I32))),
-            Inst.Move(br(3, I32), Op.Arith(InfixOp.Div, br(0, I32), br(2, I32))),
+            Inst.Move(br(3, I32), Op.Binary(InfixOp.Div, br(0, I32), br(2, I32))),
             Inst.Move(br(4, I32), Op.Garbled),
             Inst.Move(register(4, I32), Op.Copy(br(3, I32))),
 

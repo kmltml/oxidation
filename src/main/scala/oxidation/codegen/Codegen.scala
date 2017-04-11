@@ -68,7 +68,7 @@ object Codegen {
         rval <- compileExpr(right)
         res <- genReg(translateType(valType))
         _ <- instructions(
-          Inst.Move(res, Op.Arith(op, lval, rval))
+          Inst.Move(res, Op.Binary(op, lval, rval))
         )
       } yield Val.R(res)
 
@@ -116,7 +116,7 @@ object Codegen {
     case Typed(ast.Block(stmnts), typ) =>
       for {
         bindings <- storeBindings
-        vals <- stmnts.toVector.traverse {
+        vals <- stmnts.traverse {
           case t @ Typed(_: ast.Expression, _) => compileExpr(t.asInstanceOf[Typed[ast.Expression]])
           case Typed(ast.ValDef(name, _, expr), _) =>
             for {
@@ -227,9 +227,17 @@ object Codegen {
 
     case Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), params), t) =>
       for {
-        r <- genReg(translateType(t))
         ptrv <- compileExpr(ptr)
-        offv <- params.headOption.traverse(compileExpr)
+        offv <- params.headOption.traverse { off =>
+          for {
+            v <- compileExpr(off)
+            r <- genReg(Type.I64)
+            _ <- instructions(
+              Inst.Move(r, Op.Binary(InfixOp.Mul, v, Val.I(translateType(t).size, Type.I64)))
+            )
+          } yield Val.R(r)
+        }
+        r <- genReg(translateType(t))
         _ <- instructions(
           Inst.Move(r, Op.Load(ptrv, offv getOrElse Val.I(0, Type.I64)))
         )
@@ -244,11 +252,20 @@ object Codegen {
         )
       } yield Val.I(0, ir.Type.U0)
 
-    case Typed(ast.Assign(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), params), _), None, rval), _) =>
+    case Typed(ast.Assign(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), params), pointee), None, rval), _) =>
+      // TODO pointee should be extracted from the pointer type, but Type.Ptr(_) contains an unresolved typename, some consideration is needed here
       for {
         right <- compileExpr(rval)
         ptrv <- compileExpr(ptr)
-        offv <- params.headOption.traverse(compileExpr)
+        offv <- params.headOption.traverse { v =>
+          for {
+            vv <- compileExpr(v)
+            r <- genReg(Type.I64)
+            _ <- instructions(
+              Inst.Move(r, Op.Binary(InfixOp.Mul, vv, Val.I(translateType(pointee).size, Type.I64)))
+            )
+          } yield Val.R(r)
+        }
         _ <- instructions(
           Inst.Do(Op.Store(ptrv, offv getOrElse Val.I(0, Type.I64), right))
         )
