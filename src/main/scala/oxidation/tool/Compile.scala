@@ -81,7 +81,8 @@ object Compile {
         else Right(())
       passes: List[Pass] = List(
         pass.ExplicitBlocks,
-        pass.StructLowering
+        pass.StructLowering,
+        pass.ConstantRemoval
       )
       passed <- passes.foldLeft(Right(irDefs): Either[CompileError, Set[ir.Def]]) { (defs, pass) =>
         defs.flatMap { defs =>
