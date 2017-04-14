@@ -8,7 +8,9 @@ import cats.implicits._
 import <->.EdgeSyntax
 import oxidation.ir.RegisterNamespace
 
-class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs: List[Reg]) {
+abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs: List[Reg]) {
+
+  def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun
 
   sealed trait Alloc
   final case class R(r: Reg) extends Alloc
@@ -153,56 +155,58 @@ class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs
     case Nil => graph
   }
 
-  def allocate(fun: ir.Def.Fun, precoloured: Map[ir.Register, Reg]): Map[ir.Register, Alloc] = {
+  def allocate(originalFun: ir.Def.Fun, precoloured: Map[ir.Register, Reg]): (Map[ir.Register, Alloc], ir.Def.Fun) = {
 
-    def simplifyCoalesce(initialGraph: Graph, graph: Graph, removedNodes: RemovedNodes): Map[ir.Register, Alloc] = {
+    def simplifyCoalesce(spilled: Set[ir.Register], fun: ir.Def.Fun, graph: Graph, removedNodes: RemovedNodes): (Map[ir.Register, Alloc], ir.Def.Fun) = {
       val (g1, newRemoved) = simplify(graph, removedNodes)
       val g2 = coalesce(g1)
       (g2, newRemoved) match {
         case (graph, removedNodes) =>
           if (graph.nodes.forall(graph.precoloured)) {
-            select(graph, removedNodes).colours.flatMap {
+            (select(graph, removedNodes).colours.flatMap {
               case (k, v) => k.map(_ -> R(v))
-            }
+            }, fun)
           } else if (graph.nodes.exists(n => graph.degree(n) < colourCount && !graph.moveRelated(n) && !graph.precoloured(n))) {
-            simplifyCoalesce(initialGraph, graph, removedNodes)
+            simplifyCoalesce(spilled, fun, graph, removedNodes)
           } else if (graph.preferenceEdges.nonEmpty) {
-            removeConflicting(initialGraph, graph, removedNodes)
+            removeConflicting(spilled, fun, graph, removedNodes)
           } else {
-            spill(initialGraph, graph.nodes)
+            spill(spilled, graph.nodes)
           }
       }
     }
 
-    def removeConflicting(initialGraph: Graph, graph: Graph, removedNodes: RemovedNodes): Map[ir.Register, Alloc] = {
+    def removeConflicting(spilled: Set[ir.Register], fun: ir.Def.Fun, graph: Graph, removedNodes: RemovedNodes): (Map[ir.Register, Alloc], ir.Def.Fun) = {
       val conflicting = graph.preferenceEdges.filter {
         case a <-> b => graph.interfering(a, b)
       }
       if(conflicting.nonEmpty) {
-        simplifyCoalesce(initialGraph, graph.copy(preferenceEdges = graph.preferenceEdges -- conflicting), removedNodes)
+        simplifyCoalesce(spilled, fun, graph.copy(preferenceEdges = graph.preferenceEdges -- conflicting), removedNodes)
       } else {
-        freeze(initialGraph, graph, removedNodes)
+        freeze(spilled, fun, graph, removedNodes)
       }
     }
 
-    def freeze(initialGraph: Graph, graph: Graph, removedNodes: RemovedNodes): Map[ir.Register, Alloc] = {
+    def freeze(spilled: Set[ir.Register], fun: ir.Def.Fun, graph: Graph, removedNodes: RemovedNodes): (Map[ir.Register, Alloc], ir.Def.Fun) = {
       graph.preferenceEdges.find {
         case a <-> b => graph.degree(a) < colourCount || graph.degree(b) < colourCount
       } match {
-        case None => spill(initialGraph, graph.nodes)
-        case Some(e) => simplifyCoalesce(initialGraph, graph.copy(preferenceEdges = graph.preferenceEdges - e), removedNodes)
+        case None => spill(spilled, graph.nodes)
+        case Some(e) => simplifyCoalesce(spilled, fun, graph.copy(preferenceEdges = graph.preferenceEdges - e), removedNodes)
       }
     }
 
-    def spill(initialGraph: Graph, candidates: Set[Set[ir.Register]]): Map[ir.Register, Alloc] = {
+    def spill(spilled: Set[ir.Register], candidates: Set[Set[ir.Register]]): (Map[ir.Register, Alloc], ir.Def.Fun) = {
       val regToSpill = candidates.find(_.size == 1).map(_.head).getOrElse(candidates.flatten.head)
-      val graph = initialGraph - Set(regToSpill)
-      simplifyCoalesce(graph, graph, Nil).updated(regToSpill, Spill)
+      val newSpilled = spilled + regToSpill
+      val spillfill = rebuildAfterSpill(originalFun, newSpilled)
+      val graph = (buildInterferenceGraph(spillfill) -- newSpilled).mapVar(Set(_))
+      simplifyCoalesce(newSpilled, spillfill, graph, Nil).leftMap(_.updated(regToSpill, Spill))
     }
 
-    val g = buildInterferenceGraph(fun)
+    val g = buildInterferenceGraph(originalFun)
     val initialGraph: Graph = g.copy(colours = g.colours ++ precoloured).mapVar(Set(_))
-    simplifyCoalesce(initialGraph, initialGraph, Nil)
+    simplifyCoalesce(Set.empty, originalFun, initialGraph, Nil)
   }
 
 }

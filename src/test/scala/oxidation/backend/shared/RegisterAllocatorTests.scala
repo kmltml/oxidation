@@ -18,7 +18,9 @@ object RegisterAllocatorTests extends TestSuite {
   val allocator = new RegisterAllocator[Int](
     calleeSavedRegs = List(0, 1, 2, 3, 4),
     callerSavedRegs = List(5, 6, 7, 8, 9)
-  )
+  ) {
+    def rebuildAfterSpill(fun: Def.Fun, spilled: Set[Register]): Def.Fun = fun
+  }
 
   def vr(index: Int, typ: Type): Register = Register(allocator.VirtualReg, index, typ)
 

@@ -32,7 +32,12 @@ class Amd64Target { this: Output =>
   }
 
   val allocator: RegisterAllocator[RegLoc] =
-    new RegisterAllocator[RegLoc](RegLoc.calleeSaved, RegLoc.callerSaved)
+    new RegisterAllocator[RegLoc](RegLoc.calleeSaved, RegLoc.callerSaved) {
+
+      override def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun =
+        RegisterSpillPass.txDef(fun).runEmptyA.run(spilled).head.asInstanceOf[ir.Def.Fun]
+
+    }
 
   def regSize(t: ir.Type): RegSize = t match {
     case ir.Type.U0 | ir.Type.U1 | ir.Type.U8 | ir.Type.I8 => RegSize.Byte
@@ -60,8 +65,8 @@ class Amd64Target { this: Output =>
     case ir.Def.ExternFun(name, _, _) =>
       extern(name)
     case ir.Def.Fun(name, _, _, _, _) =>
-      val (precolours, Vector(fun @ ir.Def.Fun(_, _, _, blocks, _))) = Amd64BackendPass.txDef(d).run.runA(Amd64BackendPass.St()).value
-      val allocations = allocator.allocate(fun, precolours.toMap)
+      val (precolours, Vector(unallocatedFun: ir.Def.Fun)) = Amd64BackendPass.txDef(d).run.runA(Amd64BackendPass.St()).value
+      val (allocations, fun) = allocator.allocate(unallocatedFun, precolours.toMap)
       val spills = allocations.collect {
         case (r, allocator.Spill) => r
       }.zipWithIndex.toMap
@@ -73,7 +78,7 @@ class Amd64Target { this: Output =>
         case allocator.R(l) if RegLoc.calleeSaved.contains(l) => l
       }.toList.distinct
       val requiredStackSpace = spills.size + 4 // 4 qwords of shadow space for called procedures
-      val res: S[Unit] = blocks.traverse_ {
+      val res: S[Unit] = fun.body.traverse_ {
         case ir.Block(name, instructions, flow) =>
           for {
             _ <- S.tell(label(name))

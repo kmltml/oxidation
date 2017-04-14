@@ -29,6 +29,8 @@ case class InterferenceGraph[Var, Reg](nodes: Set[Var], colours: Map[Var, Reg],
       case a <-> b => !(a == v || b == v)
     })
 
+  def --(vs: Set[Var]): InterferenceGraph[Var, Reg] = vs.foldLeft(this)(_ - _)
+
   def neighbors(v: Var): Set[Var] = interferenceEdges.collect {
     case `v` <-> a => a
     case a <-> `v` => a
