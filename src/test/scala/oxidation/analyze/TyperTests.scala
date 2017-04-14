@@ -222,6 +222,10 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
           }
         }
       }
+      "Stackalloc" - {
+        solveType(P.TypeApp(P.Var(g('stackalloc)), List(TypeName.Named(g('i64)))), ExpectedType.Undefined, Ctxt.default) ==>
+          Right(ast.Stackalloc(I64) :: Ptr(TypeName.Named(g('i64))))
+      }
     }
   }
 

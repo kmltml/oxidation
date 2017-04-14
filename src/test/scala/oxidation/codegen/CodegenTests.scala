@@ -268,6 +268,13 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
           }
         }
       }
+      "Stackalloc" - {
+        compileExpr(ast.Stackalloc(I64) :: Ptr(TypeName.Named(g('i64))))
+          .run.runA(CodegenState()).value ==>
+          (insts(
+            Inst.Move(r(0, _.Ptr), Op.Stackalloc(8))
+          ), Val.R(r(0, _.Ptr)))
+      }
     }
     "compileDef" - {
       import Codegen.compileDef

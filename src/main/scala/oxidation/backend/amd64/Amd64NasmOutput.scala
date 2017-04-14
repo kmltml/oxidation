@@ -23,13 +23,13 @@ trait Amd64NasmOutput extends Output {
         case (r, i) => s"${r.toString.toLowerCase} * $i"
       }
       val off = if(offset == 0) None else Some(offset)
-      val s = size match {
-        case RegSize.Byte => "byte"
-        case RegSize.Word => "word"
-        case RegSize.DWord => "dword"
-        case RegSize.QWord => "qword"
-      }
-      show"$s [${(rs ++ off) mkString " + "}]"
+      val s = size map {
+        case RegSize.Byte => "byte "
+        case RegSize.Word => "word "
+        case RegSize.DWord => "dword "
+        case RegSize.QWord => "qword "
+      } getOrElse ""
+      show"$s[${(rs ++ off) mkString " + "}]"
   }
 
   private implicit val showName: Show[Name] = {
@@ -85,6 +85,9 @@ trait Amd64NasmOutput extends Output {
 
   override def movsxd(dest: Val, src: Val): M =
     ln(show"movsxd $dest, $src")
+
+  override def lea(dest: Val, src: Val): M =
+    ln(show"lea $dest, $src")
 
   override def add(dest: Val, src: Val): M =
     ln(show"add $dest, $src")

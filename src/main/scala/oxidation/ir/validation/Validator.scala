@@ -157,6 +157,9 @@ object Validator {
         rtype <- valType(loc, right)
         _ <- cond(ltype == rtype, ValidationError.WrongType(loc, ltype, rtype))
       } yield Some(ltype)
+
+    case Op.Stackalloc(_) =>
+      ES.pure(Some(Type.Ptr))
   }
 
   private def valType(loc: Location, v: Val): EitherT[State[Set[Register], ?], ValidationError, Type] = v match {

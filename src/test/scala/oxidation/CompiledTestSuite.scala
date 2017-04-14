@@ -27,7 +27,7 @@ object CompiledTestSuite extends TestSuite {
         builder ++= s += '\n'
     }
     val res = Process(exeFile.getAbsolutePath) ! log
-    if(res != 0) throw AssertionError(s"Compiled test failed: ${builder.toString}", Seq.empty)
+    if(res != 0) throw AssertionError(s"Compiled test failed: ${builder.toString} with error code $res", Seq.empty)
   }
 
 }

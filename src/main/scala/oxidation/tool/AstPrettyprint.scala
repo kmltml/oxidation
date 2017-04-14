@@ -172,6 +172,9 @@ trait AstPrettyprint {
 
     case ast.Ignore(expr) =>
       s"Ignore$typeInfo(".p + prettyprintTypedExp(expr) + ")"
+
+    case ast.Stackalloc(pointee) =>
+      s"Stackalloc$typeInfo(".p + prettyprintTypeInfo(pointee) + ")"
   }
 
   def stringify(p: P): String = {

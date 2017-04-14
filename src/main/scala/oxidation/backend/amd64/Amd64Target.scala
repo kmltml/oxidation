@@ -51,6 +51,10 @@ class Amd64Target { this: Output =>
     case ir.Type.I8 | ir.Type.I16 | ir.Type.I32 | ir.Type.I64 => Signed
   }
 
+  def stackAllocOffset(index: Int): Int =
+    if(index >= 0 && index <= 3) 0x10 + index * 8 // shadow space allocated by caller
+    else -8 - (index - 4)*8
+
   def outputConstants(cs: Map[ir.ConstantPoolEntry, Name]): M =
     data |+| cs.toVector.foldMap((outputConstant _).tupled)
 
@@ -67,17 +71,17 @@ class Amd64Target { this: Output =>
     case ir.Def.Fun(name, _, _, _, _) =>
       val (precolours, Vector(unallocatedFun: ir.Def.Fun)) = Amd64BackendPass.txDef(d).run.runA(Amd64BackendPass.St()).value
       val (allocations, fun) = allocator.allocate(unallocatedFun, precolours.toMap)
-      val spills = allocations.collect {
-        case (r, allocator.Spill) => r
-      }.zipWithIndex.toMap
-      val bindings = allocations.map {
-        case (reg, allocator.R(r)) => reg -> Val.R(Reg(r, regSize(reg.typ)))
-        case (r, allocator.Spill) => r -> Val.m(regSize(r.typ), RBP, -8 * spills(r))
-      }
       val calleeSaved = allocations.values.collect {
         case allocator.R(l) if RegLoc.calleeSaved.contains(l) => l
       }.toList.distinct
-      val requiredStackSpace = spills.size + 4 // 4 qwords of shadow space for called procedures
+      val spills = allocations.collect {
+        case (r, allocator.Spill) => r
+      }.zipWithIndex.toMap.mapValues(_ + calleeSaved.size)
+      val bindings = allocations.map {
+        case (reg, allocator.R(r)) => reg -> Val.R(Reg(r, regSize(reg.typ)))
+        case (r, allocator.Spill) => r -> Val.m(Some(regSize(r.typ)), RBP, stackAllocOffset(spills(r)))
+      }
+      val requiredStackSpace = calleeSaved.size + spills.size
       val res: S[Unit] = fun.body.traverse_ {
         case ir.Block(name, instructions, flow) =>
           for {
@@ -106,7 +110,7 @@ class Amd64Target { this: Output =>
     case ir.Inst.Do(ir.Op.Store(addr, offset, value)) =>
       assert(regSize(addr.typ) == RegSize.QWord)
       assert(regSize(offset.typ) == RegSize.QWord)
-      S.tell(move(Val.m(regSize(value.typ), toVal(addr), toVal(offset)), toVal(value)))
+      S.tell(move(Val.m(Some(regSize(value.typ)), toVal(addr), toVal(offset)), toVal(value)))
 
     case ir.Inst.Eval(_, ir.Op.Call(ir.Val.G(fun, _), params)) =>
       if(params.drop(4).nonEmpty) throw new NotImplementedError("passing parameters on stack is not yet supported")
@@ -118,7 +122,7 @@ class Amd64Target { this: Output =>
 
         case (Unsigned, RegSize.QWord, RegSize.DWord) =>
           val Val.R(Reg(destLoc, _)) = toVal(dest)
-          S.tell(mov(Reg(destLoc, RegSize.DWord), toVal(src)))
+          S.tell(move(Reg(destLoc, RegSize.DWord), toVal(src)))
 
         case (Signed, RegSize.QWord, RegSize.DWord) =>
           S.tell(movsxd(toVal(dest), toVal(src)))
@@ -128,17 +132,17 @@ class Amd64Target { this: Output =>
       }
 
       case ir.Op.Trim(src) =>
-        S.tell(mov(toVal(dest), toVal(src)))
+        S.tell(move(toVal(dest), toVal(src)))
 
       case ir.Op.Unary(PrefixOp.Not, src) =>
         S.tell(Vector(
-          mov(toVal(dest), toVal(src)),
+          move(toVal(dest), toVal(src)),
           xor(toVal(dest), 1)
         ).combineAll)
 
       case ir.Op.Binary(op @ (InfixOp.Add | InfixOp.Sub), left, right) =>
         S.tell(Vector(
-          mov(toVal(dest), toVal(left)),
+          move(toVal(dest), toVal(left)),
           op match {
             case InfixOp.Add => add(toVal(dest), toVal(right))
             case InfixOp.Sub => sub(toVal(dest), toVal(right))
@@ -167,15 +171,23 @@ class Amd64Target { this: Output =>
         assert(regSize(addr.typ) == RegSize.QWord)
         assert(regSize(off.typ) == RegSize.QWord)
         S.tell(
-          mov(toVal(dest), Val.m(regSize(dest.typ), toVal(addr), toVal(off)))
+          mov(toVal(dest), Val.m(Some(regSize(dest.typ)), toVal(addr), toVal(off)))
         )
+
+      case ir.Op.Stackalloc(size) =>
+        val allocSize = (size + 7) & ~7 // align to 8 bytes
+        assert(allocSize >= size && allocSize % 8 == 0)
+        S.tell(Vector(
+          sub(RSP, allocSize),
+          lea(toVal(dest), Val.m(None, RSP, 32))
+        ).combineAll)
     }
   }
 
   def outputFlow(f: ir.FlowControl, localCount: Int, savedRegs: List[RegLoc])(implicit bindings: Map[ir.Register, Val], constants: Map[ir.ConstantPoolEntry, Name]): S[Unit] = f match {
     case ir.FlowControl.Return(r) =>
       S.tell(Vector(
-        epilogue(localCount, savedRegs),
+        epilogue(savedRegs),
         ret
       ).combineAll)
     case ir.FlowControl.Goto(n) => S.tell(jmp(n))
@@ -190,13 +202,12 @@ class Amd64Target { this: Output =>
   def prologue(localCount: Int, regsToSave: List[RegLoc]): M = Vector(
     push(RBP),
     mov(RBP, RSP),
-    regsToSave.foldMap(l => push(Reg(l, RegSize.QWord))),
-    if(localCount == 0) M.empty else sub(RSP, localCount * 8)
+    regsToSave.zipWithIndex.foldMap { case (l, i) => mov(Val.m(Some(RegSize.QWord), RBP, stackAllocOffset(i)), Reg(l, RegSize.QWord)) },
+    sub(RSP, (((localCount - 4) max 0) + 4) * 8)
   ).combineAll
 
-  def epilogue(localCount: Int, savedRegs: List[RegLoc]): M = Vector(
-    if(localCount == 0) M.empty else add(RSP, localCount * 8),
-    savedRegs.reverse.foldMap(l => pop(Reg(l, RegSize.QWord))),
+  def epilogue(savedRegs: List[RegLoc]): M = Vector(
+    savedRegs.zipWithIndex.foldMap { case (l, i) => mov(Reg(l, RegSize.QWord), Val.m(Some(RegSize.QWord), RBP, stackAllocOffset(i))) },
     mov(RSP, RBP),
     pop(RBP)
   ).combineAll

@@ -21,6 +21,7 @@ sealed trait Op {
       case Op.Widen(v) => Set(v)
       case Op.Trim(v) => Set(v)
       case Op.Member(s, _) => Set(s)
+      case Op.Stackalloc(_) => Set.empty
     }
     vals.collect {
       case Val.R(r) => r
@@ -40,6 +41,7 @@ object Op {
   final case class Widen(v: Val) extends Op
   final case class Trim(v: Val) extends Op
   final case class Member(src: Val, index: Int) extends Op
+  final case class Stackalloc(size: Int) extends Op
   case object Garbled extends Op // Assigned to register to indicate, that some instruction also writes to this register as a side effect
 
   implicit val show: Show[Op] = {
@@ -52,6 +54,7 @@ object Op {
     case Widen(v) => show"widen $v"
     case Trim(v) => show"trim $v"
     case Member(s, i) => show"member $s.$i"
+    case Stackalloc(s) => show"stackalloc $s"
     case Garbled => "garbled"
   }
 }

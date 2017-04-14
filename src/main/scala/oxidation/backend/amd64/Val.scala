@@ -9,9 +9,9 @@ object Val {
   final case class R(reg: Reg) extends Val
   final case class I(int: Int) extends Val
   final case class L(name: Name) extends Val
-  final case class M(size: RegSize, regs: List[(Reg, Int)], offset: Int) extends Val
+  final case class M(size: Option[RegSize], regs: List[(Reg, Int)], offset: Int) extends Val
 
-  def m(size: RegSize, offsets: MemOffset*): Val.M = offsets.foldLeft(M(size, List.empty, 0)) {
+  def m(size: Option[RegSize], offsets: MemOffset*): Val.M = offsets.foldLeft(M(size, List.empty, 0)) {
     case (v, MemOffset.MultipliedReg(r)) => v.copy(regs = v.regs :+ r)
     case (v, MemOffset.Offset(i)) => v.copy(offset = v.offset + i)
   }

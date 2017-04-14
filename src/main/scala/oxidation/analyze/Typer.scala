@@ -38,6 +38,9 @@ object Typer {
     case P.App(P.TypeApp(P.Var(Symbol.Global(List("cast"))), List(target)), List(src)) =>
       solveType(src, ExpectedType.Undefined, ctxt).map(cast(target, _, ctxt))
 
+    case P.TypeApp(P.Var(Symbol.Global(List("stackalloc"))), List(pointee)) =>
+      unifyType(Typed(ast.Stackalloc(lookupType(pointee, ctxt)), Ptr(pointee)), expected)
+
     case P.StructLit(name, members) =>
       for {
         struct <- lookupType(TypeName.Named(name), ctxt) match {

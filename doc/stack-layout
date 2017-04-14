@@ -1,0 +1,18 @@
+| Param 5             | <- RBP + 38h
+| Param 4             | <- RBP + 30h
+| Alloc 3             | <- RBP + 28h
+| Alloc 2             |
+| Alloc 1             |
+| Alloc 0             | <- RBP + 10h
+| Return address      |
+| Saved RBP           | <- RBP
+| Alloc 4             | <- RBP - 08h
+| Alloc 5             |
+.
+.
+.
+| Last allocated word | <- RSP + 20h
+| Reserved Param 3    | <- RSP + 18h
+| Reserved Param 2    |
+| Reserved Param 1    |
+| Reserved Param 0    | <- RSP
