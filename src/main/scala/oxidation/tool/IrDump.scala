@@ -33,6 +33,7 @@ object IrDump extends App {
     "explicit-blocks" -> pass.ExplicitBlocks,
     "struct-lowering" -> pass.StructLowering,
     "constant-removal" -> pass.ConstantRemoval,
+    "expr-weaken" -> pass.ExprWeaken,
     "amd64-backend"   -> Amd64BackendPass
   )
 
