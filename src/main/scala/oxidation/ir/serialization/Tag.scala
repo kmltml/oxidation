@@ -37,6 +37,7 @@ object Tag {
     final val Member = 1 + Garbled
     final val Stackalloc = 1 + Member
     final val Trim = 1 + Stackalloc
+    final val StructCopy = 1 + Trim
   }
 
   object Val {

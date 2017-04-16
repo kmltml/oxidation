@@ -228,6 +228,18 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Inst.Do(Op.Store(r(0, _.Ptr), r(1, _.I64), 20))
             ), Val.I(0, ir.Type.U0))
         }
+        "struct member" - {
+          val struct = Struct(g('foo), List(
+            StructMember("x", I64),
+            StructMember("y", I32)
+          ))
+          val r0 = r(0, _.Struct(Vector(ir.Type.I64, ir.Type.I32)))
+          compileExpr(ast.Assign(ast.Select(ast.Var(l('x)) :: struct, "x") :: I64, None, ast.IntLit(20) :: I64) :: U0)
+            .run.runA(CodegenState(registerBindings = Map(l('x) -> r0), nextReg = 1)).value ==>
+            (insts(
+              Inst.Move(r0, Op.StructCopy(r0, Map(0 -> Val.I(20, ir.Type.I64))))
+            ), Val.I(0, ir.Type.U0))
+        }
       }
       "Select" - {
         "Member" - {

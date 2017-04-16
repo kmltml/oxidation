@@ -246,19 +246,28 @@ object Typer {
 
     case P.Assign(lval, None, rval) =>
       for {
-        ltyped <- lval match {
-          case P.Var(s) => ctxt.terms(s) match {
-            case Ctxt.Mutable(t) => Right(Typed(ast.Var(s), t))
-            case Ctxt.Immutable(_) => Left(TyperError.ImmutableAssign(s))
-          }
-          case e => solveType(e, ExpectedType.Undefined, ctxt).flatMap {
-            case lTyped @ Typed(ast.App(Typed(ptr, _: Ptr), _), _) => Right(lTyped)
-            case e => Left(TyperError.NotAnLVal(e))
-          }
-        }
+        ltyped <- solveLVal(lval, ctxt)
         rtyped <- solveType(rval, ExpectedType.Specific(ltyped.typ), ctxt)
         t <- unifyType(Typed(ast.Assign(ltyped, None, rtyped), U0), expected)
       } yield t
+  }
+
+  private def solveLVal(e: P.Expression, ctxt: Ctxt): TyperResult[Typed[ast.Expression]] = e match {
+    case P.Var(s) => ctxt.terms(s) match {
+      case Ctxt.Mutable(t) => Right(Typed(ast.Var(s), t))
+      case Ctxt.Immutable(_) => Left(TyperError.ImmutableAssign(s))
+    }
+    case P.Select(s, member) =>
+      solveLVal(s, ctxt).flatMap {
+        case src @ Typed(_, struct @ Struct(_, members)) =>
+          members.find(_.name == member) map {
+            case StructMember(_, typ) => Typed(ast.Select(src, member), typ)
+          } toRight TyperError.MemberNotFound(member, struct)
+      }
+    case e => solveType(e, ExpectedType.Undefined, ctxt).flatMap {
+      case lTyped @ Typed(ast.App(Typed(ptr, _: Ptr), _), _) => Right(lTyped)
+      case e => Left(TyperError.NotAnLVal(e))
+    }
   }
 
   private def cast(target: TypeName, src: Typed[ast.Expression], ctxt: Ctxt): Typed[ast.Expression] =

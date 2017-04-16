@@ -271,6 +271,18 @@ object Codegen {
         )
       } yield Val.I(0, ir.Type.U0)
 
+    case Typed(ast.Assign(Typed(ast.Select(struct @ Typed(_, analyze.Type.Struct(_, members)), member), _), None, rval), _) =>
+      for {
+        right <- compileExpr(rval) // TODO handle changing struct behind a pointer `val p: ptr[str] = ???; p().length = 10`
+        structVal <- compileExpr(struct)
+        _ <- structVal match {
+          case r: Val.R =>
+            instructions(
+              Inst.Move(r.register, Op.StructCopy(r, Map(members.indexWhere(_.name == member) -> right)))
+            )
+        }
+      } yield Val.I(0, ir.Type.U0)
+
     case Typed(ast.Select(src @ Typed(_, structType: analyze.Type.Struct), member), typ) =>
       for {
         srcv <- compileExpr(src)

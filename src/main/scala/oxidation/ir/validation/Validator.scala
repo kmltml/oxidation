@@ -72,6 +72,20 @@ object Validator {
     case Op.Widen(v)  => valType(loc, v).as(None)
     case Op.Trim(v)  => valType(loc, v).as(None)
     case Op.Garbled  => ES.pure(None)
+    case Op.StructCopy(src, substs) =>
+      for {
+        srcType <- valType(loc, src).flatMap {
+          case s: Type.Struct => ES.pure(s)
+          case t => ES.raiseError[Type.Struct](ValidationError.NotAStruct(loc, t))
+        }
+        _ <- substs.toList.traverse_ {
+          case (i, v) => for {
+            _ <- cond(srcType.members.indices contains i, ValidationError.StructMemberOutOfBounds(loc, srcType, i))
+            _ <- cond(srcType.members(i) == v.typ, ValidationError.WrongType(loc, srcType.members(i), v.typ))
+          } yield ()
+        }
+      } yield Some(srcType)
+
     case Op.Call(fn, params) =>
       def flatten(p: List[Type]): List[Type] = p flatMap {
         case t @ (_: Type.Num | Type.U0 | Type.U1 | Type.Ptr | _: Type.Fun) => List(t)

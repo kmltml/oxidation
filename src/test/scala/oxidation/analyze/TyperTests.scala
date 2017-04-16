@@ -182,6 +182,22 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
             Ctxt.default.withTerms(Map(l('foo) -> Ctxt.Mutable(intptr)))) ==>
             Right(ast.Assign(ast.App(ast.Var(l('foo)) :: intptr, Nil) :: I32, None, ast.IntLit(20) :: I32) :: U0)
         }
+        "Select" - {
+          val struct = Struct(g('foo), List(
+            StructMember("x", I32),
+            StructMember("y", I64)            
+          ))
+          "mutable" - {
+            solveType(P.Assign(P.Select(P.Var(l('x)), "x"), None, P.IntLit(10)),
+              ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> mut(struct)))) ==>
+              Right(ast.Assign(ast.Select(ast.Var(l('x)) :: struct, "x") :: I32, None, ast.IntLit(10) :: I32) :: U0)
+          }
+          "immutable" - {
+            solveType(P.Assign(P.Select(P.Var(l('x)), "x"), None, P.IntLit(10)),
+              ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(struct)))) ==>
+              Left(TyperError.ImmutableAssign(l('x)))
+          }
+        }
         "composite" - {
           solveType(P.Assign(P.Var(l('x)), Some(InfixOp.Add), P.IntLit(20)), ExpectedType.Undefined,
             Ctxt.default.withTerms(Map(l('x) -> Ctxt.Mutable(I64)))) ==>

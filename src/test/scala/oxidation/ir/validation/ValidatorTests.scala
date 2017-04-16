@@ -28,6 +28,27 @@ object ValidatorTests extends TestSuite with IrValSyntax {
             .value.runEmptyA.value ==> Left(ValidationError.WrongType(loc, I32, U32))
         }
       }
+      "StructCopy" - {
+        val struct = Struct(Vector(I64, I32))
+        "valid" - {
+          validateInstruction(loc, Inst.Move(r(0, struct), Op.StructCopy(r(1, struct), Map(0 -> Val.I(0, I64), 1 -> Val.I(0, I32)))))
+            .value.runA(Set(r(0, struct), r(1, struct))).value ==> Right(())
+        }
+        "invalid" - {
+          "not a struct" - {
+            validateInstruction(loc, Inst.Move(r(0, struct), Op.StructCopy(r(1, I32), Map(0 -> Val.I(0, I32)))))
+              .value.runA(Set(r(0, struct), r(1, I32))).value ==> Left(ValidationError.NotAStruct(loc, I32))
+          }
+          "type mismatch" - {
+            validateInstruction(loc, Inst.Move(r(0, struct), Op.StructCopy(r(1, struct), Map(0 -> Val.I(0, I32)))))
+              .value.runA(Set(r(0, struct), r(1, struct))).value ==> Left(ValidationError.WrongType(loc, I64, I32))
+          }
+          "substitution out of range" - {
+            validateInstruction(loc, Inst.Move(r(0, struct), Op.StructCopy(r(1, struct), Map(5 -> Val.I(0, I32)))))
+              .value.runA(Set(r(0, struct), r(1, struct))).value ==> Left(ValidationError.StructMemberOutOfBounds(loc, struct, 5))
+          }
+        }
+      }
       "Widen" - {
         "valid" - {
           validateInstruction(loc, Inst.Move(r(0, I32), Op.Widen(Val.I(10, I8))))

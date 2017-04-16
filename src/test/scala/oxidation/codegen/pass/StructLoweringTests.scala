@@ -24,7 +24,7 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
         ))
     }
     "struct register write and read" - {
-      val r0 = register(0, Struct(Vector(I32, I64)))
+      val r0 = register(0, Struct(Vector(I32, U8)))
       pass.txDef(Def.Fun(Name.Global(List("foo")), Nil, U0, Vector(
         Block(Name.Local("body", 0), Vector(
           Inst.Move(r0, Op.Copy(Val.Struct(Vector(Val.I(0, I32), Val.I(0, U8))))),
@@ -84,6 +84,16 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
         (pass.S(nextReg = 4, bindings = Map(r0 -> Vector(sl(0, I32), sl(1, I64)), r1 -> Vector(sl(2, I32), sl(3, I64)))), Vector(
           Inst.Move(sl(2, I32), Op.Copy(sl(0, I32))),
           Inst.Move(sl(3, I64), Op.Copy(sl(1, I64)))
+        ))
+    }
+    "struct modify" - {
+      val struct = Struct(Vector(I64, I32))
+      val r0 = register(0, struct)
+      val state = pass.S(bindings = Map(r0 -> Vector(sl(0, I64), sl(1, I32))), nextReg = 2)
+      pass.txInstruction(Inst.Move(r0, Op.StructCopy(r0, Map(0 -> Val.I(10, I64))))).run(state).value ==>
+        (state, Vector(
+          Inst.Move(sl(0, I64), Op.Copy(Val.I(10, I64))),
+          Inst.Move(sl(1, I32), Op.Copy(sl(1, I32)))
         ))
     }
   }

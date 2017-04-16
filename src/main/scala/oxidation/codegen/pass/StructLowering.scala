@@ -36,6 +36,16 @@ object StructLowering extends Pass {
   def saveBinding(before: Register, after: Vector[Register]): F[Unit] =
     F.modify(s => s.copy(bindings = s.bindings.updated(before, after)))
 
+  def binding(reg: Register): F[Vector[Register]] = for {
+    bindings <- F.inspect(_.bindings)
+    r <- bindings.get(reg).map(F.pure).getOrElse {
+      for {
+        regs <- genRegs(reg.typ.asInstanceOf[Type.Struct])
+        _ <- saveBinding(reg, regs)
+      } yield regs
+    }
+  } yield r
+
   override def onDef: Def =?> F[Vector[Def]] = {
     case fun @ Def.Fun(_, params, _, _, _) => for {
       _ <- F.set(S())
@@ -54,38 +64,41 @@ object StructLowering extends Pass {
       for {
         newParams <- params.traverse {
           case reg @ Register(_, _, Type.Struct(_)) =>
-            F.inspect(_.bindings).map(_(reg).toList)
+            binding(reg).map(_.toList)
           case reg => F.pure(List(reg))
         }
         retDeconstruction <- dest match {
           case Some(destReg @ Register(_, _, Type.Struct(members))) =>
-            for {
-              regs <- members.traverse(genReg)
-              _ <- saveBinding(destReg, regs)
-            } yield regs.zipWithIndex.map {
+            binding(destReg).map(_.zipWithIndex.map {
               case (r, i) => Inst.Move(r, Op.Member(Val.R(destReg), i))
-            }
+            })
           case _ => F.pure(Vector.empty)
         }
       } yield Inst.Eval(dest, Op.Call(fn, newParams.flatten)) +: retDeconstruction
 
     case Inst.Move(dest, Op.Copy(Val.Struct(memVals))) =>
-      for {
-        regs <- memVals.traverse { v => genReg(v.typ).map(r => v -> r) }
-        _ <- saveBinding(dest, regs.map(_._2))
-      } yield regs.map { case (v, r) => Inst.Move(r, Op.Copy(v)) }
+      binding(dest).map(regs => (regs zip memVals).map { case (r, v) => Inst.Move(r, Op.Copy(v)) })
 
     case Inst.Move(dest, Op.Member(Val.R(src), i)) =>
       for {
-        bindings <- F.inspect(_.bindings)
-      } yield Vector(Inst.Move(dest, Op.Copy(Val.R(bindings(src)(i)))))
+        bindings <- binding(src)
+      } yield Vector(Inst.Move(dest, Op.Copy(Val.R(bindings(i)))))
 
     case Inst.Move(dest @ Register(_, _, Type.Struct(_)), Op.Copy(Val.R(src))) =>
       for {
-        srcRegs <- F.inspect(_.bindings(src))
-        regs <- srcRegs.traverse(r => genReg(r.typ).map(_ -> r))
-        _ <- saveBinding(dest, regs.map(_._1))
-      } yield regs.map { case (r, v) => Inst.Move(r, Op.Copy(Val.R(v))) }
+        srcRegs <- binding(src)
+        destRegs <- binding(dest)
+      } yield (destRegs zip srcRegs).map { case (d, s) => Inst.Move(d, Op.Copy(Val.R(s))) }
+
+    case Inst.Move(dest, Op.StructCopy(Val.R(src), substs)) =>
+      for {
+        srcRegs <- binding(src)
+        destRegs <- binding(dest)
+      } yield destRegs.zipWithIndex.map {
+        case (d, i) =>
+          val srcVal = (substs orElse srcRegs.andThen(Val.R))(i)
+          Inst.Move(d, Op.Copy(srcVal))
+      }
 
     case inst @ Inst.Move(Register(_, _, Type.Struct(_)), _) => throw new NotImplementedError(s"can't lower struct result in instruction $inst")
   }

@@ -13,4 +13,10 @@ def structTests(): u0 = {
 	val x = foo(10, 20)
 	x.int + x.long == 30
     }, "Call to function returning a small struct")
+
+    assert({
+        var x = foo(10, 20)
+        x.int = 50
+        x.int + x.long == 70
+    }, "Mutable struct member assignement")
 }
