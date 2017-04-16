@@ -1,10 +1,14 @@
 def basicTests() = {
-    assert(2 + 8 == 10, "Addition")
-    assert(5 - 2 == 3, "Subtraction")
-    assert(5 * 2 == 10, "Multiplication")
-    assert(8 / 2 == 4, "Division")
-    assert(9 % 2 == 1, "Modulo")
+    val two = 2
+    val five = 5
+    val eight = 8
+    assert(two + five == 7, "Addition")
+    assert(five - two == 3, "Subtraction")
+    assert(five * two == 10, "Multiplication")
+    assert(eight / two == 4, "Division")
+    assert(five % two == 1, "Modulo")
     assert(!false && (!true == false), "Not")
+    assert(factorial(10) == 3628800, "Factorial")
 
     shortcircuit()
 }
@@ -21,3 +25,6 @@ def shortcircuit(): u0 = {
         b && x == 0
     }, "Short-circuit Or")
 }
+
+def factorial(n: u64): u64 =
+    if(n == 1) 1 else n * factorial(n - 1)

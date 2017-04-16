@@ -77,9 +77,9 @@ object Amd64BackendPassTest extends TestSuite with IrValSyntax {
             Inst.Move(register(2, I32), Op.Copy(register(0, I32))),
             Inst.Move(register(3, I32), Op.Copy(register(1, I32))),
 
+            Inst.Move(br(2, I32), Op.Copy(register(3, I32))),
             Inst.Move(br(0, I32), Op.Copy(register(2, I32))),
             Inst.Move(br(1, I32), Op.Copy(0)),
-            Inst.Move(br(2, I32), Op.Copy(register(3, I32))),
             Inst.Do(Op.Copy(br(1, I32))),
             Inst.Move(br(3, I32), Op.Binary(InfixOp.Div, br(0, I32), br(2, I32))),
             Inst.Move(br(4, I32), Op.Garbled),

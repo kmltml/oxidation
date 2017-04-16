@@ -62,9 +62,9 @@ object Amd64BackendPass extends Pass {
           sextTemp -> RegLoc.D
         ))
       } yield Vector(
+        Inst.Move(rtemp, Op.Copy(r)),
         Inst.Move(ltemp, Op.Copy(l)),
         Inst.Move(sextTemp, Op.Copy(ir.Val.I(0, l.typ))),
-        Inst.Move(rtemp, Op.Copy(r)),
         Inst.Do(Op.Copy(ir.Val.R(sextTemp))),
         Inst.Move(destTemp, Op.Binary(op, ir.Val.R(ltemp), ir.Val.R(rtemp))),
         Inst.Move(otherTemp, Op.Garbled),
@@ -84,9 +84,9 @@ object Amd64BackendPass extends Pass {
           sextTemp -> RegLoc.D
         ))
       } yield Vector(
+        Inst.Move(rtemp, Op.Copy(r)),
         Inst.Move(ltemp, Op.Copy(l)),
         Inst.Move(sextTemp, Op.Copy(ir.Val.I(0, l.typ))),
-        Inst.Move(rtemp, Op.Copy(r)),
         Inst.Move(destTemp, Op.Binary(InfixOp.Mul, ir.Val.R(ltemp), ir.Val.R(rtemp))),
         Inst.Move(otherTemp, Op.Garbled),
         Inst.Move(dest, Op.Copy(ir.Val.R(destTemp)))

@@ -61,6 +61,15 @@ object RegisterSpillPass extends Pass {
         o <- fill(offset)
         d <- spill(dest)
       } yield (a._1 ++ o._1 :+ Inst.Move(d._1, Op.Load(a._2, o._2))) ++ d._2
+
+    case m @ Inst.Move(dest, Op.Copy(src)) =>
+      for {
+        spilled <- spilledRegisters
+        res <- if(spilled(dest)) for {
+          s <- fill(src)
+        } yield s._1 :+ Inst.Move(dest, Op.Copy(s._2))
+        else F.pure(Vector(m))
+      } yield res
   }
 
 }

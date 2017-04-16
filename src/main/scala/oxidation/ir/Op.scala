@@ -57,6 +57,7 @@ object Op {
     case Trim(v) => show"trim $v"
     case Member(s, i) => show"member $s.$i"
     case Stackalloc(s) => show"stackalloc $s"
+    case StructCopy(src, substs) => show"structcopy $src { ${substs.map{ case (k, v) => show".$k -> $v" } mkString ", " } }"
     case Garbled => "garbled"
   }
 }
