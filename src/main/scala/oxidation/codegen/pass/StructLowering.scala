@@ -46,6 +46,11 @@ object StructLowering extends Pass {
     }
   } yield r
 
+  def decompose(v: Val): F[Vector[Val]] = v match {
+    case Val.Struct(members) => F.pure(members)
+    case Val.R(r) => Nested(binding(r)).map(Val.R(_) : Val).value
+  }
+
   override def onDef: Def =?> F[Vector[Def]] = {
     case fun @ Def.Fun(_, params, _, _, _) => for {
       _ <- F.set(S())
@@ -76,19 +81,18 @@ object StructLowering extends Pass {
         }
       } yield Inst.Eval(dest, Op.Call(fn, newParams.flatten)) +: retDeconstruction
 
-    case Inst.Move(dest, Op.Copy(Val.Struct(memVals))) =>
-      binding(dest).map(regs => (regs zip memVals).map { case (r, v) => Inst.Move(r, Op.Copy(v)) })
+    case Inst.Move(dest, Op.Copy(Val(src, struct: Type.Struct))) =>
+      for {
+        destregs <- binding(dest)
+        srcs <- decompose(src)
+      } yield (destregs zip srcs).map {
+        case (r, v) => Inst.Move(r, Op.Copy(v))
+      }
 
     case Inst.Move(dest, Op.Member(Val.R(src), i)) =>
       for {
         bindings <- binding(src)
       } yield Vector(Inst.Move(dest, Op.Copy(Val.R(bindings(i)))))
-
-    case Inst.Move(dest @ Register(_, _, Type.Struct(_)), Op.Copy(Val.R(src))) =>
-      for {
-        srcRegs <- binding(src)
-        destRegs <- binding(dest)
-      } yield (destRegs zip srcRegs).map { case (d, s) => Inst.Move(d, Op.Copy(Val.R(s))) }
 
     case Inst.Move(dest, Op.StructCopy(Val.R(src), substs)) =>
       for {
@@ -108,6 +112,15 @@ object StructLowering extends Pass {
           case (r, i) => Inst.Move(r, Op.Load(Val.R(ptr), Val.I(struct.offset(i), Type.I64)))
         }
       } yield Inst.Move(ptr, Op.Binary(InfixOp.Add, addr, offset)) +: loads
+
+    case Inst.Eval(_, Op.Store(addr, offset, Val(value, struct: Type.Struct))) =>
+      for {
+        ptr <- genReg(Type.Ptr)
+        srcs <- decompose(value)
+        stores = srcs.zipWithIndex.map {
+          case (src, i) => Inst.Do(Op.Store(Val.R(ptr), Val.I(struct.offset(i), Type.I64), src))
+        }
+      } yield Inst.Move(ptr, Op.Binary(InfixOp.Add, addr, offset)) +: stores
 
     case inst @ Inst.Move(Register(_, _, Type.Struct(_)), _) => throw new NotImplementedError(s"can't lower struct result in instruction $inst")
   }

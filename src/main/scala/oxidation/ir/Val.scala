@@ -15,6 +15,8 @@ sealed trait Val {
 
 object Val {
 
+  def unapply(v: Val): Option[(Val, Type)] = Some(v, v.typ)
+
   final case class R(register: Register) extends Val {
     def typ = register.typ
   }

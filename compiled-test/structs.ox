@@ -31,4 +31,17 @@ def structTests(): u0 = {
         val q = cast[ptr[bar]](p)()
         q.x == 0x3344 && q.y == 0x1122
     }, "Struct load")
+
+    assert({
+        val p = stackalloc[bar]
+        p() = bar { x = 0x1122, y = 0x3344 }
+        val q = cast[ptr[i32]](p)()
+        q == 0x33441122
+    }, "Struct store")
+
+    assert({
+        val p = stackalloc[foo]
+        p() = foo(10, 20)
+        p().int == 10 && p().long == 20
+    }, "Struct load and store")
 }
