@@ -142,6 +142,15 @@ object Validator {
         _ <- cond(rightType == Type.U1, ValidationError.WrongType(loc, Type.U1, rightType))
       } yield Some(Type.U1)
     }
+    case Op.Binary(InfixOp.Add, left, right)
+      if left.typ == Type.Ptr =>
+
+      for {
+        _ <- valType(loc, left)
+        r <- valType(loc, right)
+        _ <- cond(right.typ == Type.I64, ValidationError.WrongType(loc, Type.I64, right.typ))
+      } yield Some(Type.Ptr)
+
     case Op.Binary(InfixOp.Add | InfixOp.Sub | InfixOp.Mul | InfixOp.Div | InfixOp.Mod | InfixOp.Shl | InfixOp.Shr, left, right) =>
       for {
         ltype <- valType(loc, left)

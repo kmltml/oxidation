@@ -192,11 +192,17 @@ object ValidatorTests extends TestSuite with IrValSyntax {
           }
         }
       }
-      "Arith" - {
+      "Binary" - {
         "Arithmetic" - {
           "valid" - {
-            validateInstruction(loc, Inst.Move(r(2, I32), Op.Binary(InfixOp.Add, r(0, I32), r(1, I32))))
-              .value.runA(Set(r(0, I32), r(1, I32))).value ==> Right(())
+            "integer" - {
+              validateInstruction(loc, Inst.Move(r(2, I32), Op.Binary(InfixOp.Add, r(0, I32), r(1, I32))))
+                .value.runA(Set(r(0, I32), r(1, I32))).value ==> Right(())
+            }
+            "ptr + i64" - {
+              validateInstruction(loc, Inst.Move(r(2, Ptr), Op.Binary(InfixOp.Add, r(0, Ptr), r(1, I64))))
+                .value.runA(Set(r(0, Ptr), r(1, I64))).value ==> Right(())
+            }
           }
           "invalid" - {
             "not numeric" - {

@@ -48,7 +48,13 @@ object Type {
 
   final case class Fun(params: List[Type], ret: Type) extends Type
 
-  final case class Struct(members: Vector[Type]) extends Type
+  final case class Struct(members: Vector[Type]) extends Type {
+
+    lazy val layout: Vector[Int] = members.map(_.size).scanLeft(0)(_ + _)
+
+    def offset(index: Int): Int = layout(index)
+
+  }
 
   implicit val show: Show[Type] = new Show[Type] {
     def show(t: Type): String = t match {

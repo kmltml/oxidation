@@ -100,6 +100,15 @@ object StructLowering extends Pass {
           Inst.Move(d, Op.Copy(srcVal))
       }
 
+    case Inst.Move(dest @ Register(_, _, struct: Type.Struct), Op.Load(addr, offset)) =>
+      for {
+        ptr <- genReg(Type.Ptr)
+        regs <- binding(dest)
+        loads = regs.zipWithIndex.map {
+          case (r, i) => Inst.Move(r, Op.Load(Val.R(ptr), Val.I(struct.offset(i), Type.I64)))
+        }
+      } yield Inst.Move(ptr, Op.Binary(InfixOp.Add, addr, offset)) +: loads
+
     case inst @ Inst.Move(Register(_, _, Type.Struct(_)), _) => throw new NotImplementedError(s"can't lower struct result in instruction $inst")
   }
 

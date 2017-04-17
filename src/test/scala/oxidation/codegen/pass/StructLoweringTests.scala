@@ -27,18 +27,18 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
       val r0 = register(0, Struct(Vector(I32, U8)))
       pass.txDef(Def.Fun(Name.Global(List("foo")), Nil, U0, Vector(
         Block(Name.Local("body", 0), Vector(
-          Inst.Move(r0, Op.Copy(Val.Struct(Vector(Val.I(0, I32), Val.I(0, U8))))),
+          Inst.Move(r0, Op.Copy(Val.Struct(Vector(i32(0), u8(0))))),
           Inst.Move(register(1, I32), Op.Member(r0, 0)),
           Inst.Move(register(2, U8), Op.Member(r0, 1))
-        ), FlowControl.Return(Val.I(0, U0)))
+        ), FlowControl.Return(u0))
       ), Set.empty)).runA(pass.S()).value ==> Vector(
         Def.Fun(Name.Global(List("foo")), Nil, U0, Vector(
           Block(Name.Local("body", 0), Vector(
-            Inst.Move(sl(0, I32), Op.Copy(Val.I(0, I32))),
-            Inst.Move(sl(1, U8), Op.Copy(Val.I(0, U8))),
+            Inst.Move(sl(0, I32), Op.Copy(i32(0))),
+            Inst.Move(sl(1, U8), Op.Copy(u8(0))),
             Inst.Move(register(1, I32), Op.Copy(sl(0, I32))),
             Inst.Move(register(2, U8), Op.Copy(sl(1, U8)))
-          ), FlowControl.Return(Val.I(0, U0)))
+          ), FlowControl.Return(u0))
         ), Set.empty)
       )
     }
@@ -47,16 +47,16 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
       val r0 = register(0, struct)
       pass.txDef(Def.Fun(Name.Global(List("foo")), Nil, U0, Vector(
         Block(Name.Local("body", 0), Vector(
-          Inst.Move(r0, Op.Copy(Val.Struct(Vector(Val.I(10, I32), Val.I(20, I64))))),
+          Inst.Move(r0, Op.Copy(Val.Struct(Vector(i32(10), i64(20))))),
           Inst.Do(Op.Call(Val.G(Name.Global(List("bar")), Fun(List(struct), U0)), List(r0)))
-        ), FlowControl.Return(Val.I(0, U0)))
+        ), FlowControl.Return(u0))
       ), Set.empty)).runA(pass.S()).value ==> Vector(
         Def.Fun(Name.Global(List("foo")), Nil, U0, Vector(
           Block(Name.Local("body", 0), Vector(
-            Inst.Move(sl(0, I32), Op.Copy(Val.I(10, I32))),
-            Inst.Move(sl(1, I64), Op.Copy(Val.I(20, I64))),
+            Inst.Move(sl(0, I32), Op.Copy(i32(10))),
+            Inst.Move(sl(1, I64), Op.Copy(i64(20))),
             Inst.Do(Op.Call(Val.G(Name.Global(List("bar")), Fun(List(struct), U0)), List(sl(0, I32), sl(1, I64))))
-          ), FlowControl.Return(Val.I(0, U0)))
+          ), FlowControl.Return(u0))
         ), Set.empty)
       )
     }
@@ -90,10 +90,20 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
       val struct = Struct(Vector(I64, I32))
       val r0 = register(0, struct)
       val state = pass.S(bindings = Map(r0 -> Vector(sl(0, I64), sl(1, I32))), nextReg = 2)
-      pass.txInstruction(Inst.Move(r0, Op.StructCopy(r0, Map(0 -> Val.I(10, I64))))).run(state).value ==>
+      pass.txInstruction(Inst.Move(r0, Op.StructCopy(r0, Map(0 -> i64(10))))).run(state).value ==>
         (state, Vector(
-          Inst.Move(sl(0, I64), Op.Copy(Val.I(10, I64))),
+          Inst.Move(sl(0, I64), Op.Copy(i64(10))),
           Inst.Move(sl(1, I32), Op.Copy(sl(1, I32)))
+        ))
+    }
+    "struct load" - {
+      val struct = Struct(Vector(I64, I32))
+      pass.txInstruction(Inst.Move(register(1, struct), Op.Load(register(0, Ptr), i64(0))))
+        .run(pass.S()).value ==>
+        (pass.S(nextReg = 3, bindings = Map(register(1, struct) -> Vector(sl(1, I64), sl(2, I32)))), Vector(
+          Inst.Move(sl(0, Ptr), Op.Binary(InfixOp.Add, register(0, Ptr), i64(0))),
+          Inst.Move(sl(1, I64), Op.Load(sl(0, Ptr), i64(0))),
+          Inst.Move(sl(2, I32), Op.Load(sl(0, Ptr), i64(8)))
         ))
     }
   }
