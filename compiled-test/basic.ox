@@ -10,6 +10,10 @@ def basicTests() = {
     assert(!false && (!true == false), "Not")
     assert(factorial(10) == 3628800, "Factorial")
 
+    assert({
+        factorial(3) + factorial(5) == 126
+    }, "Interfering ax precolours")
+
     shortcircuit()
 }
 

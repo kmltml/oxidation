@@ -207,7 +207,7 @@ object Codegen {
     case Typed(ast.App(Typed(fn, fnType: analyze.Type.Fun), params), t) =>
       for {
         fnVal <- fn match {
-          case ast.Var(Symbol.Global(path)) => Res.pure(Val.G(Name.Global(path.toList), translateType(fnType)))
+          case ast.Var(Symbol.Global(path)) => Res.pure(Val.G(Name.Global(path), translateType(fnType)))
           case _ => compileExpr(Typed(fn, fnType))
         }
         paramVals <- params.toList.traverse { p =>
@@ -219,9 +219,11 @@ object Codegen {
             )
           } yield r
         }
+        temp <- genReg(translateType(t))
         r <- genReg(translateType(t))
         _ <- instructions(
-          Inst.Move(r, Op.Call(fnVal, paramVals))
+          Inst.Move(temp, Op.Call(fnVal, paramVals)),
+          Inst.Move(r, Op.Copy(Val.R(temp)))
         )
       } yield Val.R(r)
 

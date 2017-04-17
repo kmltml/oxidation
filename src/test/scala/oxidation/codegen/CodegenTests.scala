@@ -65,20 +65,22 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             ast.App(ast.Var(g('bar)) :: Fun(Nil, U1), Nil) :: U1
           ) :: U1).run.runA(CodegenState()).value ==> (insts(
             Inst.Move(r(0, _.U1), Op.Call(Val.G(Name.Global(List("foo")), ir.Type.Fun(Nil, ir.Type.U1)), Nil)),
-            Inst.Flow(FlowControl.Branch(Val.R(r(0, _.U1)), Name.Local("if", 0), Name.Local("else", 0))),
+            Inst.Move(r(1, _.U1), Op.Copy(r(0, _.U1))),
+            Inst.Flow(FlowControl.Branch(Val.R(r(1, _.U1)), Name.Local("if", 0), Name.Local("else", 0))),
 
             Inst.Label(Name.Local("if", 0)),
-            Inst.Move(r(1, _.U1), Op.Copy(Val.I(1, ir.Type.U1))),
+            Inst.Move(r(2, _.U1), Op.Copy(Val.I(1, ir.Type.U1))),
             Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
 
             Inst.Label(Name.Local("else", 0)),
-            Inst.Move(r(2, _.U1), Op.Call(Val.G(Name.Global(List("bar")), ir.Type.Fun(Nil, ir.Type.U1)), Nil)),
-            Inst.Move(r(1, _.U1), Op.Copy(Val.R(r(2, _.U1)))),
+            Inst.Move(r(3, _.U1), Op.Call(Val.G(Name.Global(List("bar")), ir.Type.Fun(Nil, ir.Type.U1)), Nil)),
+            Inst.Move(r(4, _.U1), Op.Copy(Val.R(r(3, _.U1)))),
+            Inst.Move(r(2, _.U1), Op.Copy(Val.R(r(4, _.U1)))),
             Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
 
             Inst.Label(Name.Local("ifafter", 0))
 
-          ), Val.R(r(1, _.U1)))
+          ), Val.R(r(2, _.U1)))
         }
         "And" - {
           compileExpr(ast.InfixAp(InfixOp.And,
@@ -86,20 +88,22 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             ast.App(ast.Var(g('bar)) :: Fun(Nil, U1), Nil) :: U1
           ) :: U1).run.runA(CodegenState()).value ==> (insts(
             Inst.Move(r(0, _.U1), Op.Call(Val.G(Name.Global(List("foo")), ir.Type.Fun(Nil, ir.Type.U1)), Nil)),
-            Inst.Flow(FlowControl.Branch(Val.R(r(0, _.U1)), Name.Local("if", 0), Name.Local("else", 0))),
+            Inst.Move(r(1, _.U1), Op.Copy(r(0, _.U1))),
+            Inst.Flow(FlowControl.Branch(Val.R(r(1, _.U1)), Name.Local("if", 0), Name.Local("else", 0))),
 
             Inst.Label(Name.Local("if", 0)),
-            Inst.Move(r(2, _.U1), Op.Call(Val.G(Name.Global(List("bar")), ir.Type.Fun(Nil, ir.Type.U1)), Nil)),
-            Inst.Move(r(1, _.U1), Op.Copy(Val.R(r(2, _.U1)))),
+            Inst.Move(r(3, _.U1), Op.Call(Val.G(Name.Global(List("bar")), ir.Type.Fun(Nil, ir.Type.U1)), Nil)),
+            Inst.Move(r(4, _.U1), Op.Copy(Val.R(r(3, _.U1)))),
+            Inst.Move(r(2, _.U1), Op.Copy(Val.R(r(4, _.U1)))),
             Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
 
             Inst.Label(Name.Local("else", 0)),
-            Inst.Move(r(1, _.U1), Op.Copy(Val.I(0, ir.Type.U1))),
+            Inst.Move(r(2, _.U1), Op.Copy(Val.I(0, ir.Type.U1))),
             Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
 
             Inst.Label(Name.Local("ifafter", 0))
 
-          ), Val.R(r(1, _.U1)))
+          ), Val.R(r(2, _.U1)))
         }
       }
       "PrefixAp" - {
@@ -140,7 +144,8 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
           .run.runA(CodegenState()).value ==>
           (insts(
             Inst.Move(r(0, _.I32), Op.Copy(42)),
-            Inst.Move(r(1, _.I32), Op.Call(Val.G(Name.Global(List("foo")), ir.Type.Fun(List(ir.Type.I32), ir.Type.I32)), List(r(0, _.I32))))
+            Inst.Move(r(1, _.I32), Op.Call(Val.G(Name.Global(List("foo")), ir.Type.Fun(List(ir.Type.I32), ir.Type.I32)), List(r(0, _.I32)))),
+            Inst.Move(r(2, _.I32), Op.Copy(r(1, _.I32)))
           ), Val.I(0, ir.Type.U0))
       }
       "Var" - {
@@ -176,7 +181,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Inst.Label(Name.Local("ifafter", 0))
             ), Val.R(r(1, _.I32)))
         }
-        "whithout else branch" - {
+        "without else branch" - {
           val fooType = Fun(Nil, U0)
           compileExpr(ast.If(ast.Var(l('x)) :: U1,
             ast.App(ast.Var(g('foo)) :: fooType, Nil) :: U0, None) :: U0)
@@ -186,7 +191,8 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
 
               Inst.Label(Name.Local("if", 0)),
               Inst.Move(r(2, _.U0), Op.Call(Val.G(Name.Global(List("foo")), ir.Type.Fun(Nil, ir.Type.U0)), List.empty)),
-              Inst.Move(r(1, _.U0), Op.Copy(r(2, _.U0))),
+              Inst.Move(r(3, _.U0), Op.Copy(r(2, _.U0))),
+              Inst.Move(r(1, _.U0), Op.Copy(r(3, _.U0))),
               Inst.Flow(FlowControl.Goto(Name.Local("ifafter", 0))),
 
               Inst.Label(Name.Local("ifafter", 0))
@@ -261,8 +267,9 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             .run.runA(CodegenState()).value ==>
             (insts(
               Inst.Move(r(0, _.I32), Op.Copy(10)),
-              Inst.Move(r(1, _.I32), Op.Call(Val.G(Name.Global(List("f")), ir.Type.Fun(List(ir.Type.I32), ir.Type.U1)), List(r(0, _.I32))))
-            ), Val.R(r(1, _.I32)))
+              Inst.Move(r(1, _.I32), Op.Call(Val.G(Name.Global(List("f")), ir.Type.Fun(List(ir.Type.I32), ir.Type.U1)), List(r(0, _.I32)))),
+              Inst.Move(r(2, _.I32), Op.Copy(r(1, _.I32)))
+            ), Val.R(r(2, _.I32)))
         }
         "pointer" - {
           compileExpr(ast.App(ast.Var(l('p)) :: Ptr(TypeName.Named(g('i32))), Nil) :: I32)
