@@ -58,7 +58,7 @@ object Type {
 
   implicit val show: Show[Type] = new Show[Type] {
     def show(t: Type): String = t match {
-      case Fun(params, ret) => show"(${params.map(show).mkString(", ")} => ${show(ret)}"
+      case Fun(params, ret) => show"(${params.map(show).mkString(", ")}) => ${show(ret)}"
       case Struct(members) => members.map(show).mkString("{", ", ", "}")
       case t => t.toString.toLowerCase
     }

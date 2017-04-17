@@ -95,6 +95,10 @@ trait Amd64NasmOutput extends Output {
     ln(show"sub $dest, $src")
   override def xor(dest: Val, src: Val): M =
     ln(show"xor $dest, $src")
+  override def and(dest: Val, src: Val): M =
+    ln(show"and $dest, $src")
+  override def or(dest: Val, src: Val): M =
+    ln(show"or $dest, $src")
 
   override def div(src: Val): M =
     ln(show"div $src")

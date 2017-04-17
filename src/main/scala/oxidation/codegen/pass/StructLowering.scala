@@ -122,6 +122,19 @@ object StructLowering extends Pass {
         }
       } yield Inst.Move(ptr, Op.Binary(InfixOp.Add, addr, offset)) +: stores
 
+    case Inst.Eval(dest, Op.Binary(op @ (InfixOp.Eq | InfixOp.Neq), Val(left, struct: Type.Struct), Val(right, Type.Struct(_)))) =>
+      for {
+        lvals <- decompose(left)
+        rvals <- decompose(right)
+        eqs <- (struct.members, lvals, rvals).zipped.toList.toNel.get.traverse {
+          case (t, lval, rval) => genReg(Type.U1).map(r => (r, Vector(Inst.Move(r, Op.Binary(op, lval, rval)))))
+        }
+        res <- eqs.reduceLeftM(F.pure) {
+          case ((prevr, instsA), (thisr, instsB)) =>
+            genReg(Type.U1).map(r => (r, instsA ++ instsB :+ Inst.Move(r, Op.Binary(InfixOp.BitAnd, Val.R(prevr), Val.R(thisr)))))
+        }
+      } yield res._2 :+ Inst.Eval(dest, Op.Copy(Val.R(res._1)))
+
     case inst @ Inst.Move(Register(_, _, Type.Struct(_)), _) => throw new NotImplementedError(s"can't lower struct result in instruction $inst")
   }
 

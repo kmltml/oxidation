@@ -44,4 +44,8 @@ def structTests(): u0 = {
         p() = foo(10, 20)
         p().int == 10 && p().long == 20
     }, "Struct load and store")
+
+    assert({
+        foo(10, 20) == foo(10, 20) && foo(10, 30) != foo(30, 10)
+    }, "Struct equality")
 }

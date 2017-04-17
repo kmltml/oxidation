@@ -140,12 +140,15 @@ class Amd64Target { this: Output =>
           xor(toVal(dest), 1)
         ).combineAll)
 
-      case ir.Op.Binary(op @ (InfixOp.Add | InfixOp.Sub), left, right) =>
+      case ir.Op.Binary(op @ (InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor), left, right) =>
         S.tell(Vector(
           move(toVal(dest), toVal(left)),
           op match {
             case InfixOp.Add => add(toVal(dest), toVal(right))
             case InfixOp.Sub => sub(toVal(dest), toVal(right))
+            case InfixOp.BitAnd => and(toVal(dest), toVal(right))
+            case InfixOp.BitOr => or(toVal(dest), toVal(right))
+            case InfixOp.Xor => xor(toVal(dest), toVal(right))
           }
         ).combineAll)
       case ir.Op.Binary(InfixOp.Div, _, right) => S.tell(div(toVal(right)))

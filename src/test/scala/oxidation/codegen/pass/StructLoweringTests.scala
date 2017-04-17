@@ -118,6 +118,23 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
           Inst.Do(Op.Store(sl(2, Ptr), i64(8), sl(1, I32)))
         ))
     }
+
+    "struct equality" - {
+      val struct = Struct(Vector(I64, I32))
+      val state = pass.S(
+        bindings = Map(
+          register(0, struct) -> Vector(sl(0, I64), sl(1, I32)),
+          register(1, struct) -> Vector(sl(2, I64), sl(3, I32))),
+        nextReg = 4)
+      pass.txInstruction(Inst.Move(register(2, U1), Op.Binary(InfixOp.Eq, register(0, struct), register(1, struct))))
+        .run(state).value ==>
+        (state.copy(nextReg = 7), Vector(
+          Inst.Move(sl(4, U1), Op.Binary(InfixOp.Eq, sl(0, I64), sl(2, I64))),
+          Inst.Move(sl(5, U1), Op.Binary(InfixOp.Eq, sl(1, I32), sl(3, I32))),
+          Inst.Move(sl(6, U1), Op.Binary(InfixOp.BitAnd, sl(4, U1), sl(5, U1))),
+          Inst.Move(register(2, U1), Op.Copy(sl(6, U1)))
+        ))
+    }
   }
 
 }
