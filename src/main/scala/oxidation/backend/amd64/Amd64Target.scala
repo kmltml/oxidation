@@ -12,24 +12,9 @@ import oxidation.ir.ConstantPoolEntry
 
 class Amd64Target { this: Output =>
 
-  type S[A] = Writer[M, A]
+  type F[A] = Writer[M, A]
 
-  val S = new MonadWriter[S, M] {
-
-    private val w = MonadWriter[S, M]
-
-    override def writer[A](aw: (M, A)): S[A] = w.writer(aw)
-
-    override def listen[A](fa: S[A]): S[(M, A)] = w.listen(fa)
-
-    override def pass[A](fa: S[((M) => M, A)]): S[A] = w.pass(fa)
-
-    override def pure[A](x: A): S[A] = w.pure(x)
-
-    override def flatMap[A, B](fa: S[A])(f: (A) => S[B]): S[B] = w.flatMap(fa)(f)
-
-    override def tailRecM[A, B](a: A)(f: (A) => S[Either[A, B]]): S[B] = w.tailRecM(a)(f)
-  }
+  val F = implicitly[MonadWriter[F, M]]
 
   val allocator: RegisterAllocator[RegLoc] =
     new RegisterAllocator[RegLoc](RegLoc.calleeSaved, RegLoc.callerSaved) {
@@ -82,10 +67,10 @@ class Amd64Target { this: Output =>
         case (r, allocator.Spill) => r -> Val.m(Some(regSize(r.typ)), RBP, stackAllocOffset(spills(r)))
       }
       val requiredStackSpace = calleeSaved.size + spills.size
-      val res: S[Unit] = fun.body.traverse_ {
+      val res: F[Unit] = fun.body.traverse_ {
         case ir.Block(name, instructions, flow) =>
           for {
-            _ <- S.tell(label(name))
+            _ <- F.tell(label(name))
             _ <- instructions.traverse(outputInstruction(_)(bindings, constants))
             _ <- outputFlow(flow, requiredStackSpace, calleeSaved)(bindings, constants)
           } yield ()
@@ -102,46 +87,46 @@ class Amd64Target { this: Output =>
   def move(dest: Val, src: Val): M =
     if(dest == src) M.empty else mov(dest, src)
 
-  def outputInstruction(i: ir.Inst)(implicit bindings: Map[ir.Register, Val], constants: Map[ir.ConstantPoolEntry, Name]): S[Unit] = i match {
-    case ir.Inst.Label(n) => S.tell(label(n))
+  def outputInstruction(i: ir.Inst)(implicit bindings: Map[ir.Register, Val], constants: Map[ir.ConstantPoolEntry, Name]): F[Unit] = i match {
+    case ir.Inst.Label(n) => F.tell(label(n))
 
-    case ir.Inst.Do(ir.Op.Copy(_)) => S.pure(())
+    case ir.Inst.Do(ir.Op.Copy(_)) => F.pure(())
 
     case ir.Inst.Do(ir.Op.Store(addr, offset, value)) =>
       assert(regSize(addr.typ) == RegSize.QWord)
       assert(regSize(offset.typ) == RegSize.QWord)
-      S.tell(move(Val.m(Some(regSize(value.typ)), toVal(addr), toVal(offset)), toVal(value)))
+      F.tell(move(Val.m(Some(regSize(value.typ)), toVal(addr), toVal(offset)), toVal(value)))
 
     case ir.Inst.Eval(_, ir.Op.Call(ir.Val.G(fun, _), params)) =>
       if(params.drop(4).nonEmpty) throw new NotImplementedError("passing parameters on stack is not yet supported")
-      S.tell(call(fun))
+      F.tell(call(fun))
 
     case ir.Inst.Move(dest, op) => op match {
       case ir.Op.Widen(src) => (signedness(src.typ), regSize(dest.typ), regSize(src.typ)) match {
-        case (_, a, b) if a == b => S.tell(mov(toVal(dest), toVal(src)))
+        case (_, a, b) if a == b => F.tell(mov(toVal(dest), toVal(src)))
 
         case (Unsigned, RegSize.QWord, RegSize.DWord) =>
           val Val.R(Reg(destLoc, _)) = toVal(dest)
-          S.tell(move(Reg(destLoc, RegSize.DWord), toVal(src)))
+          F.tell(move(Reg(destLoc, RegSize.DWord), toVal(src)))
 
         case (Signed, RegSize.QWord, RegSize.DWord) =>
-          S.tell(movsxd(toVal(dest), toVal(src)))
+          F.tell(movsxd(toVal(dest), toVal(src)))
 
-        case (Unsigned, _, _) => S.tell(movzx(toVal(dest), toVal(src)))
-        case (Signed, _, _) => S.tell(movsx(toVal(dest), toVal(src)))
+        case (Unsigned, _, _) => F.tell(movzx(toVal(dest), toVal(src)))
+        case (Signed, _, _) => F.tell(movsx(toVal(dest), toVal(src)))
       }
 
       case ir.Op.Trim(src) =>
-        S.tell(move(toVal(dest), toVal(src)))
+        F.tell(move(toVal(dest), toVal(src)))
 
       case ir.Op.Unary(PrefixOp.Not, src) =>
-        S.tell(Vector(
+        F.tell(Vector(
           move(toVal(dest), toVal(src)),
           xor(toVal(dest), 1)
         ).combineAll)
 
       case ir.Op.Binary(op @ (InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor), left, right) =>
-        S.tell(Vector(
+        F.tell(Vector(
           move(toVal(dest), toVal(left)),
           op match {
             case InfixOp.Add => add(toVal(dest), toVal(right))
@@ -151,11 +136,11 @@ class Amd64Target { this: Output =>
             case InfixOp.Xor => xor(toVal(dest), toVal(right))
           }
         ).combineAll)
-      case ir.Op.Binary(InfixOp.Div, _, right) => S.tell(div(toVal(right)))
-      case ir.Op.Binary(InfixOp.Mod, _, right) => S.tell(div(toVal(right)))
-      case ir.Op.Binary(InfixOp.Mul, _, right) => S.tell(mul(toVal(right)))
+      case ir.Op.Binary(InfixOp.Div, _, right) => F.tell(div(toVal(right)))
+      case ir.Op.Binary(InfixOp.Mod, _, right) => F.tell(div(toVal(right)))
+      case ir.Op.Binary(InfixOp.Mul, _, right) => F.tell(mul(toVal(right)))
       case ir.Op.Binary(op @ (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq | InfixOp.Neq), left, right) =>
-          S.tell(Vector(
+          F.tell(Vector(
             cmp(toVal(left), toVal(right)),
             op match {
               case InfixOp.Lt => setl(toVal(dest))
@@ -167,35 +152,35 @@ class Amd64Target { this: Output =>
             }
           ).combineAll)
 
-      case ir.Op.Copy(src) => S.tell(move(toVal(dest), toVal(src)))
-      case ir.Op.Garbled => S.pure(())
+      case ir.Op.Copy(src) => F.tell(move(toVal(dest), toVal(src)))
+      case ir.Op.Garbled => F.pure(())
 
       case ir.Op.Load(addr, off) =>
         assert(regSize(addr.typ) == RegSize.QWord)
         assert(regSize(off.typ) == RegSize.QWord)
-        S.tell(
+        F.tell(
           mov(toVal(dest), Val.m(Some(regSize(dest.typ)), toVal(addr), toVal(off)))
         )
 
       case ir.Op.Stackalloc(size) =>
         val allocSize = (size + 7) & ~7 // align to 8 bytes
         assert(allocSize >= size && allocSize % 8 == 0)
-        S.tell(Vector(
+        F.tell(Vector(
           sub(RSP, allocSize),
           lea(toVal(dest), Val.m(None, RSP, 32))
         ).combineAll)
     }
   }
 
-  def outputFlow(f: ir.FlowControl, localCount: Int, savedRegs: List[RegLoc])(implicit bindings: Map[ir.Register, Val], constants: Map[ir.ConstantPoolEntry, Name]): S[Unit] = f match {
+  def outputFlow(f: ir.FlowControl, localCount: Int, savedRegs: List[RegLoc])(implicit bindings: Map[ir.Register, Val], constants: Map[ir.ConstantPoolEntry, Name]): F[Unit] = f match {
     case ir.FlowControl.Return(r) =>
-      S.tell(Vector(
+      F.tell(Vector(
         epilogue(savedRegs),
         ret
       ).combineAll)
-    case ir.FlowControl.Goto(n) => S.tell(jmp(n))
+    case ir.FlowControl.Goto(n) => F.tell(jmp(n))
     case ir.FlowControl.Branch(cond, ifTrue, ifFalse) =>
-      S.tell(Vector(
+      F.tell(Vector(
         test(toVal(cond), toVal(cond)),
         jnz(ifTrue),
         jmp(ifFalse)
