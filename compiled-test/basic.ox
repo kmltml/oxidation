@@ -14,6 +14,11 @@ def basicTests() = {
         factorial(3) + factorial(5) == 126
     }, "Interfering ax precolours")
 
+    assert({
+        val x: u64 = 0xfffffffffffffffe
+        x + 1 == 0xffffffffffffffff
+    }, "unsigned long arithmetic")
+
     shortcircuit()
 }
 

@@ -4,6 +4,8 @@ package pass
 
 import ir._
 
+import java.lang.{ Long => JLong }
+
 object ExprWeaken extends IdPass {
 
   override def name = "expr-weaken"
@@ -29,11 +31,11 @@ object ExprWeaken extends IdPass {
 
     // x * (2|4|8|...) == (2|4|8|...) * x == x << (1|2|3|...)
     case Inst.Move(dest, Op.Binary(InfixOp.Mul, v, Val.I(i, _)))
-      if Integer.bitCount(i) == 1 =>
-      Vector(Inst.Move(dest, Op.Binary(InfixOp.Shl, v, Val.I(Integer.numberOfTrailingZeros(i), dest.typ))))
+      if JLong.bitCount(i) == 1 =>
+      Vector(Inst.Move(dest, Op.Binary(InfixOp.Shl, v, Val.I(JLong.numberOfTrailingZeros(i), dest.typ))))
     case Inst.Move(dest, Op.Binary(InfixOp.Mul, Val.I(i, _), v))
-      if Integer.bitCount(i) == 1 =>
-      Vector(Inst.Move(dest, Op.Binary(InfixOp.Shl, v, Val.I(Integer.numberOfTrailingZeros(i), dest.typ))))
+      if JLong.bitCount(i) == 1 =>
+      Vector(Inst.Move(dest, Op.Binary(InfixOp.Shl, v, Val.I(JLong.numberOfTrailingZeros(i), dest.typ))))
 
     // x / 1 == x
     case Inst.Move(dest, Op.Binary(InfixOp.Div, v, Val.I(1, _))) =>
@@ -41,8 +43,8 @@ object ExprWeaken extends IdPass {
 
     // x / (2|4|8|...) = x >> (1|2|3|...)
     case Inst.Move(dest, Op.Binary(InfixOp.Div, v, Val.I(i, _)))
-      if Integer.bitCount(i) == 1 =>
-      Vector(Inst.Move(dest, Op.Binary(InfixOp.Shr, v, Val.I(Integer.numberOfTrailingZeros(i), dest.typ))))
+      if JLong.bitCount(i) == 1 =>
+      Vector(Inst.Move(dest, Op.Binary(InfixOp.Shr, v, Val.I(JLong.numberOfTrailingZeros(i), dest.typ))))
 
   }
 

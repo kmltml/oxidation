@@ -134,7 +134,7 @@ class Serialize(val out: DataOutputStream) {
 
   def writeVal(v: Val): Unit = v match {
     case Val.G(n, t) => writeTag(Tag.Val.G); writeName(n); writeType(t)
-    case Val.I(i, t) => writeTag(Tag.Val.I); writeInt(i); writeType(t)
+    case Val.I(i, t) => writeTag(Tag.Val.I); writeLong(i); writeType(t)
     case Val.R(r) => writeTag(Tag.Val.R); writeRegister(r)
     case Val.Struct(m) => writeTag(Tag.Val.Struct); writeSeq(m)(writeVal)
     case Val.Const(e, t) => writeTag(Tag.Val.Const); writeConstantPoolEntry(e); writeType(t)

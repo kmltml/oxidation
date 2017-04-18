@@ -16,9 +16,7 @@ object Typer {
       expected match {
         case ExpectedType.Numeric(None) | ExpectedType.Undefined => Right(Typed(ast.IntLit(i), I32))
         case ExpectedType.Numeric(Some(t)) => Right(Typed(ast.IntLit(i), t))
-        case ExpectedType.Specific(t @ (I8 | I16 | I32 | I64)) => Right(Typed(ast.IntLit(i), t))
-        case ExpectedType.Specific(t @ (U8 | U16 | U32 | U64)) =>
-          if(i >= 0) Right(Typed(ast.IntLit(i), t)) else Left(TyperError.CantMatch(expected, I32))
+        case ExpectedType.Specific(t @ (I8 | I16 | I32 | I64 | U8 | U16 | U32 | U64)) => Right(Typed(ast.IntLit(i), t))
         case _ => unifyType(Typed(ast.IntLit(i), I32), expected)
       }
 

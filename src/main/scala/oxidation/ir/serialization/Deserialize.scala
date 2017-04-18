@@ -117,7 +117,7 @@ class Deserialize(val in: DataInputStream) {
 
   def readVal(): Val = readTag() match {
     case Tag.Val.G => Val.G(readName(), readType())
-    case Tag.Val.I => Val.I(readInt(), readType())
+    case Tag.Val.I => Val.I(readLong(), readType())
     case Tag.Val.R => Val.R(readRegister())
     case Tag.Val.Struct => Val.Struct(readSeq(readVal).toVector)
     case Tag.Val.Const => Val.Const(readConstantPoolEntry(), readType())

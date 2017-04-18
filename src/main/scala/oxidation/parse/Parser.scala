@@ -189,11 +189,11 @@ class Parser {
 
   private val intLiteral: P[IntLit] =
     P(hexInt | decimalInt).map(IntLit)
-  private val decimalInt: P[Int] =
-    CharsWhile(_.isDigit).!.map(_.toInt)
-  private val hexInt: P[Int] =
+  private val decimalInt: P[Long] =
+    CharsWhile(_.isDigit).!.map(java.lang.Long.parseUnsignedLong)
+  private val hexInt: P[Long] =
     ("0x" ~/ CharsWhile(c => c.isDigit || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')).!)
-      .map(Integer.parseInt(_, 16))
+      .map(java.lang.Long.parseUnsignedLong(_, 16))
 
   private val boolLiteral: P[BoolLit] = P(
     K("true").as(BoolLit(true))

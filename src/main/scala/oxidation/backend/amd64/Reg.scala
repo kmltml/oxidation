@@ -4,7 +4,7 @@ package amd64
 
 final case class Reg(loc: RegLoc, size: RegSize) {
 
-  def *(i: Int): (Reg, Int) = (this, i) // to allow for mov(Val.m(Reg.RBX * 2, 3), Val.I(10)) syntax
+  def *(i: Long): (Reg, Long) = (this, i) // to allow for mov(Val.m(Reg.RBX * 2, 3), Val.I(10)) syntax
 
   override def toString: String = {
     def prefix(s: RegSize) = s match {
@@ -35,7 +35,7 @@ final case class Reg(loc: RegLoc, size: RegSize) {
       case RegLoc.BP => prefix(size) + "bp" + extraSuffix(size)
       case RegLoc.SI => prefix(size) + "si" + extraSuffix(size)
       case RegLoc.DI => prefix(size) + "di" + extraSuffix(size)
-      case RegLoc.R8 => "r8" + newSuffix(size) 
+      case RegLoc.R8 => "r8" + newSuffix(size)
       case RegLoc.R9 => "r9" + newSuffix(size)
       case RegLoc.R10 => "r10" + newSuffix(size)
       case RegLoc.R11 => "r11" + newSuffix(size)

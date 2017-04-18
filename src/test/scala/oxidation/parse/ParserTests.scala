@@ -20,6 +20,7 @@ object ParserTests extends TestSuite {
       "int literals" - {
         expr.parse("42").get.value ==> IntLit(42)
         expr.parse("0xdeaf").get.value ==> IntLit(0xdeaf)
+        expr.parse("0xffffffffffffffff").get.value ==> IntLit(-1)
       }
       "bool literals" - {
         expr.parse("true").get.value ==> BoolLit(true)

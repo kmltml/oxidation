@@ -20,7 +20,7 @@ object Val {
   final case class R(register: Register) extends Val {
     def typ = register.typ
   }
-  final case class I(value: Int, typ: Type) extends Val
+  final case class I(value: Long, typ: Type) extends Val
   final case class G(name: Name, typ: Type) extends Val
   final case class Struct(members: Vector[Val]) extends Val {
     lazy val typ: Type = Type.Struct(members.map(_.typ))

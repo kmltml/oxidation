@@ -14,7 +14,7 @@ trait Ast {
 
   sealed trait Expression extends BlockStatement with Product with Serializable
 
-  final case class IntLit(value: Int) extends Expression
+  final case class IntLit(value: Long) extends Expression
   final case class BoolLit(value: Boolean) extends Expression
   final case class CharLit(value: Char) extends Expression
   final case class StringLit(value: String) extends Expression
