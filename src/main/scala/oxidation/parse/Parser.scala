@@ -139,10 +139,13 @@ class Parser {
     (namedType ~ typeParams.rep).map {
       case (t, paramLists) =>
         paramLists.foldLeft(t: TypeName)(TypeName.App(_, _))
-    }
+    } | intType
   )(Name("type"))
 
   private val namedType: P[TypeName.Named] = sym.map(TypeName.Named)
+
+  private val intType: P[TypeName.IntLiteral] =
+    P(decimalInt | hexInt).map(TypeName.IntLiteral)
 
   private val typeParams: P[List[TypeName]] =
     P("[" ~/ typ.rep(sep = ",", min = 1).map(_.toList) ~ "]")

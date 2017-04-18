@@ -305,6 +305,11 @@ object ParserTests extends TestSuite {
       "a type constructor application" - {
         tpe.parse("ptr[i8]").get.value ==> TypeName.App(TypeName.Named("ptr"), List(TypeName.Named("i8")))
       }
+      "an int singleton type" - {
+        tpe.parse("42").get.value ==> TypeName.IntLiteral(42)
+        tpe.parse("arr[i32, 10]").get.value ==>
+          TypeName.App(TypeName.Named("arr"), List(TypeName.Named("i32"), TypeName.IntLiteral(10)))
+      }
     }
 
     "top-level definition should parse" - {
