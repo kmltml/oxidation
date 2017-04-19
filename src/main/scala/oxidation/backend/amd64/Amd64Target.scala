@@ -119,7 +119,11 @@ class Amd64Target { this: Output =>
       }
 
       case ir.Op.Trim(src) =>
-        F.tell(move(toVal(dest), toVal(src)))
+        toVal(src) match {
+          case Val.R(Reg(loc, _)) =>
+            F.tell(move(toVal(dest), Val.R(Reg(loc, regSize(dest.typ)))))
+          case v => F.tell(move(toVal(dest), v))
+        }
 
       case ir.Op.Unary(PrefixOp.Not, src) =>
         F.tell(Vector(

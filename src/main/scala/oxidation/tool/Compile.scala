@@ -144,7 +144,7 @@ object Compile {
   }
 
   def main(args: Array[String]): Unit = {
-    optParser.parse(args, Options()).foreach(compile(_))
+    optParser.parse(args, Options()).foreach(opt => get(compile(opt)))
   }
 
 
