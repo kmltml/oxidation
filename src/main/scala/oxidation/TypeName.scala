@@ -13,4 +13,7 @@ object TypeName {
   def ptr(pointee: TypeName): TypeName =
     App(Named(Symbol.Global(List("ptr"))), List(pointee))
 
+  def arr(member: TypeName, size: Int): TypeName =
+    App(Named(Symbol.Global(List("arr"))), List(member, IntLiteral(size)))
+
 }

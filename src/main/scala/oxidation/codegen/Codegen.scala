@@ -227,6 +227,24 @@ object Codegen {
         )
       } yield Val.R(r)
 
+    case Typed(ast.App(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), Nil), analyze.Type.Arr(member, _)), List(index)), t) =>
+      assert(member == t)
+      for {
+        ptrVal <- compileExpr(ptr)
+        resType = translateType(member)
+        offVal <- for {
+          v <- compileExpr(index)
+          r <- genReg(Type.I64)
+          _ <- instructions(
+            Inst.Move(r, Op.Binary(InfixOp.Mul, v, Val.I(resType.size, Type.I64)))
+          )
+        } yield Val.R(r)
+        r <- genReg(resType)
+        _ <- instructions(
+          Inst.Move(r, Op.Load(ptrVal, offVal))
+        )
+      } yield Val.R(r)
+
     case Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), params), t) =>
       for {
         ptrv <- compileExpr(ptr)
@@ -244,6 +262,25 @@ object Codegen {
           Inst.Move(r, Op.Load(ptrv, offv getOrElse Val.I(0, Type.I64)))
         )
       } yield Val.R(r)
+
+    case Typed(ast.Assign(Typed(ast.App(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), Nil), analyze.Type.Arr(member, _)), List(index)), _),
+                          None, rval), _) =>
+      for {
+        right <- compileExpr(rval)
+        ptrVal <- compileExpr(ptr)
+        resType = translateType(member)
+        offVal <- for {
+          v <- compileExpr(index)
+          r <- genReg(Type.I64)
+          _ <- instructions(
+            Inst.Move(r, Op.Binary(InfixOp.Mul, v, Val.I(resType.size, Type.I64)))
+          )
+        } yield Val.R(r)
+        r <- genReg(resType)
+        _ <- instructions(
+          Inst.Do(Op.Store(ptrVal, offVal, right))
+        )
+      } yield Val.I(0, Type.U0)
 
     case Typed(ast.Assign(Typed(ast.Var(n), _), None, rval), _) =>
       for {
@@ -329,7 +366,7 @@ object Codegen {
       } yield (paramRegs.map(_._2), vtemp)
       val (Log(instrs, consts), (paramRegs, v)) = s.run.runA(CodegenState()).value
       val retType = translateType(body.typ)
-      Def.Fun(Name.Global(name.toList), paramRegs, retType, Vector(Block(Name.Local("body", 0), instrs, FlowControl.Return(ir.Val.R(v)))), consts.toSet)
+      Def.Fun(Name.Global(name), paramRegs, retType, Vector(Block(Name.Local("body", 0), instrs, FlowControl.Return(ir.Val.R(v)))), consts.toSet)
   }
 
   private def translateType(t: analyze.Type): ir.Type = t match {
@@ -347,9 +384,11 @@ object Codegen {
 
 
     case analyze.Type.Fun(params, ret) =>
-      ir.Type.Fun(params.toList.map(translateType), translateType(ret))
+      ir.Type.Fun(params.map(translateType), translateType(ret))
 
     case analyze.Type.Ptr(_) => ir.Type.Ptr
+
+    case analyze.Type.Arr(member, size) => ir.Type.Arr(translateType(member), size)
 
     case analyze.Type.Struct(_, members) => ir.Type.Struct(members.map(m => translateType(m.typ)).toVector)
 

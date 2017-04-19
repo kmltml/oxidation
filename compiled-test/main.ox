@@ -1,6 +1,7 @@
 import structs.structTests
 import ptrs.ptrTests
 import stackAlloc.stackAllocTests
+import arrays.arrayTests
 import spills.spillTests
 
 def main(): u0 = {
@@ -9,5 +10,6 @@ def main(): u0 = {
     ptrTests()
     stackAllocTests()
     spillTests()
+    arrayTests()
     exit(0)
 }

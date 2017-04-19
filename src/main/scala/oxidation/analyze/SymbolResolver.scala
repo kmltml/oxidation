@@ -148,6 +148,8 @@ object SymbolResolver {
       (solveType(const, scope), params.traverse(solveType(_, scope)))
         .map2(TypeName.App)
 
+    case l: TypeName.IntLiteral => Right(l)
+
   }
 
   private def getOnlyOneSymbol(s: String, scope: Multimap[String, Symbol]): Res[Symbol] =

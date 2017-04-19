@@ -35,6 +35,9 @@ trait Output {
   def xor(dest: Val, src: Val): M
   def and(dest: Val, src: Val): M
   def or(dest: Val, src: Val): M
+  def shl(dest: Val, src: Val): M
+  def shr(dest: Val, src: Val): M
+  def sar(dest: Val, src: Val): M
 
   def div(src: Val): M
   def mul(src: Val): M

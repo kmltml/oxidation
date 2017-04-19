@@ -224,7 +224,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)), nextReg = 1)).value ==>
             (insts(
               Inst.Move(r(0, _.I32), Op.Copy(20))
-            ), Val.I(0, ir.Type.U0))
+            ), u0)
         }
         "ptr" - {
           compileExpr(ast.Assign(ast.App(ast.Var(l('p)) :: Ptr(TypeName.Named(g('i32))), List(ast.IntLit(8) :: I64)) :: I32,
@@ -232,7 +232,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             (insts(
               Inst.Move(r(1, _.I64), Op.Binary(InfixOp.Mul, Val.I(8, ir.Type.I64), Val.I(4, ir.Type.I64))),
               Inst.Do(Op.Store(r(0, _.Ptr), r(1, _.I64), 20))
-            ), Val.I(0, ir.Type.U0))
+            ), u0)
         }
         "struct member" - {
           val struct = Struct(g('foo), List(
@@ -244,7 +244,19 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             .run.runA(CodegenState(registerBindings = Map(l('x) -> r0), nextReg = 1)).value ==>
             (insts(
               Inst.Move(r0, Op.StructCopy(r0, Map(0 -> Val.I(20, ir.Type.I64))))
-            ), Val.I(0, ir.Type.U0))
+            ), u0)
+        }
+        "arr ptr" - {
+          compileExpr(ast.Assign(
+            ast.App(
+              ast.App(ast.Var(l('foo)) :: Ptr(TypeName.arr(TypeName.Named(g('i32)), 10)), Nil) :: Arr(I32, 10),
+              List(ast.IntLit(5) :: I64)) :: I32,
+            None, ast.IntLit(42) :: I32
+          ) :: U0).run.runA(CodegenState(registerBindings = Map(l('foo) -> r(0, _.Ptr)), nextReg = 1)).value ==>
+            (insts(
+              Inst.Move(r(1, _.I64), Op.Binary(InfixOp.Mul, i64(5), i64(ir.Type.I32.size))),
+              Inst.Do(Op.Store(r(0, _.Ptr), r(1, _.I64), i32(42)))
+            ), u0)
         }
       }
       "Select" - {
@@ -285,6 +297,15 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
                 Inst.Move(r(2, _.I32), Op.Load(r(0, _.Ptr), r(1, _.I64)))
               ), Val.R(r(2, _.I32)))
           }
+        }
+        "array pointer" - {
+          compileExpr(ast.App(
+            ast.App(ast.Var(l('foo)) :: Ptr(TypeName.arr(TypeName.Named(g('i32)), 10)), Nil) :: Arr(I32, 10),
+            List(ast.IntLit(5) :: I64)) :: I32).run.runA(CodegenState(registerBindings = Map(l('foo) -> r(0, _.Ptr)), nextReg = 1)).value ==>
+            (insts(
+              Inst.Move(r(1, _.I64), Op.Binary(InfixOp.Mul, i64(5), i64(ir.Type.I32.size))),
+              Inst.Move(r(2, _.I32), Op.Load(r(0, _.Ptr), r(1, _.I64)))
+            ), Val.R(r(2, _.I32)))
         }
       }
       "Stackalloc" - {

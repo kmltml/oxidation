@@ -145,10 +145,14 @@ object Typer {
               case List(off) => solveType(off, ExpectedType.Specific(I64), ctxt).map(List(_))
               case s => Left(TyperError.TooManyParamsForPointerDereference(s.size))
             }
+          case Arr(_, _) =>
+            if(pars.size != 1) Left(TyperError.WrongNumberOfArguments(1, pars.size))
+            else pars.traverse(solveType(_, ExpectedType.Specific(I64), ctxt))
         }
         valType <- fnTyped.typ match {
           case Fun(_, retType) => Right(retType)
           case Ptr(pointee) => Right(lookupType(pointee, ctxt))
+          case Arr(member, _) => Right(member)
         }
         t <- unifyType(Typed(ast.App(fnTyped, typedParams), valType), expected)
       } yield t
@@ -234,7 +238,7 @@ object Typer {
           } yield Typed(ast.VarDef(name, tpe, typedVal): ast.BlockStatement, U0)
       }
       (for {
-        body <- stmnts.init.toVector.traverse(stmnt(_, ExpectedType.Undefined))
+        body <- stmnts.init.traverse(stmnt(_, ExpectedType.Undefined))
         last <- stmnt(stmnts.last, expected)
         t <- StateT.lift(unifyType(Typed(ast.Block(body :+ last), last.typ), expected))
       } yield t).runA(ctxt)
@@ -264,6 +268,7 @@ object Typer {
       }
     case e => solveType(e, ExpectedType.Undefined, ctxt).flatMap {
       case lTyped @ Typed(ast.App(Typed(ptr, _: Ptr), _), _) => Right(lTyped)
+      case lTyped @ Typed(ast.App(Typed(_, _: Arr), _), _) => Right(lTyped) // TODO arr ref too has to be an lval
       case e => Left(TyperError.NotAnLVal(e))
     }
   }
@@ -280,6 +285,8 @@ object Typer {
 
   def lookupType(t: TypeName, ctxt: Ctxt): Type = t match {
     case TypeName.App(TypeName.Named(Symbol.Global(List("ptr"))), List(pointee)) => Type.Ptr(pointee)
+    case TypeName.App(TypeName.Named(Symbol.Global(List("arr"))), List(member, TypeName.IntLiteral(size))) =>
+      Type.Arr(lookupType(member, ctxt), size.toInt)
     case TypeName.Named(s) => ctxt.types(s)
   }
 
@@ -322,6 +329,7 @@ object Typer {
 
     case (f: Fun, ExpectedType.Appliable) => Right(t)
     case (p: Ptr, ExpectedType.Appliable) => Right(t)
+    case (a: Arr, ExpectedType.Appliable) => Right(t)
     case (_, ExpectedType.Appliable) => Left(TyperError.CantMatch(expected, t.typ))
 
     case (typ, ExpectedType.Specific(U0))

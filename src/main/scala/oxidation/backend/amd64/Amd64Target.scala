@@ -127,7 +127,7 @@ class Amd64Target { this: Output =>
           xor(toVal(dest), 1)
         ).combineAll)
 
-      case ir.Op.Binary(op @ (InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor), left, right) =>
+      case ir.Op.Binary(op @ (InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor | InfixOp.Shl | InfixOp.Shr), left, right) =>
         F.tell(Vector(
           move(toVal(dest), toVal(left)),
           op match {
@@ -136,6 +136,11 @@ class Amd64Target { this: Output =>
             case InfixOp.BitAnd => and(toVal(dest), toVal(right))
             case InfixOp.BitOr => or(toVal(dest), toVal(right))
             case InfixOp.Xor => xor(toVal(dest), toVal(right))
+            case InfixOp.Shl => shl(toVal(dest), toVal(right))
+            case InfixOp.Shr => signedness(dest.typ) match {
+              case Signed   => sar(toVal(dest), toVal(right))
+              case Unsigned => shr(toVal(dest), toVal(right))
+            }
           }
         ).combineAll)
       case ir.Op.Binary(InfixOp.Div, _, right) => F.tell(div(toVal(right)))

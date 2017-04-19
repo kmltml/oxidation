@@ -7,6 +7,8 @@ def basicTests() = {
     assert(five * two == 10, "Multiplication")
     assert(eight / two == 4, "Division")
     assert(five % two == 1, "Modulo")
+    assert(five >> 1 == 2, "Shift right")
+    assert(five << 1 == 10, "Shift left")
     assert(!false && (!true == false), "Not")
     assert(factorial(10) == 3628800, "Factorial")
 

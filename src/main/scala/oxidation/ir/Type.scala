@@ -16,6 +16,7 @@ sealed trait Type {
     case U0 | U1 => 1
     case Fun(_, _) => ???
     case Struct(members) => members.map(_.size).sum
+    case Arr(member, elemCount) => member.size * elemCount
   }
 
 }
@@ -55,6 +56,8 @@ object Type {
     def offset(index: Int): Int = layout(index)
 
   }
+
+  final case class Arr(member: Type, elems: Int) extends Type
 
   implicit val show: Show[Type] = new Show[Type] {
     def show(t: Type): String = t match {

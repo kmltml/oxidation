@@ -138,6 +138,11 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
               Right(ast.App(ast.Var(l('foo)) :: Ptr(TypeName.Named(g('i32))), List(ast.IntLit(20) :: I64)) :: I32)
           }
         }
+        "Arr" - {
+          solveType(P.App(P.Var(l('foo)), List(P.IntLit(10))), ExpectedType.Undefined,
+            Ctxt.default.withTerms(Map(l('foo) -> imm(Arr(I32, 20))))) ==>
+            Right(ast.App(ast.Var(l('foo)) :: Arr(I32, 20), List(ast.IntLit(10) :: I64)) :: I32)
+        }
       }
       "if expression" - {
         solveType(P.If(P.BoolLit(true), P.IntLit(10), Some(P.IntLit(20))),
@@ -185,7 +190,7 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         "Select" - {
           val struct = Struct(g('foo), List(
             StructMember("x", I32),
-            StructMember("y", I64)            
+            StructMember("y", I64)
           ))
           "mutable" - {
             solveType(P.Assign(P.Select(P.Var(l('x)), "x"), None, P.IntLit(10)),
@@ -197,6 +202,11 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
               ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(struct)))) ==>
               Left(TyperError.ImmutableAssign(l('x)))
           }
+        }
+        "Arr app" - {
+          solveType(P.Assign(P.App(P.Var(l('a)), List(P.IntLit(5))), None, P.IntLit(10)),
+            ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('a) -> mut(Arr(I32, 10))))) ==>
+            Right(ast.Assign(ast.App(ast.Var(l('a)) :: Arr(I32, 10), List(ast.IntLit(5) :: I64)) :: I32, None, ast.IntLit(10) :: I32) :: U0)
         }
         "composite" - {
           solveType(P.Assign(P.Var(l('x)), Some(InfixOp.Add), P.IntLit(20)), ExpectedType.Undefined,
