@@ -12,6 +12,8 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
 
   def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun
 
+  def includeRegister(register: ir.Register): Boolean
+
   sealed trait Alloc
   final case class R(r: Reg) extends Alloc
   case object Spill extends Alloc
@@ -41,7 +43,7 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
   def buildInterferenceSubGraph(block: ir.Block, inputs: Set[ir.Register],
                                 outputs: Set[ir.Register]): InterferenceGraph[ir.Register, Reg] = {
     val instrs = (block.instructions :+ ir.Inst.Flow(block.flow)).zipWithIndex
-    val regs = block.instructions.flatMap(_.regs)
+    val regs = (block.instructions.flatMap(_.regs) ++ inputs ++ outputs).filter(includeRegister)
     val lifetimes = regs.map(r => r -> RegisterLifetime.lifetime(r, instrs, inputs, outputs)).toMap
     val calls = instrs.collect {
       case (ir.Inst.Eval(_, ir.Op.Call(_, _)), i) => Call(i)
@@ -61,6 +63,10 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
       override def tailRecM[A, B](a: A)(f: (A) => F[Either[A, B]]): F[B] = W.tailRecM(a)(f)
       override def pure[A](x: A): F[A] = W.pure(x)
     }
+    assert(sorted.collect {
+      case Start(_, r) => r
+      case End(_, r) => r
+    }.forall(includeRegister))
     val f: F[Unit] = sorted.traverse_ {
       case Start(_, r) => for {
         live <- S.get
@@ -74,10 +80,14 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
       } yield ()
     }
     val edges = f.written.runA(inputs).value
+    assert(edges.forall(t => includeRegister(t._1) && includeRegister(t._2)))
     val moves = instrs.collect {
-      case (ir.Inst.Move(dest, ir.Op.Copy(ir.Val.R(src))), _) => dest -> src
-      case (ir.Inst.Move(dest, ir.Op.Widen(ir.Val.R(src))), _) => dest -> src // seems reasonable, but i'm not sure, should be tested further
+      case (ir.Inst.Move(dest, ir.Op.Copy(ir.Val.R(src))), _)
+        if includeRegister(dest) && includeRegister(src) => dest -> src
+      case (ir.Inst.Move(dest, ir.Op.Widen(ir.Val.R(src))), _)
+        if includeRegister(dest) && includeRegister(src) => dest -> src // seems reasonable, but i'm not sure, should be tested further
     }
+    assert(moves.forall(t => includeRegister(t._1) && includeRegister(t._2)))
     val callVRegs = if(calls.isEmpty) Set() else virtualRegs.keySet
     InterferenceGraph.empty
       .withNodes(regs.toSet ++ callVRegs)
@@ -88,16 +98,18 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
   def buildInterferenceGraph(fun: ir.Def.Fun): InterferenceGraph[ir.Register, Reg] = {
     val graph = FlowGraph(fun.body)
     val inputs = {
-      val i = graph.blocks.mapValues(RegisterLifetime.inputs)
+      val i = graph.blocks.mapValues(RegisterLifetime.inputs(_).filter(includeRegister))
       val firstName = fun.body.head.name
       i.updated(firstName, i(firstName) ++ fun.params)
     }
-    val outputs = graph.blocks.mapValues(b => RegisterLifetime.outputs(graph, b.name, inputs))
-    val ghosts = graph.blocks.mapValues(b => RegisterLifetime.ghosts(graph, b.name, inputs, outputs))
+    val outputs = graph.blocks.mapValues(b => RegisterLifetime.outputs(graph, b.name, inputs).filter(includeRegister))
+    val ghosts = graph.blocks.mapValues(b => RegisterLifetime.ghosts(graph, b.name, inputs, outputs).filter(includeRegister))
     val interferenceGraph = fun.body.foldMap { b =>
       buildInterferenceSubGraph(b, inputs(b.name) ++ ghosts(b.name), outputs(b.name) ++ ghosts(b.name))
     }
-    interferenceGraph.copy(colours = interferenceGraph.colours ++ virtualRegs.filterKeys(interferenceGraph.nodes))
+    interferenceGraph.withColours(virtualRegs.filterKeys(interferenceGraph.nodes)) ensuring {
+      _.nodes.forall(includeRegister)
+    }
   }
 
   val colourCount = calleeSavedRegs.size + callerSavedRegs.size

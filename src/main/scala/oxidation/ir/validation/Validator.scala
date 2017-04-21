@@ -44,17 +44,27 @@ object Validator {
     case Inst.Move(dest, op @ Op.Widen(v)) =>
       for {
         _ <- validateOp(loc, op)
-        _ <- cond(v.typ.isInstanceOf[Type.Num], ValidationError.NotANumericType(loc, v.typ))
+        _ <- expectNum(loc, v.typ)
         _ <- S.modify(_ + dest)
       } yield ()
     case Inst.Move(dest, op @ Op.Trim(v)) =>
       for {
         _ <- validateOp(loc, op)
-        _ <- cond(v.typ.isInstanceOf[Type.Num], ValidationError.NotANumericType(loc, v.typ))
-        _ <- cond(dest.typ.isInstanceOf[Type.Num], ValidationError.NotANumericType(loc, dest.typ))
+        _ <- expectNum(loc, v.typ)
+        _ <- expectNum(loc, dest.typ)
         _ <- S.modify(_ + dest)
       } yield ()
     case Inst.Move(dest, Op.Garbled) => S.modify(_ + dest)
+    case Inst.Move(dest, Op.Arr(init)) =>
+      for {
+        initType <- init.traverse(valType(loc, _))
+        destArr <- dest.typ match {
+          case a: Type.Arr => ES.pure(a)
+          case t => ES.raiseError[Type.Arr](ValidationError.WrongType(loc, t, Type.Arr(initType getOrElse Type.U0, 0)))
+        }
+        _ <- cond(initType.forall(_ == destArr.member), ValidationError.WrongType(loc, destArr.member, initType.get))
+        _ <- S.modify(_ + dest)
+      } yield ()
     case Inst.Move(dest, op) => for {
       opType <- validateOp(loc, op)
       _ <- cond(opType.forall(_ == dest.typ), ValidationError.WrongType(loc, dest.typ, opType.get))
@@ -81,7 +91,7 @@ object Validator {
         _ <- substs.toList.traverse_ {
           case (i, v) => for {
             _ <- cond(srcType.members.indices contains i, ValidationError.StructMemberOutOfBounds(loc, srcType, i))
-            _ <- cond(srcType.members(i) == v.typ, ValidationError.WrongType(loc, srcType.members(i), v.typ))
+            _ <- expect(loc, srcType.members(i), v.typ)
           } yield ()
         }
       } yield Some(srcType)
@@ -119,27 +129,27 @@ object Validator {
     case Op.Load(addr, offset) =>
       for {
         addrType <- valType(loc, addr)
-        _ <- cond(addrType == Type.Ptr, ValidationError.WrongType(loc, Type.Ptr, addrType))
+        _ <- expect(loc, Type.Ptr, addrType)
         offsetType <- valType(loc, offset)
-        _ <- cond(offsetType == Type.I64, ValidationError.WrongType(loc, Type.I64, offsetType))
+        _ <- expect(loc, Type.I64, offsetType)
       } yield None
     case Op.Store(addr: Val, offset: Val, value: Val) =>
       for {
         addrType <- valType(loc, addr)
-        _ <- cond(addrType == Type.Ptr, ValidationError.WrongType(loc, Type.Ptr, addrType))
+        _ <- expect(loc, Type.Ptr, addrType)
         offsetType <- valType(loc, offset)
-        _ <- cond(offsetType == Type.I64, ValidationError.WrongType(loc, Type.I64, offsetType))
+        _ <- expect(loc, Type.I64, offsetType)
         _ <- valType(loc, value)
       } yield Some(Type.U0)
     case Op.Unary(op: PrefixOp, right: Val)  => op match {
       case PrefixOp.Inv | PrefixOp.Neg => for {
         rightType <- valType(loc, right)
-        _ <- cond(rightType.isInstanceOf[Type.Num], ValidationError.NotANumericType(loc, rightType))
+        _ <- expectNum(loc, rightType)
       } yield Some(rightType)
 
       case PrefixOp.Not => for {
         rightType <- valType(loc, right)
-        _ <- cond(rightType == Type.U1, ValidationError.WrongType(loc, Type.U1, rightType))
+        _ <- expect(loc, Type.U1, rightType)
       } yield Some(Type.U1)
     }
     case Op.Binary(InfixOp.Add, left, right)
@@ -148,41 +158,63 @@ object Validator {
       for {
         _ <- valType(loc, left)
         r <- valType(loc, right)
-        _ <- cond(right.typ == Type.I64, ValidationError.WrongType(loc, Type.I64, right.typ))
+        _ <- expect(loc, Type.I64, right.typ)
       } yield Some(Type.Ptr)
 
     case Op.Binary(InfixOp.Add | InfixOp.Sub | InfixOp.Mul | InfixOp.Div | InfixOp.Mod | InfixOp.Shl | InfixOp.Shr, left, right) =>
       for {
         ltype <- valType(loc, left)
-        _ <- cond(ltype.isInstanceOf[Type.Num], ValidationError.NotANumericType(loc, ltype))
+        _ <- expectNum(loc, ltype)
         rtype <- valType(loc, right)
-        _ <- cond(ltype == rtype, ValidationError.WrongType(loc, ltype, rtype))
+        _ <- expect(loc, ltype, rtype)
       } yield Some(ltype)
 
     case Op.Binary(InfixOp.Eq | InfixOp.Neq, left, right) =>
       for {
         ltype <- valType(loc, left)
         rtype <- valType(loc, right)
-        _ <- cond(ltype == rtype, ValidationError.WrongType(loc, ltype, rtype))
+        _ <- expect(loc, ltype, rtype)
       } yield Some(Type.U1)
 
     case Op.Binary(InfixOp.Lt | InfixOp.Leq | InfixOp.Gt | InfixOp.Geq, left, right) =>
       for {
         ltype <- valType(loc, left)
-        _ <- cond(ltype.isInstanceOf[Type.Num], ValidationError.NotANumericType(loc, ltype))
+        _ <- expectNum(loc, ltype)
         rtype <- valType(loc, right)
-        _ <- cond(ltype == rtype, ValidationError.WrongType(loc, ltype, rtype))
+        _ <- expect(loc, ltype, rtype)
       } yield Some(Type.U1)
     case Op.Binary(InfixOp.Xor | InfixOp.BitAnd | InfixOp.BitOr, left, right) =>
       for {
         ltype <- valType(loc, left)
         _ <- cond(ltype.isInstanceOf[Type.Num] || ltype == Type.U1, ValidationError.NotANumericType(loc, ltype))
         rtype <- valType(loc, right)
-        _ <- cond(ltype == rtype, ValidationError.WrongType(loc, ltype, rtype))
+        _ <- expect(loc, ltype, rtype)
       } yield Some(ltype)
 
     case Op.Stackalloc(_) =>
       ES.pure(Some(Type.Ptr))
+
+    case Op.ArrStore(arr, index, value) =>
+      for {
+        atype <- valType(loc, arr) flatMap {
+          case a: Type.Arr => ES.pure(a)
+          case t => ES.raiseError[Type.Arr](ValidationError.NotAnArray(loc, t))
+        }
+        itype <- valType(loc, index)
+        vtype <- valType(loc, value)
+        _ <- expect(loc, Type.I64, itype)
+        _ <- expect(loc, atype.member, vtype)
+      } yield Some(Type.U0)
+
+    case Op.Elem(arr, index) =>
+      for {
+        atype <- valType(loc, arr) flatMap {
+          case a: Type.Arr => ES.pure(a)
+          case t => ES.raiseError[Type.Arr](ValidationError.NotAnArray(loc, t))
+        }
+        itype <- valType(loc, index)
+        _ <- expect(loc, Type.I64, itype)
+      } yield Some(atype.member)
   }
 
   private def valType(loc: Location, v: Val): EitherT[State[Set[Register], ?], ValidationError, Type] = v match {
@@ -195,5 +227,11 @@ object Validator {
 
   private def cond(test: Boolean, error: => ValidationError): ES[Unit] =
     EitherT.cond(test, (), error)
+
+  private def expect(loc: Location, expected: Type, found: Type): ES[Unit] =
+    cond(expected == found, ValidationError.WrongType(loc, expected, found))
+
+  private def expectNum(loc: Location, found: Type): ES[Unit] =
+    cond(found.isInstanceOf[Type.Num], ValidationError.NotANumericType(loc, found))
 
 }

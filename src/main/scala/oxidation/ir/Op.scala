@@ -21,6 +21,9 @@ sealed trait Op {
       case Op.Widen(v) => Set(v)
       case Op.Trim(v) => Set(v)
       case Op.Member(s, _) => Set(s)
+      case Op.Elem(a, i) => Set(a, i)
+      case Op.Arr(i) => i.toSet
+      case Op.ArrStore(a, i, v) => Set(a, i, v)
       case Op.Stackalloc(_) => Set.empty
       case Op.StructCopy(v, s) => s.values.toSet + v
     }
@@ -44,6 +47,9 @@ object Op {
   final case class Member(src: Val, index: Int) extends Op
   final case class Stackalloc(size: Int) extends Op
   final case class StructCopy(src: Val, substs: Map[Int, Val]) extends Op
+  final case class Elem(arr: Val, index: Val) extends Op
+  final case class Arr(init: Option[Val]) extends Op
+  final case class ArrStore(arr: Val, index: Val, value: Val) extends Op
   case object Garbled extends Op // Assigned to register to indicate, that some instruction also writes to this register as a side effect
 
   implicit val show: Show[Op] = {
@@ -58,6 +64,10 @@ object Op {
     case Member(s, i) => show"member $s.$i"
     case Stackalloc(s) => show"stackalloc $s"
     case StructCopy(src, substs) => show"structcopy $src { ${substs.map{ case (k, v) => show".$k -> $v" } mkString ", " } }"
+    case Elem(arr, index) => show"elem $arr ($index) "
+    case Arr(Some(init)) => show"arr ($init)"
+    case Arr(None) => "arr"
+    case ArrStore(arr, index, value) => show"arrstore $arr ($index) = $value"
     case Garbled => "garbled"
   }
 }

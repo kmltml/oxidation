@@ -18,4 +18,14 @@ def arrayTests(): u0 = {
         }
         sum == 55 && product == 3628800
     }, "Stackalloc'd array")
+    assert({
+        val a = arr[i32](1, 2, 3, 4, 5)
+        var sum = 0
+        var i = 0
+        while(i < 5) {
+            sum += a(i)
+            i += 1
+        }
+        sum == 15
+    }, "Local array")
 }

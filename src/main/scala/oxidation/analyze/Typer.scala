@@ -39,6 +39,21 @@ object Typer {
     case P.TypeApp(P.Var(Symbol.Global(List("stackalloc"))), List(pointee)) =>
       unifyType(Typed(ast.Stackalloc(lookupType(pointee, ctxt)), Ptr(pointee)), expected)
 
+    case P.App(P.TypeApp(P.Var(Symbol.Global(List("arr"))), membertn :: typeTail), termParams) =>
+      for {
+        size <- typeTail.headOption traverse {
+          case TypeName.IntLiteral(i) => Right(i.toInt)
+          case tn => Left(TyperError.NotASingletonType(tn))
+        }
+        _ <- size match {
+          case Some(s) => Either.cond(termParams.size == s || termParams.size == 1, (), TyperError.WrongNumberOfArguments(s, termParams.size))
+          case None => Right(())
+        }
+        memberType = lookupType(membertn, ctxt)
+        typedParams <- termParams.traverse(solveType(_, ExpectedType.Specific(memberType), ctxt))
+      } yield Typed(ast.ArrLit(typedParams), Arr(memberType, size getOrElse typedParams.size))
+
+
     case P.StructLit(name, members) =>
       for {
         struct <- lookupType(TypeName.Named(name), ctxt) match {

@@ -39,6 +39,7 @@ trait Ast {
   final case class Reinterpret(expr: Typed[Expression]) extends Expression
   final case class Ignore(expr: Typed[Expression]) extends Expression
   final case class Stackalloc(pointee: TypeInfo) extends Expression
+  final case class ArrLit(elems: List[Typed[Expression]]) extends Expression
 
 
   sealed trait TLD

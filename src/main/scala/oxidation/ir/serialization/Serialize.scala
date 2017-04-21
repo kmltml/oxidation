@@ -103,6 +103,9 @@ class Serialize(val out: DataOutputStream) {
     case Op.StructCopy(s, m) => writeTag(Tag.Op.StructCopy); writeVal(s); writeSeq(m.toSeq) {
       case (k, v) => writeInt(k); writeVal(v)
     }
+    case Op.Elem(a, i) => writeTag(Tag.Op.Elem); writeVal(a); writeVal(i)
+    case Op.Arr(i) => writeTag(Tag.Op.Arr); writeOption(i)(writeVal)
+    case Op.ArrStore(a, i, v) => writeTag(Tag.Op.ArrStore); writeVal(a); writeVal(i); writeVal(v)
   }
 
   def writeInfixOp(o: InfixOp): Unit = writeTag(o match {

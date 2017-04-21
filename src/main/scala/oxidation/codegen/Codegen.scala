@@ -263,6 +263,16 @@ object Codegen {
         )
       } yield Val.R(r)
 
+    case Typed(ast.App(arr @ Typed(_, _: analyze.Type.Arr), index :: Nil), t) =>
+      for {
+        r <- genReg(translateType(t))
+        a <- compileExpr(arr)
+        i <- compileExpr(index)
+        _ <- instructions(
+          Inst.Move(r, Op.Elem(a, i))
+        )
+      } yield Val.R(r)
+
     case Typed(ast.Assign(Typed(ast.App(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), Nil), analyze.Type.Arr(member, _)), List(index)), _),
                           None, rval), _) =>
       for {
@@ -336,6 +346,32 @@ object Codegen {
         r <- genReg(Type.Ptr)
         _ <- instructions(
           Inst.Move(r, Op.Stackalloc(translateType(pointee).size))
+        )
+      } yield Val.R(r)
+
+    case Typed(ast.ArrLit(elems), arrType @ analyze.Type.Arr(_, size))
+      if elems.size == size =>
+      for {
+        r <- genReg(translateType(arrType))
+        _ <- instructions(
+          Inst.Move(r, Op.Arr(None))
+        )
+        _ <- elems.zipWithIndex.traverse_ { case (e, i) =>
+          for {
+            v <- compileExpr(e)
+            _ <- instructions(
+              Inst.Do(Op.ArrStore(Val.R(r), Val.I(i, Type.I64), v))
+            )
+          } yield ()
+        }
+      } yield Val.R(r)
+
+    case Typed(ast.ArrLit(elem :: Nil), arrType: analyze.Type.Arr) =>
+      for {
+        r <- genReg(translateType(arrType))
+        v <- compileExpr(elem)
+        _ <- instructions(
+          Inst.Move(r, Op.Arr(Some(v)))
         )
       } yield Val.R(r)
   }

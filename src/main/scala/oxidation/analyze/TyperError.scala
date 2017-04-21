@@ -15,5 +15,6 @@ object TyperError {
   final case class NotAnLVal(expr: Typed[ast.Expression]) extends TyperError
   final case class TooManyParamsForPointerDereference(found: Int) extends TyperError
   final case class ExternNoExplicitType() extends TyperError
+  final case class NotASingletonType(found: TypeName) extends TyperError
 
 }

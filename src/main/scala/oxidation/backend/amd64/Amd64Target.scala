@@ -8,7 +8,7 @@ import cats.data._
 import cats.implicits._
 import oxidation.backend.shared.RegisterAllocator
 import oxidation.codegen.Name
-import oxidation.ir.ConstantPoolEntry
+import oxidation.ir.{ConstantPoolEntry, Register}
 
 class Amd64Target { this: Output =>
 
@@ -21,6 +21,13 @@ class Amd64Target { this: Output =>
 
       override def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun =
         RegisterSpillPass.txDef(fun).runEmptyA.run(spilled).head.asInstanceOf[ir.Def.Fun]
+
+      override def includeRegister(register: Register): Boolean = register.typ match {
+        case _: ir.Type.Arr => false
+        case _: ir.Type.Num => true
+        case ir.Type.U0 | ir.Type.U1 | ir.Type.Ptr => true
+        case _: ir.Type.Fun | _: ir.Type.Struct => throw new Exception(s"type ${register.typ} should be eliminated before target")
+      }
 
     }
 
@@ -62,26 +69,40 @@ class Amd64Target { this: Output =>
       val spills = allocations.collect {
         case (r, allocator.Spill) => r
       }.zipWithIndex.toMap.mapValues(_ + calleeSaved.size)
-      val unbound = fun.body.flatMap(_.reads).filterNot(allocations.contains(_))
-      assert(unbound.isEmpty, unbound.toString)
+      assert(fun.body.flatMap(_.reads).filterNot(allocations.contains).forall(!allocator.includeRegister(_)))
       val bindings = allocations.map {
         case (reg, allocator.R(r)) => reg -> Val.R(Reg(r, regSize(reg.typ)))
         case (r, allocator.Spill) => r -> Val.m(Some(regSize(r.typ)), RBP, stackAllocOffset(spills(r)))
       }
-      val requiredStackSpace = calleeSaved.size + spills.size
+      val requiredStackSpace = ((calleeSaved.size + spills.size - 4) max 0) * 8
+
+      val arrayRegs = fun.body.flatMap(_.reads.collect {
+        case r @ ir.Register(_, _, a: ir.Type.Arr) => r
+      }).distinct
+      val arraySizes = arrayRegs.scanLeft(requiredStackSpace)(_ + _.typ.size) // TODO align
+      val arrayAllocs = arrayRegs zip arraySizes
+
+      val allocatedStackSpace = arraySizes.lastOption getOrElse requiredStackSpace
+
+      val arrayBindings = arrayAllocs.map {
+        case (r, i) => r -> Val.m(None, RBP, -(i + r.typ.size))
+      }
+
+      val allBindings = bindings ++ arrayBindings
+
       val res: F[Unit] = fun.body.traverse_ {
         case ir.Block(name, instructions, flow) =>
           for {
             _ <- F.tell(label(name))
-            _ <- instructions.traverse(outputInstruction(_)(bindings, constants))
-            _ <- outputFlow(flow, requiredStackSpace, calleeSaved)(bindings, constants)
+            _ <- instructions.traverse(outputInstruction(_)(allBindings, constants))
+            _ <- outputFlow(flow, calleeSaved)(bindings, constants)
           } yield ()
       }
       val m = res.written
       Vector(
         global(name),
         label(name),
-        prologue(requiredStackSpace, calleeSaved),
+        prologue(allocatedStackSpace, calleeSaved),
         m
       ).combineAll
   }
@@ -98,6 +119,16 @@ class Amd64Target { this: Output =>
       assert(regSize(addr.typ) == RegSize.QWord)
       assert(regSize(offset.typ) == RegSize.QWord)
       F.tell(move(Val.m(Some(regSize(value.typ)), toVal(addr), toVal(offset)), toVal(value)))
+
+    case ir.Inst.Do(ir.Op.ArrStore(arr, index, value)) =>
+      val arrM = toVal(arr).asInstanceOf[Val.M]
+      val elemSize = value.typ.size
+      val dest = toVal(index) match {
+        case Val.I(i) => arrM + Val.m(Some(regSize(value.typ)), i * elemSize)
+        case Val.R(r) => arrM + Val.m(Some(regSize(value.typ)), r * elemSize)
+      }
+      F.tell(mov(dest, toVal(value)))
+
 
     case ir.Inst.Eval(_, ir.Op.Call(ir.Val.G(fun, _), params)) =>
       if(params.drop(4).nonEmpty) throw new NotImplementedError("passing parameters on stack is not yet supported")
@@ -124,6 +155,15 @@ class Amd64Target { this: Output =>
             F.tell(move(toVal(dest), Val.R(Reg(loc, regSize(dest.typ)))))
           case v => F.tell(move(toVal(dest), v))
         }
+
+      case ir.Op.Elem(arr, index) =>
+        val arrM = toVal(arr).asInstanceOf[Val.M]
+        val elemSize = dest.typ.size
+        val src = toVal(index) match {
+          case Val.I(i) => arrM + Val.m(Some(regSize(dest.typ)), i * elemSize)
+          case Val.R(r) => arrM + Val.m(Some(regSize(dest.typ)), r * elemSize)
+        }
+        F.tell(move(toVal(dest), src))
 
       case ir.Op.Unary(PrefixOp.Not, src) =>
         F.tell(Vector(
@@ -180,10 +220,13 @@ class Amd64Target { this: Output =>
           sub(RSP, allocSize),
           lea(toVal(dest), Val.m(None, RSP, 32))
         ).combineAll)
+
+      case ir.Op.Arr(None) =>
+        F.pure(())
     }
   }
 
-  def outputFlow(f: ir.FlowControl, localCount: Int, savedRegs: List[RegLoc])(implicit bindings: Map[ir.Register, Val], constants: Map[ir.ConstantPoolEntry, Name]): F[Unit] = f match {
+  def outputFlow(f: ir.FlowControl, savedRegs: List[RegLoc])(implicit bindings: Map[ir.Register, Val], constants: Map[ir.ConstantPoolEntry, Name]): F[Unit] = f match {
     case ir.FlowControl.Return(r) =>
       F.tell(Vector(
         epilogue(savedRegs),
@@ -202,7 +245,7 @@ class Amd64Target { this: Output =>
     push(RBP),
     mov(RBP, RSP),
     regsToSave.zipWithIndex.foldMap { case (l, i) => mov(Val.m(Some(RegSize.QWord), RBP, stackAllocOffset(i)), Reg(l, RegSize.QWord)) },
-    sub(RSP, (((localCount - 4) max 0) + 4) * 8)
+    sub(RSP, localCount + 4*8)
   ).combineAll
 
   def epilogue(savedRegs: List[RegLoc]): M = Vector(

@@ -252,6 +252,23 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         solveType(P.TypeApp(P.Var(g('stackalloc)), List(TypeName.Named(g('i64)))), ExpectedType.Undefined, Ctxt.default) ==>
           Right(ast.Stackalloc(I64) :: Ptr(TypeName.Named(g('i64))))
       }
+      "Array Literal" - {
+        "fully explicit list" - {
+          solveType(P.App(P.TypeApp(P.Var(g('arr)), List(TypeName.Named(g('i32)), TypeName.IntLiteral(5))), List(1l, 2l, 3l, 4l, 5l).map(P.IntLit)),
+            ExpectedType.Undefined, Ctxt.default) ==>
+            Right(ast.ArrLit(List(1l, 2l, 3l, 4l, 5l).map(ast.IntLit(_) :: I32)) :: Arr(I32, 5))
+        }
+        "fully explicit fill" - {
+          solveType(P.App(P.TypeApp(P.Var(g('arr)), List(TypeName.Named(g('i32)), TypeName.IntLiteral(5))), List(P.IntLit(1))),
+            ExpectedType.Undefined, Ctxt.default) ==>
+            Right(ast.ArrLit(List(ast.IntLit(1) :: I32)) :: Arr(I32, 5))
+        }
+        "implicit size" - {
+          solveType(P.App(P.TypeApp(P.Var(g('arr)), List(TypeName.Named(g('i32)))), List(1l, 2l, 3l, 4l, 5l).map(P.IntLit)),
+            ExpectedType.Undefined, Ctxt.default) ==>
+            Right(ast.ArrLit(List(1l, 2l, 3l, 4l, 5l).map(ast.IntLit(_) :: I32)) :: Arr(I32, 5))
+        }
+      }
     }
   }
 
