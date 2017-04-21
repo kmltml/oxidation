@@ -5,7 +5,7 @@ package shared
 import cats._
 import cats.data._
 import cats.implicits._
-import <->.EdgeSyntax
+
 import oxidation.ir.RegisterNamespace
 
 abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs: List[Reg]) {
@@ -52,8 +52,8 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
       case (r, (None, Some(e))) => Vector(End(e, r))
       case _ => Vector.empty
     }.toVector ++ calls).sorted
-    type F[A] = WriterT[State[Set[ir.Register], ?], Set[Edge[ir.Register]], A]
-    val W = MonadWriter[F, Set[Edge[ir.Register]]]
+    type F[A] = WriterT[State[Set[ir.Register], ?], Set[(ir.Register, ir.Register)], A]
+    val W = MonadWriter[F, Set[(ir.Register, ir.Register)]]
     val S = new MonadState[F, Set[ir.Register]] {
       override def get: F[Set[ir.Register]] = WriterT.lift(State.get)
       override def set(s: Set[ir.Register]): F[Unit] = WriterT.lift(State.set(s))
@@ -65,21 +65,24 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
       case Start(_, r) => for {
         live <- S.get
         _ <- S.modify(_ + r)
-        _ <- W.tell(live.map(r <-> _))
+        _ <- W.tell(live.map(r -> _))
       } yield ()
       case End(_, r) => S.modify(_ - r)
       case Call(_) => for {
         live <- S.get
-        _ <- W.tell(for (a <- live; b <- virtualRegs.keySet) yield a <-> b)
+        _ <- W.tell(for (a <- live; b <- virtualRegs.keySet) yield a -> b)
       } yield ()
     }
     val edges = f.written.runA(inputs).value
     val moves = instrs.collect {
-      case (ir.Inst.Move(dest, ir.Op.Copy(ir.Val.R(src))), _) => dest <-> src
-      case (ir.Inst.Move(dest, ir.Op.Widen(ir.Val.R(src))), _) => dest <-> src // seems reasonable, but i'm not sure, should be tested further
+      case (ir.Inst.Move(dest, ir.Op.Copy(ir.Val.R(src))), _) => dest -> src
+      case (ir.Inst.Move(dest, ir.Op.Widen(ir.Val.R(src))), _) => dest -> src // seems reasonable, but i'm not sure, should be tested further
     }
     val callVRegs = if(calls.isEmpty) Set() else virtualRegs.keySet
-    InterferenceGraph(regs.toSet ++ callVRegs, Map.empty, edges, moves.toSet)
+    InterferenceGraph.empty
+      .withNodes(regs.toSet ++ callVRegs)
+      .withInterferenceEdges(edges)
+      .withPreferenceEdges(moves.toSet)
   }
 
   def buildInterferenceGraph(fun: ir.Def.Fun): InterferenceGraph[ir.Register, Reg] = {
@@ -117,7 +120,7 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
 
   def coalesce(graph: InterferenceGraph[Set[ir.Register], Reg]): InterferenceGraph[Set[ir.Register], Reg] = {
     graph.preferenceEdges.find {
-      case a <-> b =>
+      case (a, b) =>
         !graph.interfering(a, b) &&
         (graph.neighbors(a) ++ graph.neighbors(b)).count(graph.degree(_) >= colourCount) < colourCount &&
         !(graph.precoloured(a) && graph.precoloured(b)) &&
@@ -125,34 +128,34 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
         // TODO ^^ This is ugly, and not present in original paper, something should be done about this ^^
     } match {
       case None => graph
-      case Some(a <-> b) =>
+      case Some((a, b)) =>
         val removed = graph - a - b
         val newNode = a ++ b
-        coalesce(removed |+| InterferenceGraph(
-          nodes = removed.nodes + newNode,
-          colours = (graph.colours.get(a) orElse graph.colours.get(b)).map(r => Map(newNode -> r)) getOrElse Map.empty,
-          interferenceEdges = (graph.neighbors(a) ++ graph.neighbors(b)).map(newNode <-> _),
-          preferenceEdges = (graph.moveNeighbors(a) ++ graph.moveNeighbors(b) diff Set(a, b)).map(newNode <-> _)
-        ))
+        coalesce(removed
+          .withNodes(Set(newNode))
+          .withColours((graph.colours.get(a) orElse graph.colours.get(b)).map(r => Map(newNode -> r)) getOrElse Map.empty)
+          .withInterferenceEdges((graph.neighbors(a) ++ graph.neighbors(b)).map(newNode -> _))
+          .withPreferenceEdges((graph.moveNeighbors(a) ++ graph.moveNeighbors(b) diff Set(a, b)).map(newNode -> _)))
     }
   }
 
   def select(graph: Graph, removed: RemovedNodes): Graph = removed match {
     case (node, neighbors) :: rest =>
-      val neighborColors = neighbors
-        .map(n => graph.nodes.find(n subsetOf _).get)
-        .map(graph.colours(_))
+      assert(graph.nodes.forall(graph.precoloured), graph.nodes.filterNot(graph.precoloured).toString + " " + removed)
+      val actualNeighbors = neighbors
+        .map(n => graph.nodes.find(n subsetOf _).getOrElse(throw new AssertionError(s"neighbor $n not found in $graph")))
+      val neighborColors = actualNeighbors.map(graph.colours(_))
       // Simplify should only remove nodes in such way, that there will be a color available when re-inserting it
       // This failing to find a register would signify a bug in the simplify method, not here.
       // Also, prefer caller saved regs, to minimize register saving in prologue
       val colour = (callerSavedRegs.find(!neighborColors(_)) orElse calleeSavedRegs.find(!neighborColors(_))).get
-      select(graph |+| InterferenceGraph(
-        nodes = graph.nodes + node,
-        colours = graph.colours.updated(node, colour),
-        interferenceEdges = neighbors.map(_ <-> node),
-        preferenceEdges = Set.empty
-      ), rest)
-    case Nil => graph
+      select(graph
+        .withColours(Map(node -> colour))
+        .withNodes(Set(node))
+        .withInterferenceEdges(actualNeighbors.map(_ -> node)), rest)
+    case Nil =>
+      assert(graph.nodes.forall(graph.precoloured), graph.nodes.filterNot(graph.precoloured).toString + " " + removed)
+      graph
   }
 
   def allocate(originalFun: ir.Def.Fun, precoloured: Map[ir.Register, Reg]): (Map[ir.Register, Alloc], ir.Def.Fun) = {
@@ -178,10 +181,10 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
 
     def removeConflicting(spilled: Set[ir.Register], fun: ir.Def.Fun, graph: Graph, removedNodes: RemovedNodes): (Map[ir.Register, Alloc], ir.Def.Fun) = {
       val conflicting = graph.preferenceEdges.filter {
-        case a <-> b => graph.interfering(a, b)
+        case (a, b) => graph.interfering(a, b)
       }
       if(conflicting.nonEmpty) {
-        simplifyCoalesce(spilled, fun, graph.copy(preferenceEdges = graph.preferenceEdges -- conflicting), removedNodes)
+        simplifyCoalesce(spilled, fun, graph.withoutPreferenceEdges(conflicting), removedNodes)
       } else {
         freeze(spilled, fun, graph, removedNodes)
       }
@@ -189,10 +192,10 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
 
     def freeze(spilled: Set[ir.Register], fun: ir.Def.Fun, graph: Graph, removedNodes: RemovedNodes): (Map[ir.Register, Alloc], ir.Def.Fun) = {
       graph.preferenceEdges.find {
-        case a <-> b => graph.degree(a) < colourCount || graph.degree(b) < colourCount
+        case (a, b) => graph.degree(a) < colourCount || graph.degree(b) < colourCount
       } match {
         case None => spill(spilled, graph, graph.nodes)
-        case Some(e) => simplifyCoalesce(spilled, fun, graph.copy(preferenceEdges = graph.preferenceEdges - e), removedNodes)
+        case Some(e) => simplifyCoalesce(spilled, fun, graph.withoutPreferenceEdges(Set(e)), removedNodes)
       }
     }
 

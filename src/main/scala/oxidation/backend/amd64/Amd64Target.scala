@@ -62,6 +62,8 @@ class Amd64Target { this: Output =>
       val spills = allocations.collect {
         case (r, allocator.Spill) => r
       }.zipWithIndex.toMap.mapValues(_ + calleeSaved.size)
+      val unbound = fun.body.flatMap(_.reads).filterNot(allocations.contains(_))
+      assert(unbound.isEmpty, unbound.toString)
       val bindings = allocations.map {
         case (reg, allocator.R(r)) => reg -> Val.R(Reg(r, regSize(reg.typ)))
         case (r, allocator.Spill) => r -> Val.m(Some(regSize(r.typ)), RBP, stackAllocOffset(spills(r)))

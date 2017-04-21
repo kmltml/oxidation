@@ -6,7 +6,6 @@ import utest._
 import codegen.{Codegen, Name}
 import ir._
 import ir.Type._
-import <->.EdgeSyntax
 
 object RegisterAllocatorTests extends TestSuite {
 
@@ -41,16 +40,17 @@ object RegisterAllocatorTests extends TestSuite {
           Block(Name.Local("ifafter", 0), Vector.empty, FlowControl.Return(register(2, I32)))
         ), Set.empty)
         allocator.buildInterferenceGraph(fun) ==> InterferenceGraph[Register, Int](
-          nodes = Set(register(0, I32), register(1, U1), register(2, I32), register(3, I32)),
           colours = Map.empty,
-          interferenceEdges = Set(
-            register(0, I32) <-> register(1, U1)
+          interferenceNeighbors = Map(
+            register(0, I32) -> Set(register(1, U1)),
+            register(1, U1) -> Set(register(0, I32))
           ),
-          preferenceEdges = Set(
-            register(2, I32) <-> register(3, I32),
-            register(2, I32) <-> register(0, I32)
+          preferenceNeighbors = Map(
+            register(2, I32) -> Set(register(3, I32), register(0, I32)),
+            register(0, I32) -> Set(register(2, I32)),
+            register(3, I32) -> Set(register(2, I32))
           )
-        )
+        ).withNodes(Set(register(0, I32), register(1, U1), register(2, I32), register(3, I32)))
       }
       "variables around function call" - {
         val fun = Def.Fun(Name.Global(List("foo")), List(register(0, I32)), I32, Vector(
@@ -68,31 +68,29 @@ object RegisterAllocatorTests extends TestSuite {
           ), FlowControl.Return(register(8, I32)))
         ), Set.empty)
         allocator.buildInterferenceGraph(fun) ==> InterferenceGraph[Register, Int](
-          nodes = Set(register(0, I32), register(1, I32), register(2, I32), register(3, I32),
-            register(4, I32), register(5, I32), register(6, I32), register(7, I32), register(8, I32),
-            vr(0, U0), vr(1, U0), vr(2, U0), vr(3, U0), vr(4, U0)),
           colours = allocator.virtualRegs,
-          interferenceEdges = Set(
-            register(1, I32) <-> register(2, I32),
-            register(1, I32) <-> register(3, I32),
-            register(2, I32) <-> register(3, I32),
-            register(2, I32) <-> register(4, I32),
-            register(2, I32) <-> register(5, I32),
-            register(2, I32) <-> register(6, I32),
-            register(2, I32) <-> vr(0, U0),
-            register(2, I32) <-> vr(1, U0),
-            register(2, I32) <-> vr(2, U0),
-            register(2, I32) <-> vr(3, U0),
-            register(2, I32) <-> vr(4, U0),
-            register(3, I32) <-> register(4, I32)
-          ),
-          preferenceEdges = Set(
-            register(0, I32) <-> register(1, I32),
-            register(4, I32) <-> register(1, I32),
-            register(5, I32) <-> register(6, I32),
-            register(8, I32) <-> register(7, I32)
-          )
-        )
+          interferenceNeighbors = Map.empty, preferenceNeighbors = Map.empty)
+          .withInterferenceEdges(Set(
+            register(1, I32) -> register(2, I32),
+            register(1, I32) -> register(3, I32),
+            register(2, I32) -> register(3, I32),
+            register(2, I32) -> register(4, I32),
+            register(2, I32) -> register(5, I32),
+            register(2, I32) -> register(6, I32),
+            register(2, I32) -> vr(0, U0),
+            register(2, I32) -> vr(1, U0),
+            register(2, I32) -> vr(2, U0),
+            register(2, I32) -> vr(3, U0),
+            register(2, I32) -> vr(4, U0),
+            register(3, I32) -> register(4, I32)
+          )).withPreferenceEdges(Set(
+            register(0, I32) -> register(1, I32),
+            register(4, I32) -> register(1, I32),
+            register(5, I32) -> register(6, I32),
+            register(8, I32) -> register(7, I32)
+          )).withNodes(Set(register(0, I32), register(1, I32), register(2, I32), register(3, I32),
+            register(4, I32), register(5, I32), register(6, I32), register(7, I32), register(8, I32),
+            vr(0, U0), vr(1, U0), vr(2, U0), vr(3, U0), vr(4, U0)))
       }
     }
   }
