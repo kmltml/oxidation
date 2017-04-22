@@ -267,7 +267,7 @@ class Amd64Target { this: Output =>
     case ir.FlowControl.Goto(n) => F.tell(jmp(n))
     case ir.FlowControl.Branch(cond, ifTrue, ifFalse) =>
       F.tell(Vector(
-        test(toVal(cond), toVal(cond)),
+        cmp(toVal(cond), 0),
         jnz(ifTrue),
         jmp(ifFalse)
       ).combineAll)

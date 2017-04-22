@@ -375,6 +375,7 @@ object Typer {
 
   private def widen(expr: Typed[ast.Expression], t: Type): Typed[ast.Expression] = expr match {
     case Typed(l: ast.IntLit, _) => Typed(l, t)
+    case Typed(ast.CharLit(c), _) => Typed(ast.IntLit(c.toLong), t)
     case Typed(ast.Widen(e), _) => widen(e, t)
     case _ => Typed(ast.Widen(expr), t)
   }

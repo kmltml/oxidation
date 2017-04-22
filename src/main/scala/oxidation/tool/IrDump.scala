@@ -14,6 +14,7 @@ import ir.serialization.Serialize
 import codegen.pass.Pass
 import codegen.{Codegen, pass}
 import oxidation.backend.amd64.Amd64BackendPass
+import oxidation.backend.shared.{FlowGraph, RegisterLifetime}
 
 object IrDump extends App {
 
@@ -22,7 +23,8 @@ object IrDump extends App {
                      timing: Boolean = false,
                      out: Option[File] = None,
                      format: Format = Textual,
-                     dumpAfterEachPass: Boolean = false) extends LogOptions
+                     dumpAfterEachPass: Boolean = false,
+                     showLifetimes: Boolean = false) extends LogOptions
 
   sealed trait Format
   case object Textual extends Format
@@ -67,6 +69,9 @@ object IrDump extends App {
 
     opt[Unit]('a', "dump-after-each-pass")
       .action((_, o) => o.copy(dumpAfterEachPass = true))
+
+    opt[Unit]('l', "show-lifetimes")
+      .action((_, o) => o.copy(showLifetimes = true))
 
   }
 
@@ -118,10 +123,10 @@ object IrDump extends App {
     def dumpAfter(phase: String, defs: Set[ir.Def]): Unit = options.out match {
       case None =>
         println(s"--- Ir after phase $phase ---")
-        dump(defs, options.format, System.out)
+        dump(defs, System.out, options)
       case Some(f) =>
         val out = fileAfterPhase(f, phase)
-        dump(defs, options.format, new FileOutputStream(out))
+        dump(defs, new FileOutputStream(out), options)
     }
 
     if(options.dumpAfterEachPass) {
@@ -137,18 +142,22 @@ object IrDump extends App {
     if(!options.dumpAfterEachPass) {
       options.out match {
         case None =>
-          dump(passed, options.format, System.out)
+          dump(passed, System.out, options)
         case Some(f) =>
-          dump(passed, options.format, new FileOutputStream(f))
+          dump(passed, new FileOutputStream(f), options)
       }
     }
   }
 
-  def dump(defs: Set[ir.Def], format: Format, out: OutputStream): Unit = format match {
+  def dump(defs: Set[ir.Def], out: OutputStream, opts: Options): Unit = opts.format match {
     case Textual =>
       val writer = new PrintWriter(out, true)
       defs.foreach {
-        case ir.Def.Fun(name, params, ret, body, constants) =>
+        case fun @ ir.Def.Fun(name, params, ret, body, constants) =>
+          lazy val flowGraph = FlowGraph.apply(body)
+          lazy val inputs = body.map(b => b.name -> RegisterLifetime.inputs(b)).toMap
+          lazy val outputs = body.map(b => b.name -> RegisterLifetime.outputs(flowGraph, b.name, inputs)).toMap
+          lazy val ghosts = body.map(b => b.name -> RegisterLifetime.ghosts(flowGraph, b.name, inputs, outputs)).toMap
           writer.println(show"def $name(${params.map(_.show).mkString(", ")}): $ret {")
           if(constants.nonEmpty) {
             writer.println("  constants {")
@@ -159,10 +168,18 @@ object IrDump extends App {
           }
           body.foreach { block =>
             writer.println(show"  ${block.name} {")
+            if(opts.showLifetimes) {
+              writer.println(show"    #live in: ${inputs(block.name).map(_.show) mkString ", "}")
+              writer.println(show"    #ghost in: ${ghosts(block.name).map(_.show) mkString ", "}")
+            }
             block.instructions.foreach { instr =>
               writer.println(show"    $instr")
             }
             writer.println(show"    ${block.flow}")
+            if(opts.showLifetimes) {
+              writer.println(show"    #live out: ${outputs(block.name).map(_.show) mkString ", "}")
+              writer.println(show"    #ghost out: ${ghosts(block.name).map(_.show) mkString ", "}")
+            }
             writer.println("  }")
           }
           writer.println("}")

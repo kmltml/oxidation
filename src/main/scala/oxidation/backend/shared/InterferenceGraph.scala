@@ -23,13 +23,13 @@ case class InterferenceGraph[Var, Reg] private (colours: Map[Var, Reg],
 
   lazy val nodes: Set[Var] = colours.keySet ++ interferenceNeighbors.keySet ++ preferenceNeighbors.keySet
 
-  def interferenceEdges: Set[(Var, Var)] = interferenceNeighbors.flatMap {
+  def interferenceEdges: Set[(Var, Var)] = interferenceNeighbors.toSet[(Var, Set[Var])].flatMap {
     case (k, v) => v.map(k -> _)
-  }.toSet
+  }
 
-  def preferenceEdges: Set[(Var, Var)] = preferenceNeighbors.flatMap {
+  def preferenceEdges: Set[(Var, Var)] = preferenceNeighbors.toSet[(Var, Set[Var])].flatMap {
     case (k, v) => v.map(k -> _)
-  }.toSet
+  }
 
   def interfering(a: Var, b: Var): Boolean =
     neighbors(a) contains b
@@ -117,7 +117,7 @@ object InterferenceGraph {
     override def combine(x: InterferenceGraph[Var, Reg], y: InterferenceGraph[Var, Reg]): InterferenceGraph[Var, Reg] =
       InterferenceGraph(x.colours ++ y.colours,
         x.interferenceNeighbors |+| y.interferenceNeighbors,
-        x.preferenceNeighbors |+| y.preferenceNeighbors)
+        x.preferenceNeighbors |+| y.preferenceNeighbors) ensuring (_.interferenceEdges == (x.interferenceEdges |+| y.interferenceEdges))
 
   }
 

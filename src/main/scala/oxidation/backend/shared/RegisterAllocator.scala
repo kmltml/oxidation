@@ -79,7 +79,7 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
         _ <- W.tell(for (a <- live; b <- virtualRegs.keySet) yield a -> b)
       } yield ()
     }
-    val edges = f.written.runA(inputs).value
+    val edges = f.written.runA(inputs).value ++ inputs.subsets(2).map(_.toList match { case List(a, b) => a -> b })
     assert(edges.forall(t => includeRegister(t._1) && includeRegister(t._2)))
     val moves = instrs.collect {
       case (ir.Inst.Move(dest, ir.Op.Copy(ir.Val.R(src))), _)
@@ -92,7 +92,7 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
     InterferenceGraph.empty
       .withNodes(regs.toSet ++ callVRegs)
       .withInterferenceEdges(edges)
-      .withPreferenceEdges(moves.toSet)
+      .withPreferenceEdges(moves.toSet) ensuring (g => edges.forall { case (a, b) => g.interfering(a, b) })
   }
 
   def buildInterferenceGraph(fun: ir.Def.Fun): InterferenceGraph[ir.Register, Reg] = {

@@ -70,6 +70,13 @@ object RegisterSpillPass extends Pass {
         } yield s._1 :+ Inst.Move(dest, Op.Copy(s._2))
         else F.pure(Vector(m))
       } yield res
+
+    case Inst.Move(dest, Op.Binary(op @ (InfixOp.Eq | InfixOp.Neq | InfixOp.Gt | InfixOp.Geq | InfixOp.Lt | InfixOp.Leq),
+                                   ir.Val.R(left), ir.Val.R(right))) =>
+      for {
+        spilled <- spilledRegisters
+        l <- if(spilled(left) && spilled(right)) fill(ir.Val.R(left)) else F.pure((Vector.empty, ir.Val.R(left)))
+      } yield l._1 :+ Inst.Move(dest, Op.Binary(op, l._2, ir.Val.R(right)))
   }
 
 }
