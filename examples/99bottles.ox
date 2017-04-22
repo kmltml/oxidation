@@ -20,21 +20,21 @@ def printInt(i: i32): u0 = {
     val buff = stackalloc[arr[u8, 64]]
     var j = if(i < 0) {
         putchar('-')
-	0 - i
+	    (-i)
     } else i
     var x = 0
     while(j > 0) {
         val digit = cast[u8](j % 10)
-	j /= 10
-	buff()(x) = '0' + digit
-	x += 1
+        j /= 10
+        buff()(x) = '0' + digit
+        x += 1
     }
     if(x == 0) {
         putchar('0')
     }
     while(x > 0) {
         x -= 1
-	putchar(buff()(x))
+	    putchar(buff()(x))
     }
 }
 
@@ -42,8 +42,8 @@ def main(): u0 = {
     var n = 99
     while(n > 0) {
     	firstLine(n)
-	n -= 1
-	secondLine(n)
+        n -= 1
+        secondLine(n)
     }
     firstLine(0)
     println("Go to the store and buy some more, 99 bottles of beer on the wall.")
@@ -58,7 +58,7 @@ def firstLine(n: i32): u0 = {
 }
 
 def secondLine(n: i32): u0 = {
-    printString("Take one down, pass it around, ")	
+    printString("Take one down, pass it around, ")
     printBottles(n, false)
     println(" of beer on the wall.")
     println("")
@@ -71,6 +71,6 @@ def printBottles(n: i32, capital: u1): u0 = {
         printString("1 bottle")
     } else {
         printInt(n)
-	printString(" bottles")
+	    printString(" bottles")
     }
 }

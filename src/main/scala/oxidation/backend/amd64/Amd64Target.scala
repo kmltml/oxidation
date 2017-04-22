@@ -171,6 +171,12 @@ class Amd64Target { this: Output =>
           xor(toVal(dest), 1)
         ).combineAll)
 
+      case ir.Op.Unary(PrefixOp.Neg, src) =>
+        F.tell(Vector(
+          move(toVal(dest), toVal(src)),
+          neg(toVal(dest))
+        ).combineAll)
+
       case ir.Op.Binary(op @ (InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor | InfixOp.Shl | InfixOp.Shr), left, right) =>
         F.tell(Vector(
           move(toVal(dest), toVal(left)),

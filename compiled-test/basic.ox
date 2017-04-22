@@ -11,6 +11,7 @@ def basicTests() = {
     assert(five << 1 == 10, "Shift left")
     assert(!false && (!true == false), "Not")
     assert(factorial(10) == 3628800, "Factorial")
+    assert(-two == -2, "Negation")
 
     assert({
         factorial(3) + factorial(5) == 126

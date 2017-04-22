@@ -112,6 +112,10 @@ trait Amd64NasmOutput extends Output {
   override def mul(src: Val): M =
     ln(show"mul $src")
 
+
+  override def neg(src: Val): M =
+    ln(show"neg $src")
+
   override def test(dest: Val, src: Val) = ln(show"test $dest, $src")
   override def cmp(dest: Val, src: Val) = ln(show"cmp $dest, $src")
 
