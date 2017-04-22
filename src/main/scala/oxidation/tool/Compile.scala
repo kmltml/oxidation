@@ -112,11 +112,10 @@ object Compile {
       exeFile = new File(targetFolder, baseName + ".exe")
       out = new FileWriter(asmFile)
       _ = {
-        target.outputDefs(passed.toVector)(namedConstants).foreach { l =>
-          out.write(l)
-          out.write('\n')
-        }
-        target.outputConstants(namedConstants).foreach { l =>
+        ( target.outputExtraDefs |+|
+          target.outputDefs(passed.toVector)(namedConstants) |+|
+          target.outputConstants(namedConstants)
+        ).foreach { l =>
           out.write(l)
           out.write('\n')
         }
@@ -124,7 +123,7 @@ object Compile {
       }
       _ <- run("nasm", "-fwin64", "-o", objFile.getAbsolutePath, asmFile.getAbsolutePath)
         .left.map(AssemblerError)
-      _ <- run("gcc", objFile.getAbsolutePath, "-Wl,-emain", "-o", exeFile.getAbsolutePath)
+      _ <- run("gcc", objFile.getAbsolutePath, show"-Wl,-e${target.EntryPointName}", "-o", exeFile.getAbsolutePath)
         .left.map(LinkerError)
     } yield exeFile
   }

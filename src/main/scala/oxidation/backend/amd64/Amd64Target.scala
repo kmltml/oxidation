@@ -16,6 +16,8 @@ class Amd64Target { this: Output =>
 
   val F = implicitly[MonadWriter[F, M]]
 
+  final val EntryPointName: Name = Name.Global(List("?entry?"))
+
   val allocator: RegisterAllocator[RegLoc] =
     new RegisterAllocator[RegLoc](RegLoc.calleeSaved, RegLoc.callerSaved) {
 
@@ -106,6 +108,30 @@ class Amd64Target { this: Output =>
         m
       ).combineAll
   }
+
+  def outputExtraDefs: M = Vector(
+    global(EntryPointName),
+    extern(Name.Global(List("exit"))),
+    extern(Name.Global(List("GetCommandLineW"))),
+    extern(Name.Global(List("CommandLineToArgvW"))),
+
+    label(EntryPointName),
+    sub(RSP, 32 + 8),
+
+    call(Name.Global(List("GetCommandLineW"))),
+
+    mov(RCX, RAX),
+    lea(RDX, Val.m(None, RSP, 32)),
+    call(Name.Global(List("CommandLineToArgvW"))),
+
+    mov(RCX, Val.m(None, RSP, 32)),
+    mov(RDX, RAX),
+    call(Name.Global(List("main"))),
+
+    mov(RCX, RAX),
+    call(Name.Global(List("exit")))
+
+  ).combineAll
 
   def move(dest: Val, src: Val): M =
     if(dest == src) M.empty else mov(dest, src)
