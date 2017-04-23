@@ -26,8 +26,45 @@ trait Pass {
 
   def onFlow: ir.FlowControl =?> F[ir.FlowControl] = PartialFunction.empty
 
+  def onVal: ir.Val =?> F[ir.Val] = PartialFunction.empty
+
+  def txVal(v: ir.Val): F[ir.Val] = {
+    onVal.lift(v).getOrElse(F.pure(v))
+  }
+
   def txInstruction(inst: ir.Inst): F[Vector[ir.Inst]] = {
-    onInstruction.lift(inst).getOrElse(F.pure(Vector(inst)))
+    onInstruction.lift(inst).getOrElse(F.pure(Vector(inst))).flatMap(_.traverse {
+      case ir.Inst.Eval(dest, op) => (op match {
+        case ir.Op.Binary(op, left, right) => (txVal(left), txVal(right)).map2(ir.Op.Binary(op, _, _))
+        case ir.Op.Copy(src) => txVal(src).map(ir.Op.Copy)
+        case ir.Op.Call(fn, params) => txVal(fn).map(ir.Op.Call(_, params)) // TODO params too?
+        case ir.Op.Unary(op, right) => txVal(right).map(ir.Op.Unary(op, _))
+        case ir.Op.Load(addr, offset) => (txVal(addr), txVal(offset)).map2(ir.Op.Load)
+        case ir.Op.Store(addr, offset, value) => (txVal(addr), txVal(offset), txVal(value)).map3(ir.Op.Store)
+        case ir.Op.Widen(v) => txVal(v).map(ir.Op.Widen)
+        case ir.Op.Trim(v) => txVal(v).map(ir.Op.Trim)
+        case ir.Op.Member(src, index) => txVal(src).map(ir.Op.Member(_, index))
+        case o: ir.Op.Stackalloc => F.pure(o)
+        case ir.Op.StructCopy(src, substs) =>
+          val s = substs.toList.traverse { case (i, v) => txVal(v).map(i -> _) }.map(_.toMap)
+          (txVal(src), s).map2(ir.Op.StructCopy)
+        case ir.Op.Elem(arr, index) => (txVal(arr), txVal(index)).map2(ir.Op.Elem)
+        case ir.Op.Arr(init) => init.traverse(txVal).map(ir.Op.Arr)
+        case ir.Op.ArrStore(arr, index, value) => (txVal(arr), txVal(index), txVal(value)).map3(ir.Op.ArrStore)
+        case ir.Op.Garbled => F.pure(ir.Op.Garbled)
+      }) map (ir.Inst.Eval(dest, _))
+
+      case lbl: ir.Inst.Label => F.pure(lbl)
+      case ir.Inst.Flow(flow) => txFlow(flow).map(ir.Inst.Flow)
+    })
+  }
+
+  def txFlow(flow: ir.FlowControl): F[ir.FlowControl] = {
+    onFlow.lift(flow).getOrElse(F.pure(flow)).flatMap {
+      case ir.FlowControl.Return(v) => txVal(v).map(ir.FlowControl.Return)
+      case goto: ir.FlowControl.Goto => F.pure(goto)
+      case ir.FlowControl.Branch(cond, ifTrue, ifFalse) => txVal(cond).map(ir.FlowControl.Branch(_, ifTrue, ifFalse))
+    }
   }
 
   def txBlock(block: ir.Block): F[Vector[ir.Block]] = {
@@ -35,7 +72,7 @@ trait Pass {
     blocks.flatMap(_.traverse {
       case ir.Block(name, instrs, flow) =>
         val newInstrs = instrs.traverse(txInstruction).map(_.flatten)
-        val newFlow = onFlow.lift(flow).getOrElse(F.pure(flow))
+        val newFlow = txFlow(flow)
         (newInstrs, newFlow).map2(ir.Block(name, _, _))
     })
   }
