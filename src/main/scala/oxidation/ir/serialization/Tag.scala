@@ -12,6 +12,7 @@ object Tag {
   object Def {
     final val Fun = 0
     final val ExternFun = 1 + Fun
+    final val TrivialVal = 1 + ExternFun
   }
 
   object ConstantPoolEntry {
@@ -49,6 +50,7 @@ object Tag {
     final val G = 1 + R
     final val Struct = 1 + G
     final val Const = 1 + Struct
+    final val GlobalAddr = 1 + Const
   }
 
   object FlowControl {

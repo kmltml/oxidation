@@ -1,3 +1,5 @@
+val GlobalInt: i32 = 42
+
 def basicTests() = {
     val two = 2
     val five = 5
@@ -12,6 +14,7 @@ def basicTests() = {
     assert(!false && (!true == false), "Not")
     assert(factorial(10) == 3628800, "Factorial")
     assert(-two == -2, "Negation")
+    assert(GlobalInt == 42, "Top level val")
 
     assert({
         factorial(3) + factorial(5) == 126

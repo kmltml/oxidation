@@ -54,7 +54,14 @@ object Codegen {
 
     case Typed(ast.UnitLit(), analyze.Type.U0) => Res.pure(Val.I(0, Type.U0))
 
-    case Typed(ast.Var(n), _) => WriterT.lift(State.inspect(s => Val.R(s.registerBindings(n))))
+    case Typed(ast.Var(n: Symbol.Local), _) => WriterT.lift(State.inspect(s => Val.R(s.registerBindings(n))))
+    case Typed(ast.Var(Symbol.Global(path)), t) =>
+      for {
+        r <- genReg(translateType(t))
+        _ <- instructions(
+          Inst.Move(r, Op.Load(Val.GlobalAddr(Name.Global(path)), Val.I(0, Type.I64)))
+        )
+      } yield Val.R(r)
 
     case Typed(ast.InfixAp(InfixOp.And, left, right), analyze.Type.U1) =>
       compileExpr(Typed(ast.If(left, right, Some(Typed(ast.BoolLit(false), analyze.Type.U1))), analyze.Type.U1))
@@ -403,6 +410,12 @@ object Codegen {
       val (Log(instrs, consts), (paramRegs, v)) = s.run.runA(CodegenState()).value
       val retType = translateType(body.typ)
       Def.Fun(Name.Global(name), paramRegs, retType, Vector(Block(Name.Local("body", 0), instrs, FlowControl.Return(ir.Val.R(v)))), consts.toSet)
+
+    case ast.ValDef(Symbol.Global(name), _, value) =>
+      val (log, valueVal) = compileExpr(value).run.runA(CodegenState()).value
+      if(log.insts.isEmpty) {
+        Def.TrivialVal(Name.Global(name), valueVal)
+      } else throw new NotImplementedError("Top-level vals have to be trivial")
   }
 
   private def translateType(t: analyze.Type): ir.Type = t match {

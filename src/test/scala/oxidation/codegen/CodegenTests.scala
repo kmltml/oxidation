@@ -149,8 +149,16 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
           ), Val.I(0, ir.Type.U0))
       }
       "Var" - {
-        compileExpr(ast.Var(l('x)) :: I32).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)))).value ==>
-          (insts(), Val.R(r(0, _.I32)))
+        "local" - {
+          compileExpr(ast.Var(l('x)) :: I32).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)))).value ==>
+            (insts(), Val.R(r(0, _.I32)))
+        }
+        "global" - {
+          compileExpr(ast.Var(g('foo)) :: I32).run.runA(CodegenState()).value ==>
+            (insts(
+              Inst.Move(r(0, _.I32), Op.Load(Val.GlobalAddr(Name.Global(List("foo"))), i64(0)))
+            ), Val.R(r(0, _.I32)))
+        }
       }
       "Block" - {
         compileExpr(ast.Block(Vector(
@@ -370,6 +378,20 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             ), Set(
               ConstantPoolEntry.Str("one"), ConstantPoolEntry.Str("two")
             ))
+        }
+      }
+      "ValDef" - {
+        "trivial" - {
+          "int" - {
+            compileDef(ast.ValDef(g('foo), None, ast.IntLit(42) :: I32)) ==>
+              Def.TrivialVal(Name.Global(List("foo")), Val.I(42, ir.Type.I32))
+          }
+          "struct" - {
+            val struct = Struct(g('foo), List(StructMember("a", I64)))
+            compileDef(ast.ValDef(g('foo), None, ast.StructLit(g('foo), List("a" -> (ast.IntLit(20) :: I64))) :: struct)) ==>
+              Def.TrivialVal(Name.Global(List("foo")), Val.Struct(Vector(Val.I(20, ir.Type.I64))))
+
+          }
         }
       }
     }

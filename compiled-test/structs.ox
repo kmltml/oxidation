@@ -10,6 +10,8 @@ struct bar = {
     y: i16
 }
 
+val GlobalFoo = foo { int = 0x10203040, long = 0x5060708090a0b0c0 }
+
 def foo(i: i32, l: i64): foo =
     foo { int = i, long = l }
 
@@ -48,4 +50,8 @@ def structTests(): u0 = {
     assert({
         foo(10, 20) == foo(10, 20) && foo(10, 30) != foo(30, 10)
     }, "Struct equality")
+
+    assert({
+        GlobalFoo == foo(0x10203040, 0x5060708090a0b0c0)
+    }, "Top level structs")
 }

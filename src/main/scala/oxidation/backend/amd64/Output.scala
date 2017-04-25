@@ -18,6 +18,10 @@ trait Output {
   def data: M
 
   def defstr(name: Name, str: String): M
+  def db(name: Name, values: Byte*): M
+  def dw(name: Name, values: Short*): M
+  def dd(name: Name, values: Int*): M
+  def dq(name: Name, values: Long*): M
 
   def label(name: Name): M
 

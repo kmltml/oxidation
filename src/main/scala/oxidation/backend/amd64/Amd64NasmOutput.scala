@@ -17,7 +17,7 @@ trait Amd64NasmOutput extends Output {
     case Val.I(i) => i.show
     case Val.R(r) => r.toString.toLowerCase
     case Val.L(n) => n.show
-    case Val.M(size, regs, offset) =>
+    case Val.M(size, regs, offset, labels) =>
       val rs = regs.map {
         case (r, 1) => r.toString.toLowerCase
         case (r, i) => s"${r.toString.toLowerCase} * $i"
@@ -29,7 +29,7 @@ trait Amd64NasmOutput extends Output {
         case RegSize.DWord => "dword "
         case RegSize.QWord => "qword "
       } getOrElse ""
-      show"$s[${(rs ++ off) mkString " + "}]"
+      show"$s[${(rs ++ off.map(_.toString) ++ labels.map(_.show)) mkString " + "}]"
   }
 
   private implicit val showName: Show[Name] = {
@@ -50,6 +50,18 @@ trait Amd64NasmOutput extends Output {
 
   override def defstr(name: Name, str: String): M =
     ln(show"$name db `${escapeString(str)}`")
+
+  override def db(name: Name, values: Byte*): M =
+    ln(show"$name db ${values.map(_.show) mkString ", "}")
+
+  override def dw(name: Name, values: Short*): M =
+    ln(show"$name dw ${values.map(_.show) mkString ", "}")
+
+  override def dd(name: Name, values: Int*): M =
+    ln(show"$name dd ${values.map(_.show) mkString ", "}")
+
+  override def dq(name: Name, values: Long*): M =
+    ln(show"$name dq ${values.map(_.show) mkString ", "}")
 
   private def escapeString(s: String): String = s.flatMap {
     case '`' => "\\`"

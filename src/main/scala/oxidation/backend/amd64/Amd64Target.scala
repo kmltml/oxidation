@@ -56,10 +56,18 @@ class Amd64Target { this: Output =>
     case ConstantPoolEntry.Str(v) => defstr(name, v)
   }
 
-  def outputDefs(ds: Vector[ir.Def])(implicit constants: Map[ir.ConstantPoolEntry, Name]) : M =
-    text |+| ds.foldMap(outputDef)
+  def outputDefs(ds: Vector[ir.Def])(implicit constants: Map[ir.ConstantPoolEntry, Name]) : M = {
+    val funDefs = ds.collect {
+      case f: ir.Def.Fun => f
+      case f: ir.Def.ExternFun => f
+    }
+    val valDefs = ds.collect {
+      case v: ir.Def.TrivialVal => v
+    }
+    text |+| funDefs.foldMap(outputFunDef) |+| data |+| valDefs.foldMap(outputValDef)
+  }
 
-  def outputDef(d: ir.Def)(implicit constants: Map[ir.ConstantPoolEntry, Name]): M = d match {
+  def outputFunDef(d: ir.Def)(implicit constants: Map[ir.ConstantPoolEntry, Name]): M = d match {
     case ir.Def.ExternFun(name, _, _) =>
       extern(name)
     case ir.Def.Fun(name, _, _, _, _) =>
@@ -107,6 +115,19 @@ class Amd64Target { this: Output =>
         prologue(allocatedStackSpace, calleeSaved),
         m
       ).combineAll
+  }
+
+  def outputValDef(d: ir.Def)(implicit constants: Map[ir.ConstantPoolEntry, Name]): M = d match {
+    case ir.Def.TrivialVal(n, v) => v match {
+      case ir.Val.I(i, t: ir.Type.Num) =>
+        t.size match {
+          case 1 => db(n, i.toByte)
+          case 2 => dw(n, i.toShort)
+          case 4 => dd(n, i.toInt)
+          case 8 => dq(n, i)
+        }
+      case v => db(n, v.representation: _*)
+    }
   }
 
   def outputExtraDefs: M = Vector(
@@ -290,6 +311,7 @@ class Amd64Target { this: Output =>
     case ir.Val.I(i, _) => Val.I(i)
     case ir.Val.R(r) => bindings(r)
     case ir.Val.Const(entry, _) => Val.L(constants(entry))
+    case ir.Val.GlobalAddr(n) => Val.L(n)
   }
   private def toVal(r: ir.Register)(implicit bindings: Map[ir.Register, Val]): Val = bindings(r)
 

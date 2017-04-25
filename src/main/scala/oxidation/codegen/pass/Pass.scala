@@ -84,6 +84,7 @@ trait Pass {
         val newBody = body.traverse(txBlock).map(_.flatten)
         newBody.map((body: Vector[Block]) => ir.Def.Fun(name, params, ret, body, cp))
       case efun: ir.Def.ExternFun => F.pure(efun)
+      case ir.Def.TrivialVal(n, v) => txVal(v).map(ir.Def.TrivialVal(n, _))
     })
   }
 
