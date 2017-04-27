@@ -8,7 +8,11 @@ import cats.implicits._
 
 import oxidation.codegen.Name
 
-final case class Location(parentDef: Name, block: Name, index: Int)
+final case class Location(parentDef: Name, block: Name, index: Int) {
+
+  override def toString = Location.show.show(this)
+
+}
 
 object Location {
 

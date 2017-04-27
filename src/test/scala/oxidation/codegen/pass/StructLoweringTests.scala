@@ -66,14 +66,15 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
       pass.txInstruction(Inst.Move(r0, Op.Call(Val.G(Name.Global(List("foo")), Fun(Nil, struct)), Nil)))
         .run(pass.S()).value ==>
         (pass.S(
-          nextReg = 2,
+          nextReg = 3,
           bindings = Map(
-            r0 -> Vector(sl(0, I32), sl(1, I64))
+            r0 -> Vector(sl(1, I32), sl(2, I64)),
+            sl(0, struct) -> Vector(sl(1, I32), sl(2, I64))
           )
         ), Vector(
-          Inst.Move(r0, Op.Call(Val.G(Name.Global(List("foo")), Fun(Nil, struct)), Nil)),
-          Inst.Move(sl(0, I32), Op.Member(r0, 0)),
-          Inst.Move(sl(1, I64), Op.Member(r0, 1))
+          Inst.Move(sl(0, struct), Op.Call(Val.G(Name.Global(List("foo")), Fun(Nil, struct)), Nil)),
+          Inst.Move(sl(1, I32), Op.Member(sl(0, struct), 0)),
+          Inst.Move(sl(2, I64), Op.Member(sl(0, struct), 1))
         ))
     }
     "struct copy" - {
@@ -133,6 +134,31 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
           Inst.Move(sl(5, U1), Op.Binary(InfixOp.Eq, sl(1, I32), sl(3, I32))),
           Inst.Move(sl(6, U1), Op.Binary(InfixOp.BitAnd, sl(4, U1), sl(5, U1))),
           Inst.Move(register(2, U1), Op.Copy(sl(6, U1)))
+        ))
+    }
+
+    "call returning a nested struct" - {
+      val foo = Struct(Vector(I32, I32))
+      val bar = Struct(Vector(foo, foo))
+      val flatbar = Struct(Vector(I32, I32, I32, I32))
+      pass.txInstruction(Inst.Move(register(0, bar), Op.Call(Val.G(Name.Global(List("foo")), Fun(Nil, bar)), Nil)))
+        .run(pass.S()).value ==>
+        (pass.S(
+          bindings = Map(
+            register(0, bar) -> Vector(sl(7, foo), sl(8, foo)),
+            sl(0, flatbar) -> Vector(sl(3, I32), sl(4, I32), sl(5, I32), sl(6, I32)),
+            sl(1, foo) -> Vector(sl(3, I32), sl(4, I32)),
+            sl(2, foo) -> Vector(sl(5, I32), sl(6, I32)),
+            sl(7, foo) -> Vector(sl(3, I32), sl(4, I32)),
+            sl(8, foo) -> Vector(sl(5, I32), sl(6, I32))
+          ),
+          nextReg = 9
+        ), Vector(
+          Inst.Move(sl(0, flatbar), Op.Call(Val.G(Name.Global(List("foo")), Fun(Nil, bar)), Nil)),
+          Inst.Move(sl(3, I32), Op.Member(sl(0, flatbar), 0)),
+          Inst.Move(sl(4, I32), Op.Member(sl(0, flatbar), 1)),
+          Inst.Move(sl(5, I32), Op.Member(sl(0, flatbar), 2)),
+          Inst.Move(sl(6, I32), Op.Member(sl(0, flatbar), 3))
         ))
     }
   }

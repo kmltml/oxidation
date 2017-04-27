@@ -54,6 +54,7 @@ object Val {
     case G(n, typ) => show"(@$n)[$typ]"
     case Struct(members) => members.map(_.show).mkString("{", ", ", "}")
     case Const(e, t) => show"const ($e)[$t]"
+    case GlobalAddr(n) => show"(&@$n)[ptr]"
   }
 
 }

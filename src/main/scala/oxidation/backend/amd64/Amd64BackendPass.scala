@@ -128,7 +128,7 @@ object Amd64BackendPass extends Pass {
         })))
       } yield Vector(Inst.Move(dest, Op.Garbled))
 
-    case inst @ Inst.Move(dest, Op.Binary(InfixOp.Add | InfixOp.Sub, l, r)) =>
+    case inst @ Inst.Move(dest, Op.Binary(InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor | InfixOp.Shl | InfixOp.Shr, l, r)) =>
       F.pure(Vector(
         inst, Inst.Do(Op.Copy(r))
       ))

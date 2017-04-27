@@ -68,7 +68,7 @@ object Validator {
       } yield ()
     case Inst.Move(dest, op) => for {
       opType <- validateOp(loc, op)
-      _ <- cond(opType.forall(_ == dest.typ), ValidationError.WrongType(loc, dest.typ, opType.get))
+      _ <- opType.map(expect(loc, dest.typ, _)).getOrElse(ES.pure(()))
       _ <- S.modify(_ + dest)
     } yield ()
 
@@ -76,6 +76,11 @@ object Validator {
 
     case Inst.Label(_) => ES.pure(())
     case Inst.Flow(_) => ES.pure(())
+  }
+
+  private def flatten(p: List[Type]): List[Type] = p flatMap {
+    case t @ (_: Type.Num | Type.U0 | Type.U1 | Type.Ptr | _: Type.Fun | _: Type.Arr) => List(t)
+    case Type.Struct(members) => flatten(members.toList)
   }
 
   def validateOp(loc: Location, op: Op): ES[Option[Type]] = op match {
@@ -98,10 +103,6 @@ object Validator {
       } yield Some(srcType)
 
     case Op.Call(fn, params) =>
-      def flatten(p: List[Type]): List[Type] = p flatMap {
-        case t @ (_: Type.Num | Type.U0 | Type.U1 | Type.Ptr | _: Type.Fun) => List(t)
-        case Type.Struct(members) => members.toList
-      }
       for {
         fnType <- valType(loc, fn).flatMap {
           case f: Type.Fun => ES.pure(f)
@@ -115,7 +116,12 @@ object Validator {
             if(e == f) ES.pure(())
             else ES.raiseError[Unit](ValidationError.WrongType(loc, e, f))
         }
-      } yield Some(fnType.ret)
+        retType = flatten(List(fnType.ret)) match {
+          case Nil => Type.U0
+          case t :: Nil => t
+          case ts => Type.Struct(ts.toVector)
+        }
+      } yield Some(retType)
     case Op.Member(src, index) =>
       for {
         structType <- valType(loc, src).flatMap {
@@ -231,7 +237,7 @@ object Validator {
     EitherT.cond(test, (), error)
 
   private def expect(loc: Location, expected: Type, found: Type): ES[Unit] =
-    cond(expected == found, ValidationError.WrongType(loc, expected, found))
+    cond(flatten(List(expected)) == flatten(List(found)), ValidationError.WrongType(loc, expected, found))
 
   private def expectNum(loc: Location, found: Type): ES[Unit] =
     cond(found.isInstanceOf[Type.Num], ValidationError.NotANumericType(loc, found))

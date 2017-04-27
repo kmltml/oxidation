@@ -217,19 +217,19 @@ object Codegen {
           case ast.Var(Symbol.Global(path)) => Res.pure(Val.G(Name.Global(path), translateType(fnType)))
           case _ => compileExpr(Typed(fn, fnType))
         }
-        paramVals <- params.toList.traverse { p =>
+        paramVals <- params.traverse(compileExpr)
+        paramRegs <- paramVals.traverse { p =>
           for {
-            v <- compileExpr(p)
-            r <- genReg(translateType(p.typ))
+            r <- genReg(p.typ)
             _ <- instructions(
-              Inst.Move(r, Op.Copy(v))
+              Inst.Move(r, Op.Copy(p))
             )
           } yield r
         }
         temp <- genReg(translateType(t))
         r <- genReg(translateType(t))
         _ <- instructions(
-          Inst.Move(temp, Op.Call(fnVal, paramVals)),
+          Inst.Move(temp, Op.Call(fnVal, paramRegs)),
           Inst.Move(r, Op.Copy(Val.R(temp)))
         )
       } yield Val.R(r)

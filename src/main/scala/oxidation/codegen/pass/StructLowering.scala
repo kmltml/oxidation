@@ -51,48 +51,76 @@ object StructLowering extends Pass {
     case Val.R(r) => Nested(binding(r)).map(Val.R(_) : Val).value
   }
 
+  def flatten(r: Register): F[Vector[Register]] = r match {
+    case Register(_, _, _: Type.Struct) => binding(r).flatMap(_.traverse(flatten).map(_.flatten))
+    case r => F.pure(Vector(r))
+  }
+
+
+  def flatten(t: Type): Vector[Type] = t match {
+    case Type.Struct(members) => members.flatMap(flatten)
+    case t => Vector(t)
+  }
+
   override def onDef: Def =?> F[Vector[Def]] = {
-    case fun @ Def.Fun(_, params, _, _, _) => for {
-      _ <- F.set(S())
-      newParams <- params.traverse {
-        case r @ Register(_, _, t: Type.Struct) => for {
-          regs <- genRegs(t)
-          _ <- saveBinding(r, regs)
-        } yield regs.toList
-        case r => F.pure(List(r))
-      }
-    } yield Vector(fun.copy(params = newParams.flatten))
+    case fun @ Def.Fun(_, params, ret, _, _) =>
+      for {
+        _ <- F.set(S())
+        newParams <- params.traverse(flatten)
+        newRet = flatten(ret) match {
+          case Vector() => Type.U0
+          case Vector(t) => t
+          case ts => Type.Struct(ts)
+        }
+      } yield Vector(fun.copy(params = newParams.flatten, ret = newRet))
   }
 
   override def onInstruction: Inst =?> F[Vector[Inst]] = {
     case Inst.Eval(dest, Op.Call(fn, params)) =>
       for {
-        newParams <- params.traverse {
-          case reg @ Register(_, _, Type.Struct(_)) =>
-            binding(reg).map(_.toList)
-          case reg => F.pure(List(reg))
-        }
+        newParams <- params.traverse(flatten).map(_.flatten)
         retDeconstruction <- dest match {
-          case Some(destReg @ Register(_, _, Type.Struct(members))) =>
-            binding(destReg).map(_.zipWithIndex.map {
-              case (r, i) => Inst.Move(r, Op.Member(Val.R(destReg), i))
-            })
-          case _ => F.pure(Vector.empty)
+          case Some(destReg @ Register(_, _, retType: Type.Struct)) =>
+            def rebuild(reg: Register, t: Type.Struct, regs: List[Register]): F[(List[Register], Register)] = {
+              t.members.foldM((regs, Vector.empty[Register])) {
+                case ((regs, acc), t: Type.Struct) =>
+                  for {
+                    r <- genReg(t)
+                    res <- rebuild(r, t, regs)
+                  } yield res.map(acc :+ _)
+                case ((r :: rest, acc), _) => F.pure(rest, acc :+ r)
+              } flatMap {
+                case (rest, members) => saveBinding(reg, members) as (rest, reg)
+              }
+            }
+
+            for {
+              flatr <- genReg(Type.Struct(flatten(destReg.typ)))
+              allRegs <- flatten(destReg)
+              _ <- saveBinding(flatr, allRegs)
+              regMoves = allRegs.zipWithIndex.map {
+                case (r, i) => Inst.Move(r, Op.Member(Val.R(flatr), i))
+              }
+              _ <- rebuild(destReg, retType, allRegs.toList)
+            } yield (Some(flatr), regMoves)
+          case dest => F.pure((dest, Vector.empty))
         }
-      } yield Inst.Eval(dest, Op.Call(fn, newParams.flatten)) +: retDeconstruction
+      } yield Inst.Eval(retDeconstruction._1, Op.Call(fn, newParams)) +: retDeconstruction._2
 
     case Inst.Move(dest, Op.Copy(Val(src, struct: Type.Struct))) =>
       for {
         destregs <- binding(dest)
         srcs <- decompose(src)
-      } yield (destregs zip srcs).map {
-        case (r, v) => Inst.Move(r, Op.Copy(v))
-      }
+        res <- (destregs zip srcs).traverse {
+          case (r, v) => txInstruction(Inst.Move(r, Op.Copy(v)))
+        }
+      } yield res.flatten
 
     case Inst.Move(dest, Op.Member(Val.R(src), i)) =>
       for {
         bindings <- binding(src)
-      } yield Vector(Inst.Move(dest, Op.Copy(Val.R(bindings(i)))))
+        res <- txInstruction(Inst.Move(dest, Op.Copy(Val.R(bindings(i)))))
+      } yield res
 
     case Inst.Move(dest, Op.StructCopy(Val.R(src), substs)) =>
       for {
@@ -131,7 +159,11 @@ object StructLowering extends Pass {
         }
         res <- eqs.reduceLeftM(F.pure) {
           case ((prevr, instsA), (thisr, instsB)) =>
-            genReg(Type.U1).map(r => (r, instsA ++ instsB :+ Inst.Move(r, Op.Binary(InfixOp.BitAnd, Val.R(prevr), Val.R(thisr)))))
+            val combine = op match {
+              case InfixOp.Eq => InfixOp.BitAnd
+              case InfixOp.Neq => InfixOp.BitOr
+            }
+            genReg(Type.U1).map(r => (r, instsA ++ instsB :+ Inst.Move(r, Op.Binary(combine, Val.R(prevr), Val.R(thisr)))))
         }
       } yield res._2 :+ Inst.Eval(dest, Op.Copy(Val.R(res._1)))
 
@@ -140,7 +172,11 @@ object StructLowering extends Pass {
 
   override def onFlow: FlowControl =?> F[FlowControl] = {
     case FlowControl.Return(Val.R(src @ Register(_, _, Type.Struct(_)))) =>
-      F.inspect(s => FlowControl.Return(Val.Struct(s.bindings(src).map(Val.R))))
+      flatten(src).map {
+        case Vector() => Val.I(0, Type.U0)
+        case Vector(r) => Val.R(r)
+        case rs => Val.Struct(rs.map(Val.R))
+      }.map(FlowControl.Return)
   }
 
 }
