@@ -100,7 +100,7 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
     val inputs = {
       val i = graph.blocks.mapValues(RegisterLifetime.inputs(_).filter(includeRegister))
       val firstName = fun.body.head.name
-      i.updated(firstName, i(firstName) ++ fun.params)
+      i.updated(firstName, i(firstName) ++ fun.params.filter(includeRegister))
     }
     val outputs = graph.blocks.mapValues(b => RegisterLifetime.outputs(graph, b.name, inputs).filter(includeRegister))
     val ghosts = graph.blocks.mapValues(b => RegisterLifetime.ghosts(graph, b.name, inputs, outputs).filter(includeRegister))

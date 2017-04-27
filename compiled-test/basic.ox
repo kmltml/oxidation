@@ -25,6 +25,8 @@ def basicTests() = {
         x + 1 == 0xffffffffffffffff
     }, "unsigned long arithmetic")
 
+    assert(sum(1, 2, 3, 4, 5, 6) == 21, "Function taking more than four integer arguments")
+
     shortcircuit()
 }
 
@@ -43,3 +45,7 @@ def shortcircuit(): u0 = {
 
 def factorial(n: u64): u64 =
     if(n == 1) 1 else n * factorial(n - 1)
+
+
+def sum(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32): i32 =
+    a + b + c + d + e + f

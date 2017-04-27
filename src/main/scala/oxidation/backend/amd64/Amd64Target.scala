@@ -18,20 +18,8 @@ class Amd64Target { this: Output =>
 
   final val EntryPointName: Name = Name.Global(List("?entry?"))
 
-  val allocator: RegisterAllocator[RegLoc] =
-    new RegisterAllocator[RegLoc](RegLoc.calleeSaved, RegLoc.callerSaved) {
-
-      override def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun =
-        RegisterSpillPass.txDef(fun).runEmptyA.run(spilled).head.asInstanceOf[ir.Def.Fun]
-
-      override def includeRegister(register: Register): Boolean = register.typ match {
-        case _: ir.Type.Arr => false
-        case _: ir.Type.Num => true
-        case ir.Type.U0 | ir.Type.U1 | ir.Type.Ptr => true
-        case _: ir.Type.Fun | _: ir.Type.Struct => throw new Exception(s"type ${register.typ} should be eliminated before target")
-      }
-
-    }
+  final case class FunCtxt(bindings: Map[ir.Register, Val],
+                           constants: Map[ir.ConstantPoolEntry, Name])
 
   def regSize(t: ir.Type): RegSize = t match {
     case ir.Type.U0 | ir.Type.U1 | ir.Type.U8 | ir.Type.I8 => RegSize.Byte
@@ -72,6 +60,28 @@ class Amd64Target { this: Output =>
       extern(name)
     case ir.Def.Fun(name, _, _, _, _) =>
       val (precolours, Vector(unallocatedFun: ir.Def.Fun)) = Amd64BackendPass.txDef(d).run.runA(Amd64BackendPass.St()).value
+
+      val stackParams = unallocatedFun.params.drop(4)
+
+      val allocator: RegisterAllocator[RegLoc] =
+        new RegisterAllocator[RegLoc](RegLoc.calleeSaved, RegLoc.callerSaved) {
+
+          override def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun =
+            RegisterSpillPass.txDef(fun).runEmptyA.run(spilled).head.asInstanceOf[ir.Def.Fun]
+
+          override def includeRegister(register: Register): Boolean = {
+            val passedOnStack = stackParams.contains(register)
+            val correctType = register.typ match {
+              case _: ir.Type.Arr => false
+              case _: ir.Type.Num => true
+              case ir.Type.U0 | ir.Type.U1 | ir.Type.Ptr => true
+              case _: ir.Type.Fun | _: ir.Type.Struct => throw new Exception(s"type ${register.typ} should be eliminated before target")
+            }
+            !passedOnStack && correctType
+          }
+
+        }
+
       val (allocations, fun) = allocator.allocate(unallocatedFun, precolours.toMap)
       val calleeSaved = allocations.values.collect {
         case allocator.R(l) if RegLoc.calleeSaved.contains(l) => l
@@ -98,14 +108,20 @@ class Amd64Target { this: Output =>
         case (r, i) => r -> Val.m(None, RBP, -(i + r.typ.size))
       }
 
-      val allBindings = bindings ++ arrayBindings
+      val stackParamBindings = stackParams.zipWithIndex.map {
+        case (r, i) => r -> Val.m(Some(regSize(r.typ)), RBP, 0x30 + i * 8)
+      }
+
+      val allBindings = bindings ++ arrayBindings ++ stackParamBindings
+
+      implicit val ctxt = FunCtxt(allBindings, constants)
 
       val res: F[Unit] = fun.body.traverse_ {
         case ir.Block(name, instructions, flow) =>
           for {
             _ <- F.tell(label(name))
-            _ <- instructions.traverse(outputInstruction(_)(allBindings, constants))
-            _ <- outputFlow(flow, calleeSaved)(bindings, constants)
+            _ <- instructions.traverse(outputInstruction(_))
+            _ <- outputFlow(flow, calleeSaved)
           } yield ()
       }
       val m = res.written
@@ -157,7 +173,7 @@ class Amd64Target { this: Output =>
   def move(dest: Val, src: Val): M =
     if(dest == src) M.empty else mov(dest, src)
 
-  def outputInstruction(i: ir.Inst)(implicit bindings: Map[ir.Register, Val], constants: Map[ir.ConstantPoolEntry, Name]): F[Unit] = i match {
+  def outputInstruction(i: ir.Inst)(implicit ctxt: FunCtxt): F[Unit] = i match {
     case ir.Inst.Label(n) => F.tell(label(n))
 
     case ir.Inst.Do(ir.Op.Copy(_)) => F.pure(())
@@ -178,8 +194,16 @@ class Amd64Target { this: Output =>
 
 
     case ir.Inst.Eval(_, ir.Op.Call(ir.Val.G(fun, _), params)) =>
-      if(params.drop(4).nonEmpty) throw new NotImplementedError("passing parameters on stack is not yet supported")
-      F.tell(call(fun))
+      val stackParams = params.drop(4)
+
+      F.tell(Vector(
+        if(stackParams.nonEmpty) sub(RSP, stackParams.size * 8) else M.empty,
+        stackParams.zipWithIndex.foldMap {
+          case (r, i) => mov(Val.m(Some(regSize(r.typ)), RSP, 8 * (4 + i)), toVal(r))
+        },
+        call(fun),
+        if(stackParams.nonEmpty) add(RSP, stackParams.size * 8) else M.empty
+      ).combineAll)
 
     case ir.Inst.Move(dest, op) => op match {
       case ir.Op.Widen(src) => (signedness(src.typ), regSize(dest.typ), regSize(src.typ)) match {
@@ -279,7 +303,7 @@ class Amd64Target { this: Output =>
     }
   }
 
-  def outputFlow(f: ir.FlowControl, savedRegs: List[RegLoc])(implicit bindings: Map[ir.Register, Val], constants: Map[ir.ConstantPoolEntry, Name]): F[Unit] = f match {
+  def outputFlow(f: ir.FlowControl, savedRegs: List[RegLoc])(implicit ctxt: FunCtxt): F[Unit] = f match {
     case ir.FlowControl.Return(r) =>
       F.tell(Vector(
         epilogue(savedRegs),
@@ -307,12 +331,12 @@ class Amd64Target { this: Output =>
     pop(RBP)
   ).combineAll
 
-  private def toVal(v: ir.Val)(implicit bindings: Map[ir.Register, Val], constants: Map[ir.ConstantPoolEntry, Name]): Val = v match {
+  private def toVal(v: ir.Val)(implicit ctxt: FunCtxt): Val = v match {
     case ir.Val.I(i, _) => Val.I(i)
-    case ir.Val.R(r) => bindings(r)
-    case ir.Val.Const(entry, _) => Val.L(constants(entry))
+    case ir.Val.R(r) => ctxt.bindings(r)
+    case ir.Val.Const(entry, _) => Val.L(ctxt.constants(entry))
     case ir.Val.GlobalAddr(n) => Val.L(n)
   }
-  private def toVal(r: ir.Register)(implicit bindings: Map[ir.Register, Val]): Val = bindings(r)
+  private def toVal(r: ir.Register)(implicit ctxt: FunCtxt): Val = ctxt.bindings(r)
 
 }
