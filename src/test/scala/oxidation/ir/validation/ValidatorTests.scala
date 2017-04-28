@@ -282,26 +282,6 @@ object ValidatorTests extends TestSuite with IrValSyntax {
           }
         }
       }
-      "Arr" - {
-        "valid" - {
-          "no initializer" - {
-            validateInstruction(loc, Inst.Move(r(0, Arr(I32, 5)), Op.Arr(None))).value.runEmptyA.value ==> Right(())
-          }
-          "with initialization" - {
-            validateInstruction(loc, Inst.Move(r(0, Arr(I32, 5)), Op.Arr(Some(i32(0))))).value.runEmptyA.value ==> Right(())
-          }
-        }
-        "invalid" - {
-          "wrong initializer type" - {
-            validateInstruction(loc, Inst.Move(r(0, Arr(I32, 5)), Op.Arr(Some(i64(0))))).value.runEmptyA.value ==>
-              Left(ValidationError.WrongType(loc, I32, I64))
-          }
-          "wrong destination type" - {
-            validateInstruction(loc, Inst.Move(r(0, U0), Op.Arr(None))).value.runEmptyA.value ==>
-              Left(ValidationError.WrongType(loc, U0, Arr(U0, 0)))
-          }
-        }
-      }
       "ArrStore" - {
         "valid" - {
           validateInstruction(loc, Inst.Do(Op.ArrStore(r(0, Arr(I32, 5)), i64(0), i32(0))))

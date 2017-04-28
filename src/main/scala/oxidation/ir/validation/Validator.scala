@@ -56,16 +56,7 @@ object Validator {
         _ <- S.modify(_ + dest)
       } yield ()
     case Inst.Move(dest, Op.Garbled) => S.modify(_ + dest)
-    case Inst.Move(dest, Op.Arr(init)) =>
-      for {
-        initType <- init.traverse(valType(loc, _))
-        destArr <- dest.typ match {
-          case a: Type.Arr => ES.pure(a)
-          case t => ES.raiseError[Type.Arr](ValidationError.WrongType(loc, t, Type.Arr(initType getOrElse Type.U0, 0)))
-        }
-        _ <- cond(initType.forall(_ == destArr.member), ValidationError.WrongType(loc, destArr.member, initType.get))
-        _ <- S.modify(_ + dest)
-      } yield ()
+
     case Inst.Move(dest, op) => for {
       opType <- validateOp(loc, op)
       _ <- opType.map(expect(loc, dest.typ, _)).getOrElse(ES.pure(()))
@@ -225,8 +216,9 @@ object Validator {
   }
 
   private def valType(loc: Location, v: Val): EitherT[State[Set[Register], ?], ValidationError, Type] = v match {
-    case _: Val.I | _: Val.Const | _: Val.G | _: Val.GlobalAddr => v.typ.pure[ES]
+    case _: Val.I | _: Val.Const | _: Val.G | _: Val.GlobalAddr | _: Val.UArr => v.typ.pure[ES]
     case Val.Struct(members) => members.traverse_(valType(loc, _)) as v.typ
+    case Val.Array(elems) => elems.traverse_(valType(loc, _)) as v.typ
     case Val.R(reg) => for {
       defined <- S.inspect(_(reg))
       _ <- cond(defined, ValidationError.UseBeforeDefine(loc, reg): ValidationError)

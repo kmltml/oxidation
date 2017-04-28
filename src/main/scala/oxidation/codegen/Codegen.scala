@@ -270,6 +270,17 @@ object Codegen {
         )
       } yield Val.R(r)
 
+    case Typed(ast.App(Typed(ast.Var(Symbol.Global(arrPath)), analyze.Type.Arr(elemType, _)), index :: Nil), t) =>
+      for {
+        indexVal <- compileExpr(index)
+        multipliedOffset <- genReg(Type.I64)
+        r <- genReg(translateType(t))
+        _ <- instructions(
+          Inst.Move(multipliedOffset, Op.Binary(InfixOp.Mul, indexVal, Val.I(translateType(elemType).size, Type.I64))),
+          Inst.Move(r, Op.Load(Val.GlobalAddr(Name.Global(arrPath)), Val.R(multipliedOffset)))
+        )
+      } yield Val.R(r)
+
     case Typed(ast.App(arr @ Typed(_, _: analyze.Type.Arr), index :: Nil), t) =>
       for {
         r <- genReg(translateType(t))
@@ -357,30 +368,7 @@ object Codegen {
       } yield Val.R(r)
 
     case Typed(ast.ArrLit(elems), arrType @ analyze.Type.Arr(_, size))
-      if elems.size == size =>
-      for {
-        r <- genReg(translateType(arrType))
-        _ <- instructions(
-          Inst.Move(r, Op.Arr(None))
-        )
-        _ <- elems.zipWithIndex.traverse_ { case (e, i) =>
-          for {
-            v <- compileExpr(e)
-            _ <- instructions(
-              Inst.Do(Op.ArrStore(Val.R(r), Val.I(i, Type.I64), v))
-            )
-          } yield ()
-        }
-      } yield Val.R(r)
-
-    case Typed(ast.ArrLit(elem :: Nil), arrType: analyze.Type.Arr) =>
-      for {
-        r <- genReg(translateType(arrType))
-        v <- compileExpr(elem)
-        _ <- instructions(
-          Inst.Move(r, Op.Arr(Some(v)))
-        )
-      } yield Val.R(r)
+      if elems.size == size => elems.traverse(compileExpr).map(Val.Array)
   }
 
   def compileDef(d: ast.Def): Def = d match {

@@ -49,7 +49,6 @@ trait Pass {
           val s = substs.toList.traverse { case (i, v) => txVal(v).map(i -> _) }.map(_.toMap)
           (txVal(src), s).map2(ir.Op.StructCopy)
         case ir.Op.Elem(arr, index) => (txVal(arr), txVal(index)).map2(ir.Op.Elem)
-        case ir.Op.Arr(init) => init.traverse(txVal).map(ir.Op.Arr)
         case ir.Op.ArrStore(arr, index, value) => (txVal(arr), txVal(index), txVal(value)).map3(ir.Op.ArrStore)
         case ir.Op.Garbled => F.pure(ir.Op.Garbled)
       }) map (ir.Inst.Eval(dest, _))

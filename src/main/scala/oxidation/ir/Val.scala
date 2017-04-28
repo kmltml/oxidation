@@ -27,6 +27,8 @@ sealed trait Val {
       ).take(t.size).map(_.toByte)
     case Struct(members) =>
       members.foldMap(_.representation)
+    case Array(elems) =>
+      elems.foldMap(_.representation)
   }
 
 }
@@ -43,6 +45,10 @@ object Val {
   final case class Struct(members: Vector[Val]) extends Val {
     lazy val typ: Type = Type.Struct(members.map(_.typ))
   }
+  final case class Array(elems: List[Val]) extends Val {
+    lazy val typ: Type.Arr = Type.Arr(elems.headOption.map(_.typ) getOrElse Type.U0, elems.size)
+  }
+  final case class UArr(typ: Type.Arr) extends Val
   final case class Const(entry: ConstantPoolEntry, typ: Type) extends Val
   final case class GlobalAddr(name: Name) extends Val {
     override def typ: Type = Type.Ptr
@@ -55,6 +61,10 @@ object Val {
     case Struct(members) => members.map(_.show).mkString("{", ", ", "}")
     case Const(e, t) => show"const ($e)[$t]"
     case GlobalAddr(n) => show"(&@$n)[ptr]"
+    case arr @ Array(elems) =>
+      val Type.Arr(elemType, size) = arr.typ
+      show"arr[$elemType, $size](${elems.map(_.show) mkString ", "})"
+    case UArr(Type.Arr(elem, size)) => show"uarr[$elem, $size]"
   }
 
 }

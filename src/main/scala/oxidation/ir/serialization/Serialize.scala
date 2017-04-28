@@ -108,7 +108,6 @@ class Serialize(val out: DataOutputStream) {
       case (k, v) => writeInt(k); writeVal(v)
     }
     case Op.Elem(a, i) => writeTag(Tag.Op.Elem); writeVal(a); writeVal(i)
-    case Op.Arr(i) => writeTag(Tag.Op.Arr); writeOption(i)(writeVal)
     case Op.ArrStore(a, i, v) => writeTag(Tag.Op.ArrStore); writeVal(a); writeVal(i); writeVal(v)
   }
 
@@ -146,6 +145,8 @@ class Serialize(val out: DataOutputStream) {
     case Val.Struct(m) => writeTag(Tag.Val.Struct); writeSeq(m)(writeVal)
     case Val.Const(e, t) => writeTag(Tag.Val.Const); writeConstantPoolEntry(e); writeType(t)
     case Val.GlobalAddr(n) => writeTag(Tag.Val.GlobalAddr); writeName(n)
+    case Val.Array(elems) => writeTag(Tag.Val.Array); writeSeq(elems)(writeVal)
+    case Val.UArr(tpe) => writeTag(Tag.Val.UArr); writeType(tpe)
   }
 
   def writeName(n: Name): Unit = n match {

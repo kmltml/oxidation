@@ -89,7 +89,6 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Op.Trim => Op.Trim(readVal())
     case Tag.Op.StructCopy => Op.StructCopy(readVal(), readSeq(() => readInt() -> readVal()).toMap)
     case Tag.Op.Elem => Op.Elem(readVal(), readVal())
-    case Tag.Op.Arr => Op.Arr(readOption(readVal))
     case Tag.Op.ArrStore => Op.ArrStore(readVal(), readVal(), readVal())
   }
 
@@ -127,6 +126,8 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Val.Struct => Val.Struct(readSeq(readVal).toVector)
     case Tag.Val.Const => Val.Const(readConstantPoolEntry(), readType())
     case Tag.Val.GlobalAddr => Val.GlobalAddr(readName())
+    case Tag.Val.Array => Val.Array(readSeq(readVal).toList)
+    case Tag.Val.UArr => Val.UArr(readType().asInstanceOf[Type.Arr])
   }
 
   def readName(): Name = readTag() match {

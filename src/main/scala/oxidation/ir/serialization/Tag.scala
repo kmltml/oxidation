@@ -40,8 +40,7 @@ object Tag {
     final val Trim = 1 + Stackalloc
     final val StructCopy = 1 + Trim
     final val Elem = 1 + StructCopy
-    final val Arr = 1 + Elem
-    final val ArrStore = 1 + Arr
+    final val ArrStore = 1 + Elem
   }
 
   object Val {
@@ -51,6 +50,8 @@ object Tag {
     final val Struct = 1 + G
     final val Const = 1 + Struct
     final val GlobalAddr = 1 + Const
+    final val Array = 1 + GlobalAddr
+    final val UArr = 1 + Array
   }
 
   object FlowControl {

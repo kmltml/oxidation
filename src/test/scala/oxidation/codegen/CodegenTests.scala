@@ -331,25 +331,10 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
           ), Val.R(r(0, _.Ptr)))
       }
       "ArrLit" - {
-        "fill" - {
-          compileExpr(ast.ArrLit(List(ast.IntLit(0) :: I32)) :: Arr(I32, 10))
-            .run.runA(CodegenState()).value ==>
-            (insts(
-              Inst.Move(r(0, _.Arr(ir.Type.I32, 10)), Op.Arr(Some(i32(0))))
-            ), Val.R(r(0, _.Arr(ir.Type.I32, 10))))
-        }
         "list" - {
-          val r0 = r(0, _.Arr(ir.Type.I32, 5))
           compileExpr(ast.ArrLit(List(0, 1, 2, 3, 4).map(ast.IntLit(_) :: I32)) :: Arr(I32, 5))
             .run.runA(CodegenState()).value ==>
-            (insts(
-              Inst.Move(r0, Op.Arr(None)),
-              Inst.Do(Op.ArrStore(r0, i64(0), i32(0))),
-              Inst.Do(Op.ArrStore(r0, i64(1), i32(1))),
-              Inst.Do(Op.ArrStore(r0, i64(2), i32(2))),
-              Inst.Do(Op.ArrStore(r0, i64(3), i32(3))),
-              Inst.Do(Op.ArrStore(r0, i64(4), i32(4)))
-            ), Val.R(r0))
+            (insts(), Val.Array(List(0, 1, 2, 3, 4).map(i32)))
         }
       }
     }

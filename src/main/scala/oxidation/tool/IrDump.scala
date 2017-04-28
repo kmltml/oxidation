@@ -32,6 +32,7 @@ object IrDump extends App {
 
 
   val AllPasses: List[(String, Pass)] = List(
+    "arr-init" -> pass.ArrInit,
     "explicit-blocks" -> pass.ExplicitBlocks,
     "struct-lowering" -> pass.StructLowering,
     "unit-removal"    -> pass.UnitRemoval,

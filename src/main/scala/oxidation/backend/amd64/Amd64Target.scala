@@ -178,6 +178,8 @@ class Amd64Target { this: Output =>
 
     case ir.Inst.Do(ir.Op.Copy(_)) => F.pure(())
 
+    case ir.Inst.Move(_, ir.Op.Copy(ir.Val.UArr(_))) => F.pure(())
+
     case ir.Inst.Do(ir.Op.Store(addr, offset, value)) =>
       assert(regSize(addr.typ) == RegSize.QWord)
       assert(regSize(offset.typ) == RegSize.QWord)
@@ -298,8 +300,6 @@ class Amd64Target { this: Output =>
           lea(toVal(dest), Val.m(None, RSP, 32))
         ).combineAll)
 
-      case ir.Op.Arr(None) =>
-        F.pure(())
     }
   }
 

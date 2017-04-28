@@ -80,6 +80,7 @@ object Compile {
           irDefs.traverse_(Validator.validateDef).left.map(ValidatorError(_, "codegen"))
         else Right(())
       passes: List[Pass] = List(
+        pass.ArrInit,
         pass.ExplicitBlocks,
         pass.StructLowering,
         pass.UnitRemoval,
