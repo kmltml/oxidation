@@ -17,7 +17,7 @@ object StructLowering extends Pass {
 
   def register(index: Int, typ: Type): Register = Register(StructLoweringReg, index, typ)
 
-  final case class S(nextReg: Int = 0, bindings: Map[Register, Vector[Register]] = Map.empty)
+  final case class S(nextReg: Int = 0, bindings: Map[Register, Vector[Register]] = Map.empty, sret: Option[Register] = None)
 
   override type F[A] = State[S, A]
   val F: MonadState[F, S] = implicitly[MonadState[F, S]]
@@ -62,6 +62,8 @@ object StructLowering extends Pass {
     case t => Vector(t)
   }
 
+  private def fitsInRegisters(s: Type): Boolean = flatten(s).size <= 5
+
   override def onDef: Def =?> F[Vector[Def]] = {
     case fun @ Def.Fun(_, params, ret, _, _) =>
       for {
@@ -72,15 +74,21 @@ object StructLowering extends Pass {
           case Vector(t) => t
           case ts => Type.Struct(ts)
         }
-      } yield Vector(fun.copy(params = newParams.flatten, ret = newRet))
+        res <-
+          if(fitsInRegisters(newRet)) F.pure(fun.copy(params = newParams.flatten, ret = newRet))
+          else for {
+            r <- genReg(Type.Ptr)
+            _ <- F.modify(_.copy(sret = Some(r)))
+          } yield fun.copy(params = r +: newParams.flatten, ret = Type.Ptr)
+      } yield Vector(res)
   }
 
   override def onInstruction: Inst =?> F[Vector[Inst]] = {
     case Inst.Eval(dest, Op.Call(fn, params)) =>
       for {
         newParams <- params.traverse(flatten).map(_.flatten)
-        retDeconstruction <- dest match {
-          case Some(destReg @ Register(_, _, retType: Type.Struct)) =>
+        res <- dest match {
+          case Some(destReg @ Register(_, _, retType: Type.Struct)) if fitsInRegisters(retType) =>
             def rebuild(reg: Register, t: Type.Struct, regs: List[Register]): F[(List[Register], Register)] = {
               t.members.foldM((regs, Vector.empty[Register])) {
                 case ((regs, acc), t: Type.Struct) =>
@@ -102,10 +110,24 @@ object StructLowering extends Pass {
                 case (r, i) => Inst.Move(r, Op.Member(Val.R(flatr), i))
               }
               _ <- rebuild(destReg, retType, allRegs.toList)
-            } yield (Some(flatr), regMoves)
-          case dest => F.pure((dest, Vector.empty))
+            } yield Inst.Eval(Some(flatr), Op.Call(fn, newParams)) +: regMoves
+
+          case Some(destReg @ Register(_, _, retType: Type.Struct)) =>
+            for {
+              sret <- genReg(Type.Ptr)
+              newfun = fn match {
+                case Val.G(name, Type.Fun(params, _)) => Val.G(name, Type.Fun(Type.Ptr +: params, Type.Ptr))
+              }
+              returned <- genReg(Type.Ptr)
+              load <- txInstruction(Inst.Move(destReg, Op.Load(Val.R(returned), Val.I(0, Type.I64))))
+            } yield Vector(
+              Inst.Move(sret, Op.Stackalloc(retType.size)),
+              Inst.Move(returned, Op.Call(newfun, sret +: params))
+            ) ++ load
+
+          case dest => F.pure(Vector(Inst.Eval(dest, Op.Call(fn, newParams))))
         }
-      } yield Inst.Eval(retDeconstruction._1, Op.Call(fn, newParams)) +: retDeconstruction._2
+      } yield res
 
     case Inst.Move(dest, Op.Copy(Val(src, struct: Type.Struct))) =>
       for {
@@ -170,13 +192,25 @@ object StructLowering extends Pass {
     case inst @ Inst.Move(Register(_, _, Type.Struct(_)), _) => throw new NotImplementedError(s"can't lower struct result in instruction $inst")
   }
 
-  override def onFlow: FlowControl =?> F[FlowControl] = {
+  override def onFlow: FlowControl =?> F[(Vector[ir.Inst], FlowControl)] = {
     case FlowControl.Return(Val.R(src @ Register(_, _, Type.Struct(_)))) =>
-      flatten(src).map {
-        case Vector() => Val.I(0, Type.U0)
-        case Vector(r) => Val.R(r)
-        case rs => Val.Struct(rs.map(Val.R))
-      }.map(FlowControl.Return)
+      for {
+        sret <- F.inspect(_.sret)
+        res <- sret match {
+          case None =>
+            flatten(src).map {
+              case Vector() => Val.I(0, Type.U0)
+              case Vector(r) => Val.R(r)
+              case rs => Val.Struct(rs.map(Val.R))
+            }.map(FlowControl.Return).map((Vector.empty, _))
+          case Some(sret) =>
+            for {
+              stores <- txInstruction(Inst.Do(Op.Store(Val.R(sret), Val.I(0, Type.I64), Val.R(src))))
+              r <- genReg(Type.Ptr)
+              copy = Inst.Move(r, Op.Copy(Val.R(sret)))
+            } yield (stores :+ copy, FlowControl.Return(Val.R(r)))
+        }
+      } yield res
   }
 
 }

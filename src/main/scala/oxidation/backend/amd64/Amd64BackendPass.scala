@@ -134,7 +134,7 @@ object Amd64BackendPass extends Pass {
       ))
   }
 
-  override def onFlow: FlowControl =?> F[FlowControl] = {
+  override def onFlow = {
     case flow @ FlowControl.Return(ir.Val.Struct(members)) =>
       val allocs = members.map { case ir.Val.R(r) => r }.zipWithIndex.map {
         case (r, 0) => r -> RegLoc.A
@@ -143,7 +143,7 @@ object Amd64BackendPass extends Pass {
         case (r, 3) => r -> RegLoc.R8
         case (r, 4) => r -> RegLoc.R9
       }.toSet
-      F.tell(allocs).as(flow)
+      F.tell(allocs) as (Vector.empty, flow)
   }
 
   override def onBlock: Block =?> F[Vector[Block]] = {

@@ -24,7 +24,7 @@ trait Pass {
 
   def onInstruction: ir.Inst =?> F[Vector[ir.Inst]] = PartialFunction.empty
 
-  def onFlow: ir.FlowControl =?> F[ir.FlowControl] = PartialFunction.empty
+  def onFlow: ir.FlowControl =?> F[(Vector[ir.Inst], ir.FlowControl)] = PartialFunction.empty
 
   def onVal: ir.Val =?> F[ir.Val] = PartialFunction.empty
 
@@ -51,18 +51,22 @@ trait Pass {
         case ir.Op.Elem(arr, index) => (txVal(arr), txVal(index)).map2(ir.Op.Elem)
         case ir.Op.ArrStore(arr, index, value) => (txVal(arr), txVal(index), txVal(value)).map3(ir.Op.ArrStore)
         case ir.Op.Garbled => F.pure(ir.Op.Garbled)
-      }) map (ir.Inst.Eval(dest, _))
+      }) map (o => Vector(ir.Inst.Eval(dest, o)))
 
-      case lbl: ir.Inst.Label => F.pure(lbl)
-      case ir.Inst.Flow(flow) => txFlow(flow).map(ir.Inst.Flow)
-    })
+      case lbl: ir.Inst.Label => F.pure(Vector[ir.Inst](lbl))
+      case ir.Inst.Flow(flow) =>
+        for {
+          f <- txFlow(flow)
+          pres <- f._1.traverse(txInstruction)
+        } yield pres.flatten :+ ir.Inst.Flow(f._2)
+    }).map(_.flatten)
   }
 
-  def txFlow(flow: ir.FlowControl): F[ir.FlowControl] = {
-    onFlow.lift(flow).getOrElse(F.pure(flow)).flatMap {
-      case ir.FlowControl.Return(v) => txVal(v).map(ir.FlowControl.Return)
-      case goto: ir.FlowControl.Goto => F.pure(goto)
-      case ir.FlowControl.Branch(cond, ifTrue, ifFalse) => txVal(cond).map(ir.FlowControl.Branch(_, ifTrue, ifFalse))
+  def txFlow(flow: ir.FlowControl): F[(Vector[ir.Inst], ir.FlowControl)] = {
+    onFlow.lift(flow).getOrElse(F.pure((Vector.empty, flow))).flatMap {
+      case (pre, ir.FlowControl.Return(v)) => txVal(v).map(ir.FlowControl.Return).map(pre -> _)
+      case (pre, goto: ir.FlowControl.Goto) => F.pure((pre, goto))
+      case (pre, ir.FlowControl.Branch(cond, ifTrue, ifFalse)) => txVal(cond).map(ir.FlowControl.Branch(_, ifTrue, ifFalse)).map(pre -> _)
     }
   }
 
@@ -72,7 +76,7 @@ trait Pass {
       case ir.Block(name, instrs, flow) =>
         val newInstrs = instrs.traverse(txInstruction).map(_.flatten)
         val newFlow = txFlow(flow)
-        (newInstrs, newFlow).map2(ir.Block(name, _, _))
+        (newInstrs, newFlow).map2 { case (instrs, (pres, flo)) => ir.Block(name, instrs ++ pres, flo) }
     })
   }
 

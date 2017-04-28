@@ -47,8 +47,8 @@ object ConstantRemoval extends IdPass {
   }
 
   override def onFlow = {
-    case FlowControl.Branch(Val.I(0, _), _, lbl) => FlowControl.Goto(lbl)
-    case FlowControl.Branch(Val.I(1, _), lbl, _) => FlowControl.Goto(lbl)
+    case FlowControl.Branch(Val.I(0, _), _, lbl) => (Vector.empty, FlowControl.Goto(lbl))
+    case FlowControl.Branch(Val.I(1, _), lbl, _) => (Vector.empty, FlowControl.Goto(lbl))
   }
 
 }

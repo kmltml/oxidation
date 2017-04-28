@@ -15,6 +15,15 @@ struct bar = {
     y: i16
 }
 
+struct bigfoo = {
+    a: i32
+    b: i32
+    c: i32
+    d: i32
+    e: i32
+    f: i32
+}
+
 val GlobalFoo = foo { int = 0x10203040, long = 0x5060708090a0b0c0 }
 
 def foo(i: i32, l: i64): foo =
@@ -25,6 +34,9 @@ def twofoos(x: foo, y: foo): twofoos =
 
 def sumfoos(t: twofoos): foo =
     foo { int = t.x.int + t.y.int, long = t.x.long + t.y.long }
+
+def bigfoo(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32): bigfoo =
+    bigfoo { a = a, b = b, c = c, d = d, e = e, f = f }
 
 def structTests(): u0 = {
     assert({
@@ -74,4 +86,7 @@ def structTests(): u0 = {
     assert({
         sumfoos(twofoos { x = foo(10, 20), y = foo(30, 40) }) == foo(40, 60)
     }, "Call to function taking nested structs")
+
+    assert(bigfoo(0, 1, 2, 3, 4, 5) == bigfoo { a = 0, b = 1, c = 2, d = 3, e = 4, f = 5 }, "Call to function returning big struct")
+
 }
