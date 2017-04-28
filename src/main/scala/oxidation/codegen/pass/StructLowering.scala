@@ -122,7 +122,7 @@ object StructLowering extends Pass {
               load <- txInstruction(Inst.Move(destReg, Op.Load(Val.R(returned), Val.I(0, Type.I64))))
             } yield Vector(
               Inst.Move(sret, Op.Stackalloc(retType.size)),
-              Inst.Move(returned, Op.Call(newfun, sret +: params))
+              Inst.Move(returned, Op.Call(newfun, sret +: newParams))
             ) ++ load
 
           case dest => F.pure(Vector(Inst.Eval(dest, Op.Call(fn, newParams))))
@@ -158,19 +158,19 @@ object StructLowering extends Pass {
       for {
         ptr <- genReg(Type.Ptr)
         regs <- binding(dest)
-        loads = regs.zipWithIndex.map {
-          case (r, i) => Inst.Move(r, Op.Load(Val.R(ptr), Val.I(struct.offset(i), Type.I64)))
+        loads <- regs.zipWithIndex.traverse {
+          case (r, i) => txInstruction(Inst.Move(r, Op.Load(Val.R(ptr), Val.I(struct.offset(i), Type.I64))))
         }
-      } yield Inst.Move(ptr, Op.Binary(InfixOp.Add, addr, offset)) +: loads
+      } yield Inst.Move(ptr, Op.Binary(InfixOp.Add, addr, offset)) +: loads.flatten
 
     case Inst.Eval(_, Op.Store(addr, offset, Val(value, struct: Type.Struct))) =>
       for {
         ptr <- genReg(Type.Ptr)
         srcs <- decompose(value)
-        stores = srcs.zipWithIndex.map {
-          case (src, i) => Inst.Do(Op.Store(Val.R(ptr), Val.I(struct.offset(i), Type.I64), src))
+        stores <- srcs.zipWithIndex.traverse {
+          case (src, i) => txInstruction(Inst.Do(Op.Store(Val.R(ptr), Val.I(struct.offset(i), Type.I64), src)))
         }
-      } yield Inst.Move(ptr, Op.Binary(InfixOp.Add, addr, offset)) +: stores
+      } yield Inst.Move(ptr, Op.Binary(InfixOp.Add, addr, offset)) +: stores.flatten
 
     case Inst.Eval(dest, Op.Binary(op @ (InfixOp.Eq | InfixOp.Neq), Val(left, struct: Type.Struct), Val(right, Type.Struct(_)))) =>
       for {
@@ -187,7 +187,8 @@ object StructLowering extends Pass {
             }
             genReg(Type.U1).map(r => (r, instsA ++ instsB :+ Inst.Move(r, Op.Binary(combine, Val.R(prevr), Val.R(thisr)))))
         }
-      } yield res._2 :+ Inst.Eval(dest, Op.Copy(Val.R(res._1)))
+        insts <- res._2.traverse(txInstruction)
+      } yield insts.flatten :+ Inst.Eval(dest, Op.Copy(Val.R(res._1)))
 
     case inst @ Inst.Move(Register(_, _, Type.Struct(_)), _) => throw new NotImplementedError(s"can't lower struct result in instruction $inst")
   }

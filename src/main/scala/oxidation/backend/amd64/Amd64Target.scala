@@ -75,7 +75,8 @@ class Amd64Target { this: Output =>
               case _: ir.Type.Arr => false
               case _: ir.Type.Num => true
               case ir.Type.U0 | ir.Type.U1 | ir.Type.Ptr => true
-              case _: ir.Type.Fun | _: ir.Type.Struct => throw new Exception(s"type ${register.typ} should be eliminated before target")
+              case _: ir.Type.Fun | _: ir.Type.Struct =>
+                throw new Exception(s"type ${register.typ} should be eliminated before target (used in ${register.show})")
             }
             !passedOnStack && correctType
           }

@@ -24,6 +24,12 @@ struct bigfoo = {
     f: i32
 }
 
+struct threefoos = {
+    x: foo
+    y: foo
+    z: foo
+}
+
 val GlobalFoo = foo { int = 0x10203040, long = 0x5060708090a0b0c0 }
 
 def foo(i: i32, l: i64): foo =
@@ -37,6 +43,9 @@ def sumfoos(t: twofoos): foo =
 
 def bigfoo(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32): bigfoo =
     bigfoo { a = a, b = b, c = c, d = d, e = e, f = f }
+
+def threefoos(x: foo, y: foo, z: foo): threefoos =
+    threefoos { x = x, y = y, z = z }
 
 def structTests(): u0 = {
     assert({
@@ -89,4 +98,6 @@ def structTests(): u0 = {
 
     assert(bigfoo(0, 1, 2, 3, 4, 5) == bigfoo { a = 0, b = 1, c = 2, d = 3, e = 4, f = 5 }, "Call to function returning big struct")
 
+    assert(threefoos(foo(0, 1), foo(2, 3), foo(4, 5)) == threefoos { x = foo { int = 0, long = 1 }, y = foo { int = 2, long = 3 }, z = foo { int = 4, long = 5 } },
+        "Call to function returning nested big struct")
 }
