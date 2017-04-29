@@ -106,6 +106,8 @@ trait AstPrettyprint {
 
     case ast.BoolLit(b) => b.toString
 
+    case ast.FloatLit(f) => f.toString
+
     case ast.CharLit(c) => c.toString
 
     case ast.Extern() => s"Extern$typeInfo"
@@ -217,6 +219,8 @@ object TypedAstPrettyprint extends AstPrettyprint {
     e.expr match {
 
       case ast.IntLit(i) => s"[$typ]($i)"
+
+      case ast.FloatLit(i) => s"[$typ]($i)"
 
       case ast.BoolLit(b) => s"[$typ]($b)"
 

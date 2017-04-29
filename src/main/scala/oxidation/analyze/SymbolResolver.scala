@@ -135,7 +135,7 @@ object SymbolResolver {
       }.map(parse.ast.Block)
 
     case _: parse.ast.IntLit | _: parse.ast.BoolLit | _: parse.ast.StringLit | _: parse.ast.CharLit |
-         _: parse.ast.Extern | _: parse.ast.UnitLit => Right(e)
+         _: parse.ast.Extern | _: parse.ast.UnitLit | _: parse.ast.FloatLit => Right(e)
 
     case parse.ast.Widen(_) | parse.ast.Ignore(_) => ??? // theese should only be present after the typer
   }

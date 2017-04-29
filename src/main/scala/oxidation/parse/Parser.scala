@@ -29,7 +29,7 @@ class Parser {
   }
   val WS: P0 = {
     import fastparse.all._
-    (CharsWhile(_.isWhitespace) | NL | blockComment).rep
+    P(CharsWhile(_.isWhitespace) | NL | blockComment).rep
   }
 
   val White: WhitespaceApi.Wrapper = WhitespaceApi.Wrapper(WS)
@@ -45,7 +45,7 @@ class Parser {
     P((WS ~~ tld).repX(sep = semi).map(_.toVector) ~~ End)
 
   private val expression0: P[Expression] = P(
-    stringLiteral | intLiteral | structLit | charLiteral | unitLiteral | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
+    stringLiteral | floatLiteral | intLiteral | structLit | charLiteral | unitLiteral | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
   )
   private val expression1: P[Expression] = P(
     expression0 ~~ postfix.repX
@@ -127,7 +127,7 @@ class Parser {
       "val", "var", "true", "false", "module", "import", "type")))
 
   private val idSpecialChars = "$_"
-  private val idStart = CharPred(c => c.isLetter || idSpecialChars.contains(c))
+  private val idStart = P(CharPred(c => c.isLetter || idSpecialChars.contains(c)))
   private val id: P0 = {
     val idRest  = CharsWhile(c => c.isLetterOrDigit || idSpecialChars.contains(c), min = 0)
     !keyword ~ idStart ~~ idRest
@@ -190,13 +190,22 @@ class Parser {
     P(K("type") ~ sym ~ params.? ~ "=" ~/ typ).map(TypeAliasDef.tupled)
   }
 
+  private val digits: P0 = CharsWhile(_.isDigit)
+
   private val intLiteral: P[IntLit] =
     P(hexInt | decimalInt).map(IntLit)
   private val decimalInt: P[Long] =
-    CharsWhile(_.isDigit).!.map(java.lang.Long.parseUnsignedLong)
+    digits.!.map(java.lang.Long.parseUnsignedLong)
   private val hexInt: P[Long] =
     ("0x" ~/ CharsWhile(c => c.isDigit || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')).!)
       .map(java.lang.Long.parseUnsignedLong(_, 16))
+
+  private val floatLiteral: P[FloatLit] =
+    P( digits ~~ "." ~~ digits ~~ exponent.?
+     | digits ~~ exponent).!.map(s => FloatLit(BigDecimal(s)))
+  private val exponent: P0 =
+    P(CharIn("eE") ~~ CharIn("+-").? ~~ digits)
+
 
   private val boolLiteral: P[BoolLit] = P(
     K("true").as(BoolLit(true))

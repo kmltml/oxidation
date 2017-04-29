@@ -22,6 +22,12 @@ object ParserTests extends TestSuite {
         expr.parse("0xdeaf").get.value ==> IntLit(0xdeaf)
         expr.parse("0xffffffffffffffff").get.value ==> IntLit(-1)
       }
+      "FloatLit" - {
+        expr.parse("0.1").get.value ==> FloatLit(BigDecimal("0.1"))
+        expr.parse("1e+10").get.value ==> FloatLit(BigDecimal("1e+10"))
+        expr.parse("1e10").get.value ==> FloatLit(BigDecimal("1e10"))
+        expr.parse("1e-10").get.value ==> FloatLit(BigDecimal("1e-10"))
+      }
       "bool literals" - {
         expr.parse("true").get.value ==> BoolLit(true)
         expr.parse("false").get.value ==> BoolLit(false)

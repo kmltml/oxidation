@@ -15,6 +15,7 @@ trait Ast {
   sealed trait Expression extends BlockStatement with Product with Serializable
 
   final case class IntLit(value: Long) extends Expression
+  final case class FloatLit(value: BigDecimal) extends Expression
   final case class BoolLit(value: Boolean) extends Expression
   final case class CharLit(value: Char) extends Expression
   final case class StringLit(value: String) extends Expression
@@ -74,7 +75,7 @@ trait Ast {
     val more = stmnt match {
       case _: IntLit | _: StringLit | _: BoolLit | _: Var | _: Extern |
            _: TypeAliasDef | _: StructDef | _: EnumDef | _: CharLit |
-           _: UnitLit => Vector.empty[A]
+           _: UnitLit | _: FloatLit => Vector.empty[A]
       case InfixAp(_, left, right) => traverse(left)(f) ++ traverse(right)(f)
       case PrefixAp(_, e) => traverse(e)(f)
       case Block(stmnts) => stmnts.foldMap(traverse(_)(f))
