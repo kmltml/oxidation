@@ -77,6 +77,15 @@ object RegisterSpillPass extends Pass {
         spilled <- spilledRegisters
         l <- if(spilled(left) && spilled(right)) fill(ir.Val.R(left)) else F.pure((Vector.empty, ir.Val.R(left)))
       } yield l._1 :+ Inst.Move(dest, Op.Binary(op, l._2, ir.Val.R(right)))
+
+    case Inst.Eval(dest, Op.Call(fn, params)) =>
+      for {
+        stackParams <- params.drop(4).traverse(r => fill(ir.Val.R(r)))
+        fillInsts = stackParams.flatMap(_._1).toVector
+        newStackParams = stackParams.map {
+          case (_, ir.Val.R(reg)) => reg
+        }
+      } yield fillInsts :+ Inst.Eval(dest, Op.Call(fn, params.take(4) ++ newStackParams))
   }
 
 }
