@@ -25,6 +25,14 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         findType(P.IntLit(20), ExpectedType.Numeric(None), Ctxt.empty) ==> Right(I32)
         findType(P.IntLit(20), ExpectedType.Specific(U32), Ctxt.empty) ==> Right(U32)
       }
+      "FloatLit" - {
+        solveType(P.FloatLit(BigDecimal(0.1)), ExpectedType.Undefined, Ctxt.default) ==>
+          Right(P.FloatLit(BigDecimal(0.1)) :: F64)
+        solveType(P.FloatLit(BigDecimal(0.1)), ExpectedType.Specific(F32), Ctxt.default) ==>
+          Right(P.FloatLit(BigDecimal(0.1)) :: F32)
+        solveType(P.FloatLit(BigDecimal(0.1)), ExpectedType.Numeric(Some(F64)), Ctxt.default) ==>
+          Right(P.FloatLit(BigDecimal(0.1)) :: F64)
+      }
       "bool literals" - {
         findType(P.BoolLit(true), ExpectedType.Undefined) ==> Right(U1)
         findType(P.BoolLit(false), ExpectedType.Specific(U1)) ==> Right(U1)
@@ -57,7 +65,18 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
           Ctxt.terms(l('x) -> imm(U8), l('y) -> imm(U32))) ==> Right(U32)
 
         findType(P.InfixAp(InfixOp.Eq, P.IntLit(1), P.IntLit(2)), ExpectedType.Undefined, Ctxt.empty) ==> Right(U1)
-
+        "Floating point operations" - {
+          "f64 + f64 -> f64" - {
+            solveType(P.InfixAp(InfixOp.Add, P.Var(l('x)), P.Var(l('y))), ExpectedType.Undefined,
+              Ctxt.default.withTerms(Map(l('x) -> imm(F64), l('y) -> imm(F64)))) ==>
+              Right(ast.InfixAp(InfixOp.Add, ast.Var(l('x)) :: F64, ast.Var(l('y)) :: F64) :: F64)
+          }
+          "f64 <= f64 -> u1" - {
+            solveType(P.InfixAp(InfixOp.Leq, P.Var(l('x)), P.Var(l('y))), ExpectedType.Undefined,
+              Ctxt.default.withTerms(Map(l('x) -> imm(F64), l('y) -> imm(F64)))) ==>
+              Right(ast.InfixAp(InfixOp.Leq, ast.Var(l('x)) :: F64, ast.Var(l('y)) :: F64) :: U1)
+          }
+        }
         "widening in arithmetic expressions" - {
           "i32 + i8 -> i32" - {
             solveType(P.InfixAp(InfixOp.Add, P.Var(l('x)), P.Var(l('y))), ExpectedType.Numeric(None),
@@ -92,6 +111,11 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         findType(P.PrefixAp(PrefixOp.Inv, P.IntLit(64)), ExpectedType.Numeric(None)) ==> Right(I32)
         findType(P.PrefixAp(PrefixOp.Neg, P.Var(l('x))), ExpectedType.Undefined, Ctxt.terms(l('x) -> imm(U64))) ==> Right(I64)
         findType(P.PrefixAp(PrefixOp.Not, P.BoolLit(false)), ExpectedType.Undefined) ==> Right(U1)
+        "-f64 -> f64" - {
+          solveType(P.PrefixAp(PrefixOp.Neg, P.Var(l('x))), ExpectedType.Undefined,
+            Ctxt.default.withTerms(Map(l('x) -> imm(F64)))) ==>
+            Right(ast.PrefixAp(PrefixOp.Neg, ast.Var(l('x)) :: F64) :: F64)
+        }
       }
       "block expression" - {
         findType(P.Block(Vector(

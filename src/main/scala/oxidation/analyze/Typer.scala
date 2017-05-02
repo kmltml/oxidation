@@ -15,9 +15,17 @@ object Typer {
     case P.IntLit(i) =>
       expected match {
         case ExpectedType.Numeric(None) | ExpectedType.Undefined => Right(Typed(ast.IntLit(i), I32))
-        case ExpectedType.Numeric(Some(t)) => Right(Typed(ast.IntLit(i), t))
-        case ExpectedType.Specific(t @ (I8 | I16 | I32 | I64 | U8 | U16 | U32 | U64)) => Right(Typed(ast.IntLit(i), t))
+        case ExpectedType.Numeric(Some(t: Integral)) => Right(Typed(ast.IntLit(i), t))
+        case ExpectedType.Specific(t: Integral) => Right(Typed(ast.IntLit(i), t))
         case _ => unifyType(Typed(ast.IntLit(i), I32), expected)
+      }
+
+    case P.FloatLit(f) =>
+      expected match {
+        case ExpectedType.Numeric(None) | ExpectedType.Undefined => Right(Typed(ast.FloatLit(f), F64))
+        case ExpectedType.Numeric(Some(t: F)) => Right(Typed(ast.FloatLit(f), t))
+        case ExpectedType.Specific(t: F) => Right(Typed(ast.FloatLit(f), t))
+        case _ => unifyType(Typed(ast.FloatLit(f), F64), expected)
       }
 
     case P.BoolLit(b) => unifyType(Typed(ast.BoolLit(b), U1), expected)
@@ -355,9 +363,9 @@ object Typer {
     case (_, ExpectedType.Undefined) => Right(t)
   }
 
-  private def wider(a: Type, b: Type): Type = {
-    if(a == b) a
-    else {
+  private def wider(a: Type, b: Type): Type = (a, b) match {
+    case (a, b) if a == b => a
+    case (a: Integral, b: Integral) =>
       val sign = isSigned(a) || isSigned(b)
       val width = bitwidth(a) max bitwidth(b)
       (sign, width) match {
@@ -370,11 +378,12 @@ object Typer {
         case (false, 32) => U32
         case (false, 64) => U64
       }
-    }
+    case (F64, _: F) | (_: F, F64) => F64
   }
 
   private def widen(expr: Typed[ast.Expression], t: Type): Typed[ast.Expression] = expr match {
     case Typed(l: ast.IntLit, _) => Typed(l, t)
+    case Typed(l: ast.FloatLit, _) => Typed(l, t)
     case Typed(ast.CharLit(c), _) => Typed(ast.IntLit(c.toLong), t)
     case Typed(ast.Widen(e), _) => widen(e, t)
     case _ => Typed(ast.Widen(expr), t)
@@ -395,6 +404,7 @@ object Typer {
   }
 
   private def signed(t: Type): Type = t match {
+    case t: F => t
     case I8 | U8 => I8
     case I16 | U16 => I16
     case I32 | U32 => I32
