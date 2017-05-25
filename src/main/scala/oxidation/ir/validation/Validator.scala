@@ -216,7 +216,7 @@ object Validator {
   }
 
   private def valType(loc: Location, v: Val): EitherT[State[Set[Register], ?], ValidationError, Type] = v match {
-    case _: Val.I | _: Val.Const | _: Val.G | _: Val.GlobalAddr | _: Val.UArr => v.typ.pure[ES]
+    case _: Val.I | _: Val.Const | _: Val.G | _: Val.GlobalAddr | _: Val.UArr | _: Val.F32 | _: Val.F64 => v.typ.pure[ES]
     case Val.Struct(members) => members.traverse_(valType(loc, _)) as v.typ
     case Val.Array(elems) => elems.traverse_(valType(loc, _)) as v.typ
     case Val.R(reg) => for {

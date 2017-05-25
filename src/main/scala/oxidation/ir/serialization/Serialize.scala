@@ -90,6 +90,8 @@ class Serialize(val out: DataOutputStream) {
     case Type.Ptr => writeTag(Tag.Type.Ptr)
     case Type.Fun(p, r) => writeTag(Tag.Type.Fun); writeSeq(p)(writeType); writeType(r)
     case Type.Struct(m) => writeTag(Tag.Type.Struct); writeSeq(m)(writeType)
+    case Type.F32 => writeTag(Tag.Type.F32)
+    case Type.F64 => writeTag(Tag.Type.F64)
   }
 
   def writeOp(op: Op): Unit = op match {
@@ -147,6 +149,8 @@ class Serialize(val out: DataOutputStream) {
     case Val.GlobalAddr(n) => writeTag(Tag.Val.GlobalAddr); writeName(n)
     case Val.Array(elems) => writeTag(Tag.Val.Array); writeSeq(elems)(writeVal)
     case Val.UArr(tpe) => writeTag(Tag.Val.UArr); writeType(tpe)
+    case Val.F32(f) => writeTag(Tag.Val.F32); writeFloat(f)
+    case Val.F64(d) => writeTag(Tag.Val.F64); writeDouble(d)
   }
 
   def writeName(n: Name): Unit = n match {

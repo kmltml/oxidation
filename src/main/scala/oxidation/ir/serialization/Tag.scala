@@ -52,6 +52,8 @@ object Tag {
     final val GlobalAddr = 1 + Const
     final val Array = 1 + GlobalAddr
     final val UArr = 1 + Array
+    final val F32 = 1 + UArr
+    final val F64 = 1 + F32
   }
 
   object FlowControl {
@@ -74,6 +76,8 @@ object Tag {
     final val Ptr = 1 + U64
     final val Fun = 1 + Ptr
     final val Struct = 1 + Fun
+    final val F32 = 1 + Struct
+    final val F64 = 1 + F32
   }
 
   object InfixOp {

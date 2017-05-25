@@ -7,7 +7,7 @@ import cats.implicits._
 
 import codegen.Name
 
-sealed trait Val {
+sealed trait Val extends Product with Serializable {
 
   import Val._
 
@@ -25,6 +25,10 @@ sealed trait Val {
         v >>> 8*6 & 0xff,
         v >>> 8*7
       ).take(t.size).map(_.toByte)
+    case F32(f) =>
+      I(java.lang.Float.floatToRawIntBits(f), Type.U32).representation
+    case F64(d) =>
+      I(java.lang.Double.doubleToRawLongBits(d), Type.U64).representation
     case Struct(members) =>
       members.foldMap(_.representation)
     case Array(elems) =>
@@ -41,6 +45,12 @@ object Val {
     def typ = register.typ
   }
   final case class I(value: Long, typ: Type) extends Val
+  final case class F32(value: Float) extends Val {
+    override def typ = Type.F32
+  }
+  final case class F64(value: Double) extends Val {
+    override def typ = Type.F64
+  }
   final case class G(name: Name, typ: Type) extends Val
   final case class Struct(members: Vector[Val]) extends Val {
     lazy val typ: Type = Type.Struct(members.map(_.typ))
@@ -65,6 +75,8 @@ object Val {
       val Type.Arr(elemType, size) = arr.typ
       show"arr[$elemType, $size](${elems.map(_.show) mkString ", "})"
     case UArr(Type.Arr(elem, size)) => show"uarr[$elem, $size]"
+    case F32(f) => show"($f)[f32]"
+    case F64(d) => show"($d)[f64]"
   }
 
 }

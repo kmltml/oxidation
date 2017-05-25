@@ -31,6 +31,11 @@ object Codegen {
 
   def compileExpr(expr: Typed[ast.Expression]): Res[Val] = expr match {
     case Typed(ast.IntLit(i), typ) => Res.pure(Val.I(i, translateType(typ)))
+    case Typed(ast.FloatLit(bd), analyze.Type.F32) =>
+      Res.pure(Val.F32(bd.toFloat))
+    case Typed(ast.FloatLit(bd), analyze.Type.F64) =>
+      Res.pure(Val.F64(bd.toDouble))
+
     case Typed(ast.BoolLit(b), typ) =>
       val i = b match {
         case true => 1
@@ -416,9 +421,11 @@ object Codegen {
     case analyze.Type.U32 => ir.Type.U32
     case analyze.Type.U64 => ir.Type.U64
 
+    case analyze.Type.F32 => ir.Type.F32
+    case analyze.Type.F64 => ir.Type.F64
+
     case analyze.Type.U1 => ir.Type.U1
     case analyze.Type.U0 => ir.Type.U0
-
 
     case analyze.Type.Fun(params, ret) =>
       ir.Type.Fun(params.map(translateType), translateType(ret))

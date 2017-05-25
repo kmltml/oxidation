@@ -107,8 +107,8 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
     val interferenceGraph = fun.body.foldMap { b =>
       buildInterferenceSubGraph(b, inputs(b.name) ++ ghosts(b.name), outputs(b.name) ++ ghosts(b.name))
     }
-    interferenceGraph.withColours(virtualRegs.filterKeys(interferenceGraph.nodes)) ensuring {
-      _.nodes.forall(includeRegister)
+    interferenceGraph.withColours(virtualRegs.filterKeys(interferenceGraph.nodes)) ensuring { g =>
+      g.nodes.forall(r => includeRegister(r) || (virtualRegs contains r))
     }
   }
 

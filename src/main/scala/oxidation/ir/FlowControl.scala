@@ -9,15 +9,17 @@ import cats.implicits._
 
 sealed trait FlowControl {
 
-  def reads: Set[Register] = {
-    val vals = this match {
-      case oxidation.ir.FlowControl.Branch(v, _, _) => Set(v)
-      case oxidation.ir.FlowControl.Return(v) => Set(v)
-      case oxidation.ir.FlowControl.Goto(_) => Set.empty
-    }
+  import FlowControl._
+
+  def reads: Set[Register] =
     vals.collect {
-      case oxidation.ir.Val.R(r) => r
+      case Val.R(r) => r
     }
+
+  def vals: Set[Val] = this match {
+    case Branch(v, _, _) => Set(v)
+    case Return(v) => Set(v)
+    case Goto(_) => Set.empty
   }
 
 }

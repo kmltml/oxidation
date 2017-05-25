@@ -13,6 +13,7 @@ libraryDependencies ++=
   "com.lihaoyi" %% "utest" % "0.4.5" % "test" ::
   "org.typelevel" %% "cats" % "0.9.0" ::
   "com.github.scopt" %% "scopt" % "3.5.0" ::
+  "com.github.julien-truffaut" %% "monocle-core" % "1.4.0" ::
   Nil
 
 testFrameworks += new TestFramework("utest.runner.Framework")

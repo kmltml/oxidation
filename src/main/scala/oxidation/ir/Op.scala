@@ -9,26 +9,23 @@ import codegen.Name
 
 sealed trait Op {
 
-  def reads: Set[Register] = {
-    val vals = this match {
-      case Op.Binary(_, l, r) => Set(l, r)
-      case Op.Call(fn, params) => params.map(ir.Val.R).toSet + fn
-      case Op.Copy(v) => Set(v)
-      case Op.Unary(_, v) => Set(v)
-      case Op.Garbled => Set.empty
-      case Op.Load(a, o) => Set(a, o)
-      case Op.Store(a, o, v) => Set(a, o, v)
-      case Op.Widen(v) => Set(v)
-      case Op.Trim(v) => Set(v)
-      case Op.Member(s, _) => Set(s)
-      case Op.Elem(a, i) => Set(a, i)
-      case Op.ArrStore(a, i, v) => Set(a, i, v)
-      case Op.Stackalloc(_) => Set.empty
-      case Op.StructCopy(v, s) => s.values.toSet + v
-    }
-    vals.collect {
-      case Val.R(r) => r
-    }
+  def reads: Set[Register] = vals.collect { case Val.R(r) => r }
+
+  def vals: Set[Val] = this match {
+    case Op.Binary(_, l, r) => Set(l, r)
+    case Op.Call(fn, params) => params.map(ir.Val.R).toSet + fn
+    case Op.Copy(v) => Set(v)
+    case Op.Unary(_, v) => Set(v)
+    case Op.Garbled => Set.empty
+    case Op.Load(a, o) => Set(a, o)
+    case Op.Store(a, o, v) => Set(a, o, v)
+    case Op.Widen(v) => Set(v)
+    case Op.Trim(v) => Set(v)
+    case Op.Member(s, _) => Set(s)
+    case Op.Elem(a, i) => Set(a, i)
+    case Op.ArrStore(a, i, v) => Set(a, i, v)
+    case Op.Stackalloc(_) => Set.empty
+    case Op.StructCopy(v, s) => s.values.toSet + v
   }
 
 }

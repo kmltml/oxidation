@@ -29,6 +29,8 @@ trait Output {
   def extern(name: Name): M
 
   def mov(dest: Val, src: Val): M
+  def movd(dest: Val, src: Val): M
+  def movq(dest: Val, src: Val): M
   def movzx(dest: Val, src: Val): M
   def movsx(dest: Val, src: Val): M
   def movsxd(dest: Val, src: Val): M
@@ -50,6 +52,25 @@ trait Output {
 
   def test(dest: Val, src: Val): M
   def cmp(dest: Val, src: Val): M
+
+  def movups(dest: Val, src: Val): M
+  def movss(dest: Val, src: Val): M
+  def movsd(dest: Val, src: Val): M
+
+  def addss(dest: Val, src: Val): M
+  def subss(dest: Val, src: Val): M
+  def mulss(dest: Val, src: Val): M
+  def divss(dest: Val, src: Val): M
+
+  def addsd(dest: Val, src: Val): M
+  def subsd(dest: Val, src: Val): M
+  def mulsd(dest: Val, src: Val): M
+  def divsd(dest: Val, src: Val): M
+
+  def ucomiss(dest: Val, src: Val): M
+  def ucomisd(dest: Val, src: Val): M
+  def cmpeqss(dest: Val, src: Val): M
+  def cmpeqsd(dest: Val, src: Val): M
 
   def setl(dest: Val): M
   def setle(dest: Val): M

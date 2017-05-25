@@ -2,17 +2,26 @@ package oxidation.backend.amd64
 
 import oxidation.codegen.Name
 
-sealed trait Val extends Product with Serializable
+sealed trait Val extends Product with Serializable {
+
+  def withSize(s: RegSize): Val = ???
+
+}
 
 object Val {
 
-  final case class R(reg: Reg) extends Val
+  final case class R(reg: Reg) extends Val {
+    override def withSize(s: RegSize): R = R(reg.copy(size = s))
+  }
+  final case class F(reg: Xmm) extends Val
   final case class I(int: Long) extends Val
   final case class L(name: Name) extends Val
   final case class M(size: Option[RegSize], regs: List[(Reg, Long)], offset: Long, labels: List[Name]) extends Val {
 
     def +(m: M): M =
       M(size orElse m.size, regs ++ m.regs, offset + m.offset, labels ++ m.labels)
+
+    override def withSize(s: RegSize): M = copy(size = Some(s))
 
   }
 
@@ -22,6 +31,7 @@ object Val {
     case (v, MemOffset.Label(n)) => v.copy(labels = n :: v.labels)
   }
   implicit def r(reg: Reg): Val = R(reg)
+  implicit def f(reg: Xmm): Val = F(reg)
   implicit def i(int: Long): Val = I(int)
 
   sealed trait MemOffset

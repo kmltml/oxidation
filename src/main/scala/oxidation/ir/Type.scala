@@ -29,7 +29,9 @@ object Type {
 
   sealed trait Num extends Type
 
-  sealed abstract class I(val w: Int) extends Num
+  sealed trait Integral extends Num
+
+  sealed abstract class I(val w: Int) extends Integral
   object I {
     def unapply(arg: I): Option[Int] = Some(arg.w)
   }
@@ -38,7 +40,7 @@ object Type {
   case object I32 extends I(32)
   case object I64 extends I(64)
 
-  sealed abstract class U(val w: Int) extends Num
+  sealed abstract class U(val w: Int) extends Integral
   object U {
     def unapply(arg: U): Option[Int] = Some(arg.w)
   }
@@ -46,6 +48,14 @@ object Type {
   case object U16 extends U(16)
   case object U32 extends U(32)
   case object U64 extends U(64)
+
+  sealed abstract class F(val bits: Int) extends Num
+  object F {
+    def unapply(arg: F): Option[Int] = Some(arg.bits)
+  }
+
+  case object F32 extends F(32)
+  case object F64 extends F(64)
 
   final case class Fun(params: List[Type], ret: Type) extends Type
 

@@ -21,6 +21,16 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
         compileExpr(ast.IntLit(20) :: I32)
           .run.runA(CodegenState()).value ==> (insts(), Val.I(20, ir.Type.I32))
       }
+      "FloatLit" - {
+        "F32" - {
+          compileExpr(ast.FloatLit(BigDecimal(0.1f)) :: F32)
+            .run.runA(CodegenState()).value ==> (insts(), Val.F32(0.1f))
+        }
+        "F64" - {
+          compileExpr(ast.FloatLit(BigDecimal(0.1)) :: F64)
+            .run.runA(CodegenState()).value ==> (insts(), Val.F64(0.1))
+        }
+      }
       "BoolLit" - {
         compileExpr(ast.BoolLit(true) :: U1).run.runA(CodegenState()).value ==>
           (insts(), Val.I(1, ir.Type.U1))

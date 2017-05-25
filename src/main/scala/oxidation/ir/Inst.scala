@@ -18,6 +18,13 @@ sealed trait Inst {
     case Flow(f) => f.reads
   }
 
+  def vals: Set[Val] = this match {
+    case Move(_, op) => op.vals
+    case Do(op) => op.vals
+    case Label(_) => Set.empty
+    case Flow(f) => f.vals
+  }
+
 }
 
 object Inst {

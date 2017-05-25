@@ -42,7 +42,7 @@ object Amd64BackendPass extends Pass {
     S.modify(s => s.copy(returnedStructs = s.returnedStructs + reg))
 
   override def onInstruction: Inst =?> F[Vector[Inst]] = {
-    case Inst.Move(dest, Op.Binary(op @ (InfixOp.Div | InfixOp.Mod) , l, r)) => // TODO handle signed case; deduplicate?
+    case Inst.Move(dest @ ir.Register(_, _, _: ir.Type.Integral), Op.Binary(op @ (InfixOp.Div | InfixOp.Mod) , l, r)) => // TODO handle signed case; deduplicate?
       for {
         ltemp <- nextReg(l.typ)
         sextTemp <- nextReg(l.typ)
@@ -70,7 +70,7 @@ object Amd64BackendPass extends Pass {
         Inst.Move(otherTemp, Op.Garbled),
         Inst.Move(dest, Op.Copy(ir.Val.R(destTemp)))
       )
-    case Inst.Move(dest, Op.Binary(InfixOp.Mul , l, r)) => // TODO handle signed case
+    case Inst.Move(dest @ ir.Register(_, _, _: ir.Type.Integral), Op.Binary(InfixOp.Mul , l, r)) => // TODO handle signed case
       for {
         ltemp <- nextReg(l.typ)
         sextTemp <- nextReg(l.typ)
@@ -130,8 +130,17 @@ object Amd64BackendPass extends Pass {
 
     case inst @ Inst.Move(dest, Op.Binary(InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor | InfixOp.Shl | InfixOp.Shr, l, r)) =>
       F.pure(Vector(
-        inst, Inst.Do(Op.Copy(r))
+        inst, Inst.Do(Op.Copy(r)) // Prevent `dest` and `r` from being allocated to the same register, it would otherwise end up as `mov x, l / add x, x`
       ))
+
+
+    case Inst.Move(dest, Op.Binary(op @ (InfixOp.Eq | InfixOp.Neq), ir.Val(l, _: ir.Type.F), r)) =>
+      for {
+        mask <- nextReg(l.typ)
+      } yield Vector(
+        Inst.Move(mask, Op.Copy(l)),
+        Inst.Move(dest, Op.Binary(op, ir.Val.R(mask), r))
+      )
   }
 
   override def onFlow = {

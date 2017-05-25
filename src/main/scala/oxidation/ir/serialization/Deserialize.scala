@@ -73,6 +73,8 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Type.Ptr => Type.Ptr
     case Tag.Type.Fun => Type.Fun(readSeq(readType).toList, readType())
     case Tag.Type.Struct => Type.Struct(readSeq(readType).toVector)
+    case Tag.Type.F32 => Type.F32
+    case Tag.Type.F64 => Type.F64
   }
 
   def readOp(): Op = readTag() match {
@@ -128,6 +130,8 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Val.GlobalAddr => Val.GlobalAddr(readName())
     case Tag.Val.Array => Val.Array(readSeq(readVal).toList)
     case Tag.Val.UArr => Val.UArr(readType().asInstanceOf[Type.Arr])
+    case Tag.Val.F32 => Val.F32(readFloat())
+    case Tag.Val.F64 => Val.F64(readDouble())
   }
 
   def readName(): Name = readTag() match {

@@ -6,9 +6,11 @@ import Reg._
 import cats._
 import cats.data._
 import cats.implicits._
+import monocle.Lens
+import monocle.function.{Field1, Field2}
 import oxidation.backend.shared.RegisterAllocator
 import oxidation.codegen.Name
-import oxidation.ir.{ConstantPoolEntry, Register}
+import oxidation.ir.ConstantPoolEntry
 
 class Amd64Target { this: Output =>
 
@@ -18,8 +20,10 @@ class Amd64Target { this: Output =>
 
   final val EntryPointName: Name = Name.Global(List("?entry?"))
 
-  final case class FunCtxt(bindings: Map[ir.Register, Val],
-                           constants: Map[ir.ConstantPoolEntry, Name])
+  final case class FunCtxt(bindings: Map[ir.Register, Val] = Map.empty,
+                           constants: Map[ir.ConstantPoolEntry, Name] = Map.empty,
+                           stack: StackLayout = StackLayout.empty,
+                           floats: Map[ir.Val, Name] = Map.empty)
 
   def regSize(t: ir.Type): RegSize = t match {
     case ir.Type.U0 | ir.Type.U1 | ir.Type.U8 | ir.Type.I8 => RegSize.Byte
@@ -55,6 +59,123 @@ class Amd64Target { this: Output =>
     text |+| funDefs.foldMap(outputFunDef) |+| data |+| valDefs.foldMap(outputValDef)
   }
 
+  object AllocationState {
+
+    def state[S, A](lens: Lens[(FunCtxt, ir.Def.Fun), S])(f: S => (S, A)): State[(FunCtxt, ir.Def.Fun), A] =
+      State(s => f(lens.get(s)).leftMap(lens.set(_)(s)))
+
+    val ctxtLens = Field1.first[(FunCtxt, ir.Def.Fun), FunCtxt]
+
+    def funState[A] = state[ir.Def.Fun, A](Field2.second) _
+
+    def stackState[A] = state[StackLayout, A](ctxtLens composeLens Lens[FunCtxt, StackLayout](_.stack)(a => s => s.copy(stack = a))) _
+
+    def bindingsState[A] = state[Map[ir.Register, Val], A](ctxtLens composeLens Lens[FunCtxt, Map[ir.Register, Val]](_.bindings)(a => s => s.copy(bindings = a))) _
+
+    def allocAll[R](ls: List[R])(f: R => StackAlloc): State[(FunCtxt, ir.Def.Fun), List[(R, StackAlloc.Addr)]] =
+      ls.traverse(r => stackState(s => s.alloc(f(r)).map(r -> _)))
+
+  }
+
+  private def allocateIntRegs(stackParams: List[ir.Register], precolours: Map[ir.Register, RegLoc]): State[(FunCtxt, ir.Def.Fun), Unit] = {
+    val allocator: RegisterAllocator[RegLoc] =
+      new RegisterAllocator[RegLoc](RegLoc.calleeSaved, RegLoc.callerSaved) {
+
+        override def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun =
+          RegisterSpillPass.txDef(fun).runEmptyA.run(spilled).head.asInstanceOf[ir.Def.Fun]
+
+        override def includeRegister(register: ir.Register): Boolean = {
+          val passedOnStack = stackParams.contains(register)
+          val correctType = register.typ match {
+            case _: ir.Type.Arr | _: ir.Type.F => false
+            case _: ir.Type.Integral => true
+            case ir.Type.U0 | ir.Type.U1 | ir.Type.Ptr => true
+            case _: ir.Type.Fun | _: ir.Type.Struct =>
+              throw new Exception(s"type ${register.typ} should be eliminated before target (used in ${register.show})")
+          }
+          !passedOnStack && correctType
+        }
+
+      }
+
+    import AllocationState._
+
+    for {
+      allocations <- funState(allocator.allocate(_, precolours).swap)
+      calleeSaved = allocations.values.collect {
+        case allocator.R(l) if RegLoc.calleeSaved.contains(l) => l
+      }.toSet
+      newCalleeSaved <- stackState(s => (s, calleeSaved -- s.allocs.collect { case (StackAlloc.SavedIntReg(r), _) => r }.toSet))
+      calleeSavedAllocs <- allocAll(newCalleeSaved.toList)(StackAlloc.SavedIntReg)
+
+      spills = allocations.collect {
+        case (r, allocator.Spill) => r
+      }.toList
+      regular = allocations.collect {
+        case (reg, allocator.R(r)) => reg -> Val.R(Reg(r, regSize(reg.typ)))
+      }
+      spillAllocs <- allocAll(spills)(_ => StackAlloc.Spill)
+      spillVals <- spillAllocs.traverse { case (r, a) => stackState(s => (s, r -> s.offset(a).withSize(regSize(r.typ)))) }
+      _ <- bindingsState(b => (b ++ spillVals ++ regular, ()))
+    } yield ()
+  }
+
+  private def allocateFloatRegs(stackParams: List[ir.Register]): State[(FunCtxt, ir.Def.Fun), Unit] = {
+    val allocator: RegisterAllocator[Xmm] =
+      new RegisterAllocator[Xmm](Xmm.calleeSaved, Xmm.callerSaved) {
+
+        override def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun = ??? // TODO float spills
+
+        override def includeRegister(register: ir.Register): Boolean = {
+          val passedOnStack = stackParams.contains(register)
+          val correctType = register.typ match {
+            case _: ir.Type.F => true
+            case _: ir.Type.Arr | _: ir.Type.Integral | ir.Type.U0 | ir.Type.U1 | ir.Type.Ptr => false
+            case _: ir.Type.Fun | _: ir.Type.Struct =>
+              throw new Exception(s"type ${register.typ} should be eliminated before target (used in ${register.show})")
+          }
+          !passedOnStack && correctType
+        }
+
+      }
+
+    import AllocationState._
+
+    for {
+      allocations <- funState(allocator.allocate(_, Map.empty).swap)
+      calleeSaved = allocations.values.collect {
+        case allocator.R(l) if RegLoc.calleeSaved.contains(l) => l
+      }.toSet
+      newCalleeSaved <- stackState(s => (s, s.allocs.collect { case (StackAlloc.SavedXmmReg(r), _) => r }.toSet -- calleeSaved))
+      calleeSavedAllocs <- allocAll(newCalleeSaved.toList)(StackAlloc.SavedXmmReg)
+
+      spills = allocations.collect {
+        case (r, allocator.Spill) => r
+      }.toList
+      regular = allocations.collect {
+        case (reg, allocator.R(r)) => reg -> Val.F(r)
+      }
+      spillAllocs <- allocAll(spills)(_ => StackAlloc.Spill)
+      spillVals <- spillAllocs.traverse { case (r, a) => stackState(s => (s, r -> s.offset(a).withSize(regSize(r.typ)))) }
+      _ <- bindingsState(b => (b ++ spillVals ++ regular, ()))
+    } yield ()
+
+  }
+
+  private def allocateArrays: State[(FunCtxt, ir.Def.Fun), Unit] = {
+    import AllocationState._
+
+    for {
+      arrayRegs <- funState(f => (f, f.body.flatMap(_.reads.collect {
+        case r @ ir.Register(_, _, a: ir.Type.Arr) => (r, a)
+      }).distinct))
+      arrayAllocs <- allocAll(arrayRegs.toList) { case (_, t) => StackAlloc.Array(t) }
+
+      arrayBindings <- arrayAllocs.traverse { case ((r, _), a) => stackState(s => (s, r -> s.offset(a))) }
+      _ <- bindingsState(b => (b ++ arrayBindings, ()))
+    } yield ()
+  }
+
   def outputFunDef(d: ir.Def)(implicit constants: Map[ir.ConstantPoolEntry, Name]): M = d match {
     case ir.Def.ExternFun(name, _, _) =>
       extern(name)
@@ -63,74 +184,47 @@ class Amd64Target { this: Output =>
 
       val stackParams = unallocatedFun.params.drop(4)
 
-      val allocator: RegisterAllocator[RegLoc] =
-        new RegisterAllocator[RegLoc](RegLoc.calleeSaved, RegLoc.callerSaved) {
-
-          override def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun =
-            RegisterSpillPass.txDef(fun).runEmptyA.run(spilled).head.asInstanceOf[ir.Def.Fun]
-
-          override def includeRegister(register: Register): Boolean = {
-            val passedOnStack = stackParams.contains(register)
-            val correctType = register.typ match {
-              case _: ir.Type.Arr => false
-              case _: ir.Type.Num => true
-              case ir.Type.U0 | ir.Type.U1 | ir.Type.Ptr => true
-              case _: ir.Type.Fun | _: ir.Type.Struct =>
-                throw new Exception(s"type ${register.typ} should be eliminated before target (used in ${register.show})")
-            }
-            !passedOnStack && correctType
-          }
-
+      val allocS = for {
+        _ <- allocateIntRegs(stackParams, precolours.toMap)
+        _ <- allocateFloatRegs(stackParams)
+        _ <- allocateArrays
+        stackParamBindings = stackParams.zipWithIndex.map {
+          case (r, i) => r -> Val.m(Some(regSize(r.typ)), RBP, 0x30 + i * 8)
         }
+        _ <- AllocationState.bindingsState(b => (b ++ stackParamBindings, ()))
+      } yield ()
+      val (ctxt, allocatedFun) = allocS.runS((FunCtxt(constants = constants), unallocatedFun)).value
 
-      val (allocations, fun) = allocator.allocate(unallocatedFun, precolours.toMap)
-      val calleeSaved = allocations.values.collect {
-        case allocator.R(l) if RegLoc.calleeSaved.contains(l) => l
-      }.toList.distinct
-      val spills = allocations.collect {
-        case (r, allocator.Spill) => r
-      }.zipWithIndex.toMap.mapValues(_ + calleeSaved.size)
-      assert(fun.body.flatMap(_.reads).filterNot(allocations.contains).forall(!allocator.includeRegister(_)))
-      val bindings = allocations.map {
-        case (reg, allocator.R(r)) => reg -> Val.R(Reg(r, regSize(reg.typ)))
-        case (r, allocator.Spill) => r -> Val.m(Some(regSize(r.typ)), RBP, stackAllocOffset(spills(r)))
-      }
-      val requiredStackSpace = ((calleeSaved.size + spills.size - 4) max 0) * 8
+      val floatVals = (for {
+        block <- allocatedFun.body
+        instr <- block.instructions
+        v @ (ir.Val.F32(_) | ir.Val.F64(_)) <- instr.vals
+      } yield v).distinct
+      val floatNames = floatVals.zipWithIndex.map {
+        case (v, i) => v -> Name.Local("$FL", i)
+      }.toMap
 
-      val arrayRegs = fun.body.flatMap(_.reads.collect {
-        case r @ ir.Register(_, _, a: ir.Type.Arr) => r
-      }).distinct
-      val arraySizes = arrayRegs.scanLeft(requiredStackSpace)(_ + _.typ.size) // TODO align
-      val arrayAllocs = arrayRegs zip arraySizes
+      implicit val _ctxt = ctxt.copy(floats = floatNames)
 
-      val allocatedStackSpace = arraySizes.lastOption getOrElse requiredStackSpace
-
-      val arrayBindings = arrayAllocs.map {
-        case (r, i) => r -> Val.m(None, RBP, -(i + r.typ.size))
-      }
-
-      val stackParamBindings = stackParams.zipWithIndex.map {
-        case (r, i) => r -> Val.m(Some(regSize(r.typ)), RBP, 0x30 + i * 8)
-      }
-
-      val allBindings = bindings ++ arrayBindings ++ stackParamBindings
-
-      implicit val ctxt = FunCtxt(allBindings, constants)
-
-      val res: F[Unit] = fun.body.traverse_ {
+      val res: F[Unit] = allocatedFun.body.traverse_ {
         case ir.Block(name, instructions, flow) =>
           for {
             _ <- F.tell(label(name))
             _ <- instructions.traverse(outputInstruction(_))
-            _ <- outputFlow(flow, calleeSaved)
+            _ <- outputFlow(flow)
           } yield ()
       }
       val m = res.written
+      val floatM = floatNames.map {
+        case (ir.Val.F32(f), n) => dd(n, java.lang.Float.floatToRawIntBits(f))
+        case (ir.Val.F64(d), n) => dq(n, java.lang.Double.doubleToRawLongBits(d))
+      }.toVector.combineAll
       Vector(
         global(name),
         label(name),
-        prologue(allocatedStackSpace, calleeSaved),
-        m
+        prologue,
+        m,
+        floatM
       ).combineAll
   }
 
@@ -171,8 +265,14 @@ class Amd64Target { this: Output =>
 
   ).combineAll
 
-  def move(dest: Val, src: Val): M =
-    if(dest == src) M.empty else mov(dest, src)
+  def move(dest: Val, src: ir.Val)(implicit ctxt: FunCtxt): M =
+    if(dest == toVal(src)) M.empty else (dest, src.typ) match {
+      case (_, _: ir.Type.Integral | ir.Type.U1 | ir.Type.Ptr) => mov(dest, toVal(src))
+      case (Val.F(_), ir.Type.F32) => movss(dest, toVal(src))
+      case (Val.F(_), ir.Type.F64) => movsd(dest, toVal(src))
+      case (Val.R(_), ir.Type.F32) => movd(dest, toVal(src))
+      case (Val.R(_), ir.Type.F64) => movq(dest, toVal(src))
+    }
 
   def outputInstruction(i: ir.Inst)(implicit ctxt: FunCtxt): F[Unit] = i match {
     case ir.Inst.Label(n) => F.tell(label(n))
@@ -184,7 +284,7 @@ class Amd64Target { this: Output =>
     case ir.Inst.Do(ir.Op.Store(addr, offset, value)) =>
       assert(regSize(addr.typ) == RegSize.QWord)
       assert(regSize(offset.typ) == RegSize.QWord)
-      F.tell(move(Val.m(Some(regSize(value.typ)), toVal(addr), toVal(offset)), toVal(value)))
+      F.tell(mov(Val.m(Some(regSize(value.typ)), toVal(addr), toVal(offset)), toVal(value)))
 
     case ir.Inst.Do(ir.Op.ArrStore(arr, index, value)) =>
       val arrM = toVal(arr).asInstanceOf[Val.M]
@@ -214,7 +314,7 @@ class Amd64Target { this: Output =>
 
         case (Unsigned, RegSize.QWord, RegSize.DWord) =>
           val Val.R(Reg(destLoc, _)) = toVal(dest)
-          F.tell(move(Reg(destLoc, RegSize.DWord), toVal(src)))
+          F.tell(move(Reg(destLoc, RegSize.DWord), src))
 
         case (Signed, RegSize.QWord, RegSize.DWord) =>
           F.tell(movsxd(toVal(dest), toVal(src)))
@@ -226,8 +326,8 @@ class Amd64Target { this: Output =>
       case ir.Op.Trim(src) =>
         toVal(src) match {
           case Val.R(Reg(loc, _)) =>
-            F.tell(move(toVal(dest), Val.R(Reg(loc, regSize(dest.typ)))))
-          case v => F.tell(move(toVal(dest), v))
+            F.tell(mov(toVal(dest), Val.R(Reg(loc, regSize(dest.typ)))))
+          case v => F.tell(mov(toVal(dest), v))
         }
 
       case ir.Op.Elem(arr, index) =>
@@ -237,53 +337,100 @@ class Amd64Target { this: Output =>
           case Val.I(i) => arrM + Val.m(Some(regSize(dest.typ)), i * elemSize)
           case Val.R(r) => arrM + Val.m(Some(regSize(dest.typ)), r * elemSize)
         }
-        F.tell(move(toVal(dest), src))
+        F.tell(mov(toVal(dest), src))
 
       case ir.Op.Unary(PrefixOp.Not, src) =>
         F.tell(Vector(
-          move(toVal(dest), toVal(src)),
+          move(toVal(dest), src),
           xor(toVal(dest), 1)
         ).combineAll)
 
       case ir.Op.Unary(PrefixOp.Neg, src) =>
         F.tell(Vector(
-          move(toVal(dest), toVal(src)),
+          move(toVal(dest), src),
           neg(toVal(dest))
         ).combineAll)
 
-      case ir.Op.Binary(op @ (InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor | InfixOp.Shl | InfixOp.Shr), left, right) =>
-        F.tell(Vector(
-          move(toVal(dest), toVal(left)),
-          op match {
-            case InfixOp.Add => add(toVal(dest), toVal(right))
-            case InfixOp.Sub => sub(toVal(dest), toVal(right))
-            case InfixOp.BitAnd => and(toVal(dest), toVal(right))
-            case InfixOp.BitOr => or(toVal(dest), toVal(right))
-            case InfixOp.Xor => xor(toVal(dest), toVal(right))
-            case InfixOp.Shl => shl(toVal(dest), toVal(right))
-            case InfixOp.Shr => signedness(dest.typ) match {
-              case Signed   => sar(toVal(dest), toVal(right))
-              case Unsigned => shr(toVal(dest), toVal(right))
-            }
-          }
-        ).combineAll)
-      case ir.Op.Binary(InfixOp.Div, _, right) => F.tell(div(toVal(right)))
-      case ir.Op.Binary(InfixOp.Mod, _, right) => F.tell(div(toVal(right)))
-      case ir.Op.Binary(InfixOp.Mul, _, right) => F.tell(mul(toVal(right)))
-      case ir.Op.Binary(op @ (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq | InfixOp.Neq), left, right) =>
-          F.tell(Vector(
-            cmp(toVal(left), toVal(right)),
-            op match {
-              case InfixOp.Lt => setl(toVal(dest))
-              case InfixOp.Gt => setg(toVal(dest))
-              case InfixOp.Geq => setge(toVal(dest))
-              case InfixOp.Leq => setle(toVal(dest))
-              case InfixOp.Eq => sete(toVal(dest))
-              case InfixOp.Neq => setne(toVal(dest))
-            }
-          ).combineAll)
+      case ir.Op.Binary(op, left, right) => left.typ match {
+        case _: ir.Type.Integral | ir.Type.U1 | ir.Type.Ptr => op match {
+          case InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor | InfixOp.Shl | InfixOp.Shr =>
+            F.tell(Vector(
+              move(toVal(dest), left),
+              op match {
+                case InfixOp.Add => add(toVal(dest), toVal(right))
+                case InfixOp.Sub => sub(toVal(dest), toVal(right))
+                case InfixOp.BitAnd => and(toVal(dest), toVal(right))
+                case InfixOp.BitOr => or(toVal(dest), toVal(right))
+                case InfixOp.Xor => xor(toVal(dest), toVal(right))
+                case InfixOp.Shl => shl(toVal(dest), toVal(right))
+                case InfixOp.Shr => signedness(dest.typ) match {
+                  case Signed   => sar(toVal(dest), toVal(right))
+                  case Unsigned => shr(toVal(dest), toVal(right))
+                }
+              }
+            ).combineAll)
+          case InfixOp.Div => F.tell(div(toVal(right)))
+          case InfixOp.Mod => F.tell(div(toVal(right)))
+          case InfixOp.Mul => F.tell(mul(toVal(right)))
+          case (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq | InfixOp.Neq) =>
+            F.tell(Vector(
+              cmp(toVal(left), toVal(right)),
+              op match {
+                case InfixOp.Lt => setl(toVal(dest))
+                case InfixOp.Gt => setg(toVal(dest))
+                case InfixOp.Geq => setge(toVal(dest))
+                case InfixOp.Leq => setle(toVal(dest))
+                case InfixOp.Eq => sete(toVal(dest))
+                case InfixOp.Neq => setne(toVal(dest))
+              }
+            ).combineAll)
+        }
+        case ir.Type.F32 => op match {
+          case InfixOp.Add | InfixOp.Sub | InfixOp.Div | InfixOp.Mul =>
+            F.tell(Vector(
+              move(toVal(dest), left),
+              op match {
+                case InfixOp.Add => addss(toVal(dest), toVal(right))
+                case InfixOp.Sub => subss(toVal(dest), toVal(right))
+                case InfixOp.Div => divss(toVal(dest), toVal(right))
+                case InfixOp.Mul => mulss(toVal(dest), toVal(right))
+              }
+            ).combineAll)
 
-      case ir.Op.Copy(src) => F.tell(move(toVal(dest), toVal(src)))
+          case InfixOp.Eq | InfixOp.Neq =>
+            F.tell(Vector(
+              op match {
+                case InfixOp.Eq => cmpeqss(toVal(left), toVal(right))
+              },
+              move(toVal(dest).withSize(RegSize.DWord), left),
+              neg(toVal(dest).withSize(RegSize.DWord))
+            ).combineAll)
+        }
+        case ir.Type.F64 => op match {
+          case InfixOp.Add | InfixOp.Sub | InfixOp.Div | InfixOp.Mul =>
+            F.tell(Vector(
+              move(toVal(dest), left),
+              op match {
+                case InfixOp.Add => addsd(toVal(dest), toVal(right))
+                case InfixOp.Sub => subsd(toVal(dest), toVal(right))
+                case InfixOp.Div => divsd(toVal(dest), toVal(right))
+                case InfixOp.Mul => mulsd(toVal(dest), toVal(right))
+              }
+            ).combineAll)
+          case InfixOp.Eq | InfixOp.Neq =>
+            F.tell(Vector(
+              op match {
+                case InfixOp.Eq => cmpeqsd(toVal(left), toVal(right))
+              },
+              move(toVal(dest).withSize(RegSize.QWord), left),
+              neg(toVal(dest).withSize(RegSize.QWord))
+            ).combineAll)
+        }
+
+      }
+
+      case ir.Op.Copy(src) => F.tell(move(toVal(dest), src))
+
       case ir.Op.Garbled => F.pure(())
 
       case ir.Op.Load(addr, off) =>
@@ -304,10 +451,10 @@ class Amd64Target { this: Output =>
     }
   }
 
-  def outputFlow(f: ir.FlowControl, savedRegs: List[RegLoc])(implicit ctxt: FunCtxt): F[Unit] = f match {
+  def outputFlow(f: ir.FlowControl)(implicit ctxt: FunCtxt): F[Unit] = f match {
     case ir.FlowControl.Return(r) =>
       F.tell(Vector(
-        epilogue(savedRegs),
+        epilogue,
         ret
       ).combineAll)
     case ir.FlowControl.Goto(n) => F.tell(jmp(n))
@@ -319,24 +466,38 @@ class Amd64Target { this: Output =>
       ).combineAll)
   }
 
-  def prologue(localCount: Int, regsToSave: List[RegLoc]): M = Vector(
-    push(RBP),
-    mov(RBP, RSP),
-    regsToSave.zipWithIndex.foldMap { case (l, i) => mov(Val.m(Some(RegSize.QWord), RBP, stackAllocOffset(i)), Reg(l, RegSize.QWord)) },
-    sub(RSP, localCount + 4*8)
-  ).combineAll
+  def prologue(implicit ctxt: FunCtxt): M = {
+    val regStores = ctxt.stack.allocs.collect {
+      case (StackAlloc.SavedIntReg(r), a) => mov(ctxt.stack.offset(a).withSize(RegSize.QWord), Reg(r, RegSize.QWord))
+      case (StackAlloc.SavedXmmReg(r), a) => movups(ctxt.stack.offset(a), r)
+    }
+    Vector(
+      push(RBP),
+      mov(RBP, RSP),
+      regStores.combineAll,
+      sub(RSP, (ctxt.stack.mainSize + 4) * 8)
+    ).combineAll
+  }
 
-  def epilogue(savedRegs: List[RegLoc]): M = Vector(
-    savedRegs.zipWithIndex.foldMap { case (l, i) => mov(Reg(l, RegSize.QWord), Val.m(Some(RegSize.QWord), RBP, stackAllocOffset(i))) },
-    mov(RSP, RBP),
-    pop(RBP)
-  ).combineAll
+  def epilogue(implicit ctxt: FunCtxt): M = {
+    val regRestores = ctxt.stack.allocs.collect {
+      case (StackAlloc.SavedIntReg(r), a) => mov(Reg(r, RegSize.QWord), ctxt.stack.offset(a).withSize(RegSize.QWord))
+      case (StackAlloc.SavedXmmReg(r), a) => movups(r, ctxt.stack.offset(a))
+    }
+    Vector(
+      regRestores.combineAll,
+      mov(RSP, RBP),
+      pop(RBP)
+    ).combineAll
+  }
 
   private def toVal(v: ir.Val)(implicit ctxt: FunCtxt): Val = v match {
     case ir.Val.I(i, _) => Val.I(i)
     case ir.Val.R(r) => ctxt.bindings(r)
     case ir.Val.Const(entry, _) => Val.L(ctxt.constants(entry))
     case ir.Val.GlobalAddr(n) => Val.L(n)
+    case f : ir.Val.F32 => Val.m(None, ctxt.floats(f))
+    case f : ir.Val.F64 => Val.m(None, ctxt.floats(f))
   }
   private def toVal(r: ir.Register)(implicit ctxt: FunCtxt): Val = ctxt.bindings(r)
 

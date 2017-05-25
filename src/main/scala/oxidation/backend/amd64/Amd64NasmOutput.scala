@@ -16,6 +16,7 @@ trait Amd64NasmOutput extends Output {
   private implicit val showVal: Show[Val] = {
     case Val.I(i) => i.show
     case Val.R(r) => r.toString.toLowerCase
+    case Val.F(Xmm(i)) => s"xmm$i"
     case Val.L(n) => n.show
     case Val.M(size, regs, offset, labels) =>
       val rs = regs.map {
@@ -89,6 +90,11 @@ trait Amd64NasmOutput extends Output {
   override def mov(dest: Val, src: Val): M =
     ln(show"mov $dest, $src")
 
+  override def movd(dest: Val, src: Val): M =
+    ln(show"movd $dest, $src")
+  override def movq(dest: Val, src: Val): M =
+    ln(show"movq $dest, $src")
+
   override def movzx(dest: Val, src: Val): M =
     ln(show"movzx $dest, $src")
 
@@ -130,6 +136,41 @@ trait Amd64NasmOutput extends Output {
 
   override def test(dest: Val, src: Val) = ln(show"test $dest, $src")
   override def cmp(dest: Val, src: Val) = ln(show"cmp $dest, $src")
+
+  def movups(dest: Val, src: Val): M =
+    ln(show"movups $dest, $src")
+  def movss(dest: Val, src: Val): M =
+    ln(show"movss $dest, $src")
+  def movsd(dest: Val, src: Val): M =
+    ln(show"movsd $dest, $src")
+
+  def addss(dest: Val, src: Val): M =
+    ln(show"addss $dest, $src")
+  def subss(dest: Val, src: Val): M =
+    ln(show"subss $dest, $src")
+  def mulss(dest: Val, src: Val): M =
+    ln(show"mulss $dest, $src")
+  def divss(dest: Val, src: Val): M =
+    ln(show"divss $dest, $src")
+
+  def addsd(dest: Val, src: Val): M =
+    ln(show"addsd $dest, $src")
+  def subsd(dest: Val, src: Val): M =
+    ln(show"subsd $dest, $src")
+  def mulsd(dest: Val, src: Val): M =
+    ln(show"mulsd $dest, $src")
+  def divsd(dest: Val, src: Val): M =
+    ln(show"divsd $dest, $src")
+
+  def ucomiss(dest: Val, src: Val): M =
+    ln(show"ucomiss $dest, $src")
+  def ucomisd(dest: Val, src: Val): M =
+    ln(show"ucomisd $dest, $src")
+
+  def cmpeqss(dest: Val, src: Val): M =
+    ln(show"cmpeqss $dest, $src")
+  def cmpeqsd(dest: Val, src: Val): M =
+    ln(show"cmpeqsd $dest, $src")
 
   def setl(dest: Val): M = ln(show"setl $dest")
   def setle(dest: Val): M = ln(show"setle $dest")
