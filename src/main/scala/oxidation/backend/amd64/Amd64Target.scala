@@ -28,8 +28,8 @@ class Amd64Target { this: Output =>
   def regSize(t: ir.Type): RegSize = t match {
     case ir.Type.U0 | ir.Type.U1 | ir.Type.U8 | ir.Type.I8 => RegSize.Byte
     case ir.Type.U16 | ir.Type.I16 => RegSize.Word
-    case ir.Type.U32 | ir.Type.I32 => RegSize.DWord
-    case ir.Type.U64 | ir.Type.I64 | ir.Type.Ptr => RegSize.QWord
+    case ir.Type.U32 | ir.Type.I32 | ir.Type.F32 => RegSize.DWord
+    case ir.Type.U64 | ir.Type.I64 | ir.Type.Ptr | ir.Type.F64 => RegSize.QWord
   }
 
   def signedness(t: ir.Type): Signedness = t match {
@@ -120,7 +120,7 @@ class Amd64Target { this: Output =>
     } yield ()
   }
 
-  private def allocateFloatRegs(stackParams: List[ir.Register]): State[(FunCtxt, ir.Def.Fun), Unit] = {
+  private def allocateFloatRegs(stackParams: List[ir.Register], precolours: Map[ir.Register, Xmm]): State[(FunCtxt, ir.Def.Fun), Unit] = {
     val allocator: RegisterAllocator[Xmm] =
       new RegisterAllocator[Xmm](Xmm.calleeSaved, Xmm.callerSaved) {
 
@@ -142,7 +142,7 @@ class Amd64Target { this: Output =>
     import AllocationState._
 
     for {
-      allocations <- funState(allocator.allocate(_, Map.empty).swap)
+      allocations <- funState(allocator.allocate(_, precolours).swap)
       calleeSaved = allocations.values.collect {
         case allocator.R(l) if RegLoc.calleeSaved.contains(l) => l
       }.toSet
@@ -185,8 +185,8 @@ class Amd64Target { this: Output =>
       val stackParams = unallocatedFun.params.drop(4)
 
       val allocS = for {
-        _ <- allocateIntRegs(stackParams, precolours.toMap)
-        _ <- allocateFloatRegs(stackParams)
+        _ <- allocateIntRegs(stackParams, precolours.int.toMap)
+        _ <- allocateFloatRegs(stackParams, precolours.float.toMap)
         _ <- allocateArrays
         stackParamBindings = stackParams.zipWithIndex.map {
           case (r, i) => r -> Val.m(Some(regSize(r.typ)), RBP, 0x30 + i * 8)
@@ -302,7 +302,13 @@ class Amd64Target { this: Output =>
       F.tell(Vector(
         if(stackParams.nonEmpty) sub(RSP, stackParams.size * 8) else M.empty,
         stackParams.zipWithIndex.foldMap {
-          case (r, i) => mov(Val.m(Some(regSize(r.typ)), RSP, 8 * (4 + i)), toVal(r))
+          case (r, i) =>
+            val dest = Val.m(Some(regSize(r.typ)), RSP, 8 * (4 + i))
+            r.typ match {
+              case ir.Type.F32 => movss(dest, toVal(r))
+              case ir.Type.F64 => movsd(dest, toVal(r))
+              case _ => mov(dest, toVal(r))
+            }
         },
         call(fun),
         if(stackParams.nonEmpty) add(RSP, stackParams.size * 8) else M.empty

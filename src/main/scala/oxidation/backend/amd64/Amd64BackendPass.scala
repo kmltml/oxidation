@@ -8,6 +8,7 @@ import cats.implicits._
 import codegen.pass.Pass
 import oxidation.ir._
 import Reg._
+import Xmm._
 
 object Amd64BackendPass extends Pass {
 
@@ -18,9 +19,19 @@ object Amd64BackendPass extends Pass {
   }
 
   final case class St(nextReg: Int = 0, returnedStructs: Set[Register] = Set.empty)
+  final case class Colours(int: Set[(Register, RegLoc)] = Set.empty,
+                           float: Set[(Register, Xmm)] = Set.empty)
+  implicit object Colours extends Monoid[Colours] {
 
-  type F[A] = WriterT[State[St, ?], Set[(Register, RegLoc)], A]
-  val F = MonadWriter[F, Set[(Register, RegLoc)]]
+    override def empty: Colours = Colours(Set.empty, Set.empty)
+
+    override def combine(x: Colours, y: Colours): Colours = Colours(x.int |+| y.int, x.float |+| y.float)
+
+  }
+
+  type F[A] = WriterT[State[St, ?], Colours, A]
+
+  val F = MonadWriter[F, Colours]
   val S = new MonadState[F, St] {
     override def get: F[St] = WriterT.lift(State.get)
 
@@ -41,6 +52,9 @@ object Amd64BackendPass extends Pass {
   private def saveReturnedStruct(reg: Register): F[Unit] =
     S.modify(s => s.copy(returnedStructs = s.returnedStructs + reg))
 
+  private def tellIntColour(cs: Set[(Register, RegLoc)]): F[Unit] = F.tell(Colours(int = cs))
+  private def tellFloatColour(cs: Set[(Register, Xmm)]): F[Unit] = F.tell(Colours(float = cs))
+
   override def onInstruction: Inst =?> F[Vector[Inst]] = {
     case Inst.Move(dest @ ir.Register(_, _, _: ir.Type.Integral), Op.Binary(op @ (InfixOp.Div | InfixOp.Mod) , l, r)) => // TODO handle signed case; deduplicate?
       for {
@@ -49,7 +63,7 @@ object Amd64BackendPass extends Pass {
         rtemp <- nextReg(r.typ)
         destTemp <- nextReg(dest.typ)
         otherTemp <- nextReg(dest.typ)
-        _ <- F.tell(Set(
+        _ <- tellIntColour(Set(
           destTemp -> (op match {
             case InfixOp.Div => RegLoc.A
             case InfixOp.Mod => RegLoc.D
@@ -77,7 +91,7 @@ object Amd64BackendPass extends Pass {
         rtemp <- nextReg(r.typ)
         destTemp <- nextReg(dest.typ)
         otherTemp <- nextReg(dest.typ)
-        _ <- F.tell(Set(
+        _ <- tellIntColour(Set(
           destTemp -> RegLoc.A,
           otherTemp -> RegLoc.D,
           ltemp -> RegLoc.A,
@@ -94,19 +108,30 @@ object Amd64BackendPass extends Pass {
 
     case Inst.Eval(dest, call @ Op.Call(_, params)) =>
       val paramColours = params.zipWithIndex.collect {
+        case t @ (Register(_, _, _: Type.Integral | Type.U1 | Type.Ptr), _) => t
+      }.collect {
         case (r, 0) => r -> RegLoc.C
         case (r, 1) => r -> RegLoc.D
         case (r, 2) => r -> RegLoc.R8
         case (r, 3) => r -> RegLoc.R9
       }
+      val floatParamColours = params.zipWithIndex.collect {
+        case t @ (Register(_, _, _: Type.F), _) => t
+      }.collect {
+        case (r, 0) => r -> Xmm0
+        case (r, 1) => r -> Xmm1
+        case (r, 2) => r -> Xmm2
+        case (r, 3) => r -> Xmm3
+      }
       for {
-        _ <- F.tell(paramColours.toSet)
+        _ <- F.tell(Colours(paramColours.toSet, floatParamColours.toSet))
         destInsts <- dest match {
           case Some(r @ Register(_, _, Type.Struct(_))) => saveReturnedStruct(r).as(Vector.empty)
-          case Some(r) => F.tell(Set(r -> RegLoc.A)).as(Vector())
+          case Some(r @ Register(_, _, _: Type.F)) => tellFloatColour(Set(r -> Xmm0)).as(Vector())
+          case Some(r) => tellIntColour(Set(r -> RegLoc.A)).as(Vector())
           case None => for {
             r <- nextReg(Type.U0)
-            _ <- F.tell(Set(r -> RegLoc.A))
+            _ <- tellIntColour(Set(r -> RegLoc.A))
           } yield Vector(Inst.Move(r, Op.Garbled))
         }
         newDest = dest match {
@@ -119,7 +144,7 @@ object Amd64BackendPass extends Pass {
       for {
         returnedStructs <- S.inspect(_.returnedStructs)
         _ = assert(returnedStructs contains src)
-        _ <- F.tell(Set(dest -> (member match {
+        _ <- tellIntColour(Set(dest -> (member match {
           case 0 => RegLoc.A
           case 1 => RegLoc.D
           case 2 => RegLoc.C
@@ -152,21 +177,33 @@ object Amd64BackendPass extends Pass {
         case (r, 3) => r -> RegLoc.R8
         case (r, 4) => r -> RegLoc.R9
       }.toSet
-      F.tell(allocs) as (Vector.empty, flow)
-  }
-
-  override def onBlock: Block =?> F[Vector[Block]] = {
-    case b @ Block(_, _, FlowControl.Return(ir.Val.R(r))) =>
-      F.tell(Set(r -> RegLoc.A)).as(Vector(b))
+      tellIntColour(allocs) as (Vector.empty, flow)
+    case flow @ FlowControl.Return(ir.Val.R(r)) =>
+      val c = r.typ match {
+        case _: Type.F => tellFloatColour(Set(r -> Xmm0))
+        case _ => tellIntColour(Set(r -> RegLoc.A))
+      }
+      c as (Vector.empty, flow)
   }
 
   override def onDef: Def =?> F[Vector[Def]] = {
     case fun @ Def.Fun(_, params, _, _, _) =>
-      F.tell(params.zipWithIndex.collect {
+      val paramColours = params.zipWithIndex.collect {
+        case t @ (Register(_, _, _: Type.Integral | Type.U1 | Type.Ptr), _) => t
+      }.collect {
         case (r, 0) => r -> RegLoc.C
         case (r, 1) => r -> RegLoc.D
         case (r, 2) => r -> RegLoc.R8
         case (r, 3) => r -> RegLoc.R9
-      }.toSet).as(Vector(fun))
+      }
+      val floatParamColours = params.zipWithIndex.collect {
+        case t @ (Register(_, _, _: Type.F), _) => t
+      }.collect {
+        case (r, 0) => r -> Xmm0
+        case (r, 1) => r -> Xmm1
+        case (r, 2) => r -> Xmm2
+        case (r, 3) => r -> Xmm3
+      }
+      F.tell(Colours(paramColours.toSet, floatParamColours.toSet)).as(Vector(fun))
   }
 }
