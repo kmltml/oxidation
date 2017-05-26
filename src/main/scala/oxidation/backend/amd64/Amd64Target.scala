@@ -268,10 +268,19 @@ class Amd64Target { this: Output =>
   def move(dest: Val, src: ir.Val)(implicit ctxt: FunCtxt): M =
     if(dest == toVal(src)) M.empty else (dest, src.typ) match {
       case (_, _: ir.Type.Integral | ir.Type.U1 | ir.Type.Ptr) => mov(dest, toVal(src))
-      case (Val.F(_), ir.Type.F32) => movss(dest, toVal(src))
-      case (Val.F(_), ir.Type.F64) => movsd(dest, toVal(src))
+      case (Val.F(_) | _: Val.M, ir.Type.F32) => movss(dest, toVal(src))
+      case (Val.F(_) | _: Val.M, ir.Type.F64) => movsd(dest, toVal(src))
       case (Val.R(_), ir.Type.F32) => movd(dest, toVal(src))
       case (Val.R(_), ir.Type.F64) => movq(dest, toVal(src))
+    }
+
+  def move(dest: ir.Register, src: Val)(implicit ctxt: FunCtxt): M =
+    if(toVal(dest) == src) M.empty else (toVal(dest), dest.typ) match {
+      case (d, _: ir.Type.Integral | ir.Type.U1 | ir.Type.Ptr) => mov(d, src)
+      case (d: Val.F, ir.Type.F32) => movss(d, src)
+      case (d: Val.F, ir.Type.F64) => movsd(d, src)
+      case (d: Val.R, ir.Type.F32) => movd(d, src)
+      case (d: Val.R, ir.Type.F64) => movq(d, src)
     }
 
   def outputInstruction(i: ir.Inst)(implicit ctxt: FunCtxt): F[Unit] = i match {
@@ -284,7 +293,7 @@ class Amd64Target { this: Output =>
     case ir.Inst.Do(ir.Op.Store(addr, offset, value)) =>
       assert(regSize(addr.typ) == RegSize.QWord)
       assert(regSize(offset.typ) == RegSize.QWord)
-      F.tell(mov(Val.m(Some(regSize(value.typ)), toVal(addr), toVal(offset)), toVal(value)))
+      F.tell(move(Val.m(Some(regSize(value.typ)), toVal(addr), toVal(offset)), value))
 
     case ir.Inst.Do(ir.Op.ArrStore(arr, index, value)) =>
       val arrM = toVal(arr).asInstanceOf[Val.M]
@@ -443,7 +452,7 @@ class Amd64Target { this: Output =>
         assert(regSize(addr.typ) == RegSize.QWord)
         assert(regSize(off.typ) == RegSize.QWord)
         F.tell(
-          mov(toVal(dest), Val.m(Some(regSize(dest.typ)), toVal(addr), toVal(off)))
+          move(dest, Val.m(Some(regSize(dest.typ)), toVal(addr), toVal(off)))
         )
 
       case ir.Op.Stackalloc(size) =>

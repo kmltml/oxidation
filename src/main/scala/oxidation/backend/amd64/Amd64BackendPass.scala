@@ -170,6 +170,14 @@ object Amd64BackendPass extends Pass {
         Inst.Move(mask, Op.Copy(l)),
         Inst.Move(dest, Op.Binary(op, ir.Val.R(mask), r))
       )
+
+    case Inst.Eval(dest, Op.Store(addr, off, f @ (ir.Val.F32(_) | ir.Val.F64(_)))) =>
+      for {
+        t <- nextReg(f.typ)
+      } yield Vector(
+        Inst.Move(t, Op.Copy(f)),
+        Inst.Eval(dest, Op.Store(addr, off, ir.Val.R(t)))
+      )
   }
 
   override def onFlow = {

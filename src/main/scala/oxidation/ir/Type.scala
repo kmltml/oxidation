@@ -12,6 +12,7 @@ sealed trait Type {
   def size: Int = this match {
     case I(w) => w / 8
     case U(w) => w / 8
+    case F(w) => w / 8
     case Ptr => 8
     case U0 | U1 => 1
     case Fun(_, _) => ???
