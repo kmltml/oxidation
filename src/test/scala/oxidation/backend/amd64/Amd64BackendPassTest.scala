@@ -160,6 +160,32 @@ object Amd64BackendPassTest extends TestSuite with IrValSyntax {
               )
             )
         }
+        "call to function returning struct with floats" - {
+          val vec = Struct(Vector(F64, F64, F64, F64))
+          pass.txBlock(Block(Name.Local("", 0), Vector(
+            Inst.Move(register(0, vec), Op.Call(ir.Val.G(Name.Global(List("foo")), Fun(Nil, vec)), Nil)),
+            Inst.Move(register(1, F64), Op.Member(register(0, vec), 0)),
+            Inst.Move(register(2, F64), Op.Member(register(0, vec), 1)),
+            Inst.Move(register(3, F64), Op.Member(register(0, vec), 2)),
+            Inst.Move(register(4, F64), Op.Member(register(0, vec), 3))
+          ), FlowControl.Return(u0))).written.runA(pass.St()).value ==> Colours(float = Set(
+            register(1, F64) -> Xmm0,
+            register(2, F64) -> Xmm1,
+            register(3, F64) -> Xmm2,
+            register(4, F64) -> Xmm3
+          ))
+        }
+        "def of function returning struct with floats" - {
+
+          pass.txFlow(FlowControl.Return(
+            ir.Val.Struct(Vector(register(0, F64), register(1, F64), register(2, F64), register(3, F64))))).written.runA(pass.St()).value ==>
+            Colours(float = Set(
+              register(0, F64) -> Xmm0,
+              register(1, F64) -> Xmm1,
+              register(2, F64) -> Xmm2,
+              register(3, F64) -> Xmm3
+            ))
+        }
       }
     }
   }

@@ -116,7 +116,7 @@ object Reg {
 
 }
 
-sealed trait RegLoc extends Product with Serializable
+sealed trait RegLoc extends AnyReg with Product with Serializable
 
 object RegLoc {
   case object A extends RegLoc

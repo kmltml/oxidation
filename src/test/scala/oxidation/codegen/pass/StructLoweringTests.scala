@@ -161,6 +161,30 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
           Inst.Move(sl(6, I32), Op.Member(sl(0, flatbar), 3))
         ))
     }
+
+    "call returning a small struct with mixed int and float members" - {
+      val foo = Struct(Vector(F64, F64, F64, F64, I64, I64, I64, I64, I64))
+      pass.txInstruction(Inst.Move(register(0, foo), Op.Call(Val.G(Name.Global(List("foo")), Fun(Nil, foo)), Nil)))
+        .run(pass.S()).value ==>
+        (pass.S(
+          bindings = Map(
+            register(0, foo) -> Vector(sl(1, F64), sl(2, F64), sl(3, F64), sl(4, F64), sl(5, I64), sl(6, I64), sl(7, I64), sl(8, I64), sl(9, I64)),
+            sl(0, foo) -> Vector(sl(1, F64), sl(2, F64), sl(3, F64), sl(4, F64), sl(5, I64), sl(6, I64), sl(7, I64), sl(8, I64), sl(9, I64))
+          ),
+          nextReg = 10
+        ), Vector(
+          Inst.Move(sl(0, foo), Op.Call(Val.G(Name.Global(List("foo")), Fun(Nil, foo)), Nil)),
+          Inst.Move(sl(1, F64), Op.Member(sl(0, foo), 0)),
+          Inst.Move(sl(2, F64), Op.Member(sl(0, foo), 1)),
+          Inst.Move(sl(3, F64), Op.Member(sl(0, foo), 2)),
+          Inst.Move(sl(4, F64), Op.Member(sl(0, foo), 3)),
+          Inst.Move(sl(5, I64), Op.Member(sl(0, foo), 4)),
+          Inst.Move(sl(6, I64), Op.Member(sl(0, foo), 5)),
+          Inst.Move(sl(7, I64), Op.Member(sl(0, foo), 6)),
+          Inst.Move(sl(8, I64), Op.Member(sl(0, foo), 7)),
+          Inst.Move(sl(9, I64), Op.Member(sl(0, foo), 8))
+        ))
+    }
   }
 
 }

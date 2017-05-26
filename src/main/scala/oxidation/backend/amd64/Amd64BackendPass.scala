@@ -18,7 +18,7 @@ object Amd64BackendPass extends Pass {
     val prefix = "br"
   }
 
-  final case class St(nextReg: Int = 0, returnedStructs: Set[Register] = Set.empty)
+  final case class St(nextReg: Int = 0, returnedStructs: Map[Register, Vector[AnyReg]] = Map.empty)
   final case class Colours(int: Set[(Register, RegLoc)] = Set.empty,
                            float: Set[(Register, Xmm)] = Set.empty)
   implicit object Colours extends Monoid[Colours] {
@@ -49,8 +49,16 @@ object Amd64BackendPass extends Pass {
     s => (s.copy(nextReg = s.nextReg + 1), Register(BackendReg, s.nextReg, typ))
   })
 
-  private def saveReturnedStruct(reg: Register): F[Unit] =
-    S.modify(s => s.copy(returnedStructs = s.returnedStructs + reg))
+  private def saveReturnedStruct(reg: Register): F[Unit] = {
+    val Type.Struct(members) = reg.typ
+    val intColours = List(RegLoc.A, RegLoc.D, RegLoc.C, RegLoc.R8, RegLoc.R9)
+    val floatColours = List(Xmm0, Xmm1, Xmm2, Xmm3)
+    val memberColours = members.foldLeft((Vector.empty[AnyReg], intColours, floatColours)) {
+      case ((acc, ics, c :: fcs), _: Type.F) => (acc :+ c, ics, fcs)
+      case ((acc, c :: ics, fcs), _) => (acc :+ c, ics, fcs)
+    }._1
+    S.modify(s => s.copy(returnedStructs = s.returnedStructs + (reg -> memberColours)))
+  }
 
   private def tellIntColour(cs: Set[(Register, RegLoc)]): F[Unit] = F.tell(Colours(int = cs))
   private def tellFloatColour(cs: Set[(Register, Xmm)]): F[Unit] = F.tell(Colours(float = cs))
@@ -142,15 +150,11 @@ object Amd64BackendPass extends Pass {
 
     case Inst.Move(dest, Op.Member(ir.Val.R(src), member)) =>
       for {
-        returnedStructs <- S.inspect(_.returnedStructs)
-        _ = assert(returnedStructs contains src)
-        _ <- tellIntColour(Set(dest -> (member match {
-          case 0 => RegLoc.A
-          case 1 => RegLoc.D
-          case 2 => RegLoc.C
-          case 3 => RegLoc.R8
-          case 4 => RegLoc.R9
-        })))
+        members <- S.inspect(_.returnedStructs(src))
+        _ <- members(member) match {
+          case x: Xmm => tellFloatColour(Set(dest -> x))
+          case r: RegLoc => tellIntColour(Set(dest -> r))
+        }
       } yield Vector(Inst.Move(dest, Op.Garbled))
 
     case inst @ Inst.Move(dest, Op.Binary(InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor | InfixOp.Shl | InfixOp.Shr, l, r)) =>
@@ -170,14 +174,18 @@ object Amd64BackendPass extends Pass {
 
   override def onFlow = {
     case flow @ FlowControl.Return(ir.Val.Struct(members)) =>
-      val allocs = members.map { case ir.Val.R(r) => r }.zipWithIndex.map {
-        case (r, 0) => r -> RegLoc.A
-        case (r, 1) => r -> RegLoc.D
-        case (r, 2) => r -> RegLoc.C
-        case (r, 3) => r -> RegLoc.R8
-        case (r, 4) => r -> RegLoc.R9
-      }.toSet
-      tellIntColour(allocs) as (Vector.empty, flow)
+      val regs = members.map { case ir.Val.R(r) => r }
+      val (ints, floats) = regs.partition {
+        case r @ ir.Register(_, _, _: ir.Type.F) => false
+        case r => true
+      }
+      val intColours = List(RegLoc.A, RegLoc.D, RegLoc.C, RegLoc.R8, RegLoc.R9)
+      assert(ints.size <= intColours.size)
+      val intAllocs = (ints zip intColours).toSet
+      val floatColours = List(Xmm0, Xmm1, Xmm2, Xmm3)
+      assert(floats.size <= floatColours.size)
+      val floatAllocs = (floats zip floatColours).toSet
+      F.tell(Colours(intAllocs, floatAllocs)) as (Vector.empty, flow)
     case flow @ FlowControl.Return(ir.Val.R(r)) =>
       val c = r.typ match {
         case _: Type.F => tellFloatColour(Set(r -> Xmm0))

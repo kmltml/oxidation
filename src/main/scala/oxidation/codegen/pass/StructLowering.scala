@@ -62,7 +62,13 @@ object StructLowering extends Pass {
     case t => Vector(t)
   }
 
-  private def fitsInRegisters(s: Type): Boolean = flatten(s).size <= 5
+  private def fitsInRegisters(s: Type): Boolean = {
+    val (ints, floats) = flatten(s).foldMap {
+      case _: Type.F => (0, 1)
+      case _ => (1, 0)
+    }
+    ints <= 5 && floats <= 4
+  }
 
   override def onDef: Def =?> F[Vector[Def]] = {
     case fun @ Def.Fun(_, params, ret, _, _) =>

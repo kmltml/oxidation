@@ -2,7 +2,7 @@ package oxidation
 package backend
 package amd64
 
-case class Xmm(i: Int)
+case class Xmm(i: Int) extends AnyReg
 
 object Xmm {
 
