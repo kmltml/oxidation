@@ -30,6 +30,7 @@ def floatTests(): u0 = {
         p() == 42.5
     }, "Float pointer load and store")
     assert(Vec5d(0.0, 1.0, 2.0, 3.0, 4.0) == Vec5d { x = 0.0, y = 1.0, z = 2.0, w = 3.0, v = 4.0 }, "Returning a big float struct")
+    assert(sqrt(0.25) == 0.5, "Square root intrinsic")
 }
 
 def sumFloats(a: f64, b: f64, c: f64, d: f64, e: f64, f: f64) = a + b + c + d + e + f

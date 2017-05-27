@@ -69,6 +69,28 @@ object ValidatorTests extends TestSuite with IrValSyntax {
             .value.runA(Set(r(0, U8), r(1, U32))).value ==> Left(ValidationError.NotANumericType(loc, Struct(Vector(I32))))
         }
       }
+      "Sqrt" - {
+        "valid" - {
+          "f32" - {
+            validateInstruction(loc, Inst.Move(r(0, F32), Op.Sqrt(r(1, F32))))
+              .value.runA(Set(r(1, F32))).value ==> Right(())
+          }
+          "f64" - {
+            validateInstruction(loc, Inst.Move(r(0, F64), Op.Sqrt(r(1, F64))))
+              .value.runA(Set(r(1, F64))).value ==> Right(())
+          }
+        }
+        "invalid" - {
+          "not a float type" - {
+            validateInstruction(loc, Inst.Move(r(0, F64), Op.Sqrt(r(1, I32))))
+              .value.runA(Set(r(1, I32))).value ==> Left(ValidationError.NotAFloatType(loc, I32))
+          }
+          "mismatched src and dest type" - {
+            validateInstruction(loc, Inst.Move(r(0, F32), Op.Sqrt(r(1, F64))))
+              .value.runA(Set(r(1, F64))).value ==> Left(ValidationError.WrongType(loc, F32, F64))
+          }
+        }
+      }
       "Garbled" - {
         "valid" - {
           validateInstruction(loc, Inst.Move(r(0, I32), Op.Garbled))

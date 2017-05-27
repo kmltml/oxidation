@@ -152,6 +152,8 @@ trait Amd64NasmOutput extends Output {
     ln(show"mulss $dest, $src")
   def divss(dest: Val, src: Val): M =
     ln(show"divss $dest, $src")
+  def sqrtss(dest: Val, src: Val): M =
+    ln(show"sqrtss $dest, $src")
 
   def addsd(dest: Val, src: Val): M =
     ln(show"addsd $dest, $src")
@@ -161,6 +163,8 @@ trait Amd64NasmOutput extends Output {
     ln(show"mulsd $dest, $src")
   def divsd(dest: Val, src: Val): M =
     ln(show"divsd $dest, $src")
+  def sqrtsd(dest: Val, src: Val): M =
+    ln(show"sqrtsd $dest, $src")
 
   def ucomiss(dest: Val, src: Val): M =
     ln(show"ucomiss $dest, $src")

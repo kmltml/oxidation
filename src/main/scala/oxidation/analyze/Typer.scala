@@ -61,6 +61,12 @@ object Typer {
         typedParams <- termParams.traverse(solveType(_, ExpectedType.Specific(memberType), ctxt))
       } yield Typed(ast.ArrLit(typedParams), Arr(memberType, size getOrElse typedParams.size))
 
+    case P.App(P.Var(sqrt @ Symbol.Global(List("sqrt"))), List(param)) =>
+      for {
+        typedParam <- solveType(param, ExpectedType.Numeric(None), ctxt)
+        pt = typedParam.typ
+        _ <- Either.cond(pt.isInstanceOf[Type.F], (), TyperError.CantMatch(ExpectedType.Specific(Type.F64), pt))
+      } yield Typed(ast.App(Typed(ast.Var(sqrt), Type.Fun(List(pt), pt)), List(typedParam)), pt)
 
     case P.StructLit(name, members) =>
       for {

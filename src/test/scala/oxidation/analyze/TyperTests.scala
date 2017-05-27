@@ -167,6 +167,17 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
             Ctxt.default.withTerms(Map(l('foo) -> imm(Arr(I32, 20))))) ==>
             Right(ast.App(ast.Var(l('foo)) :: Arr(I32, 20), List(ast.IntLit(10) :: I64)) :: I32)
         }
+
+        "sqrt intrinsic" - {
+          "f32" - {
+            solveType(P.App(P.Var(g('sqrt)), List(P.Var(l('x)))), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(F32)))) ==>
+              Right(ast.App(ast.Var(g('sqrt)) :: Fun(List(F32), F32), List(ast.Var(l('x)) :: F32)) :: F32)
+          }
+          "f64" - {
+            solveType(P.App(P.Var(g('sqrt)), List(P.Var(l('x)))), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(F64)))) ==>
+              Right(ast.App(ast.Var(g('sqrt)) :: Fun(List(F64), F64), List(ast.Var(l('x)) :: F64)) :: F64)
+          }
+        }
       }
       "if expression" - {
         solveType(P.If(P.BoolLit(true), P.IntLit(10), Some(P.IntLit(20))),

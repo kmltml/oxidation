@@ -347,6 +347,22 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             (insts(), Val.Array(List(0, 1, 2, 3, 4).map(i32)))
         }
       }
+      "Sqrt" - {
+        "f32" - {
+          compileExpr(ast.App(ast.Var(g('sqrt)) :: Fun(List(F32), F32), List(ast.Var(l('x)) :: F32)) :: F32)
+            .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.F32)), nextReg = 1)).value ==>
+            (insts(
+              Inst.Move(r(1, _.F32), Op.Sqrt(r(0, _.F32)))
+            ), Val.R(r(1, _.F32)))
+        }
+        "f64" - {
+          compileExpr(ast.App(ast.Var(g('sqrt)) :: Fun(List(F64), F64), List(ast.Var(l('x)) :: F64)) :: F64)
+            .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.F64)), nextReg = 1)).value ==>
+            (insts(
+              Inst.Move(r(1, _.F64), Op.Sqrt(r(0, _.F64)))
+            ), Val.R(r(1, _.F64)))
+        }
+      }
     }
     "compileDef" - {
       import Codegen.compileDef

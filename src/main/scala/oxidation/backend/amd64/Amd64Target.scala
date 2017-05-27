@@ -338,6 +338,12 @@ class Amd64Target { this: Output =>
         case (Signed, _, _) => F.tell(movsx(toVal(dest), toVal(src)))
       }
 
+      case ir.Op.Sqrt(src) =>
+        src.typ match {
+          case ir.Type.F32 => F.tell(sqrtss(toVal(dest), toVal(src)))
+          case ir.Type.F64 => F.tell(sqrtsd(toVal(dest), toVal(src)))
+        }
+
       case ir.Op.Trim(src) =>
         toVal(src) match {
           case Val.R(Reg(loc, _)) =>

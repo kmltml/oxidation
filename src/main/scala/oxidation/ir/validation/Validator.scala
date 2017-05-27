@@ -78,6 +78,11 @@ object Validator {
     case Op.Copy(src) => valType(loc, src).map(Some(_))
     case Op.Widen(v)  => valType(loc, v).as(None)
     case Op.Trim(v)  => valType(loc, v).as(None)
+    case Op.Sqrt(v) =>
+      for {
+        vt <- valType(loc, v)
+        _ <- cond(vt.isInstanceOf[Type.F], ValidationError.NotAFloatType(loc, vt))
+      } yield Some(vt)
     case Op.Garbled  => ES.pure(None)
     case Op.StructCopy(src, substs) =>
       for {

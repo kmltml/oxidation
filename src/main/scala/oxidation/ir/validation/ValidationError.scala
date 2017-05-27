@@ -9,6 +9,7 @@ object ValidationError {
   final case class UseBeforeDefine(location: Location, reg: Register) extends ValidationError
   final case class WrongType(location: Location, expected: Type, found: Type) extends ValidationError
   final case class NotANumericType(location: Location, found: Type) extends ValidationError
+  final case class NotAFloatType(location: Location, found: Type) extends ValidationError
   final case class NotAFunction(location: Location, found: Type) extends ValidationError
   final case class NotAStruct(location: Location, found: Type) extends ValidationError
   final case class NotAnArray(location: Location, found: Type) extends ValidationError

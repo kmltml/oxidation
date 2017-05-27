@@ -26,6 +26,7 @@ sealed trait Op {
     case Op.ArrStore(a, i, v) => Set(a, i, v)
     case Op.Stackalloc(_) => Set.empty
     case Op.StructCopy(v, s) => s.values.toSet + v
+    case Op.Sqrt(v) => Set(v)
   }
 
 }
@@ -45,6 +46,7 @@ object Op {
   final case class StructCopy(src: Val, substs: Map[Int, Val]) extends Op
   final case class Elem(arr: Val, index: Val) extends Op
   final case class ArrStore(arr: Val, index: Val, value: Val) extends Op
+  final case class Sqrt(src: Val) extends Op
   case object Garbled extends Op // Assigned to register to indicate, that some instruction also writes to this register as a side effect
 
   implicit val show: Show[Op] = {
@@ -62,5 +64,6 @@ object Op {
     case Elem(arr, index) => show"elem $arr ($index) "
     case ArrStore(arr, index, value) => show"arrstore $arr ($index) = $value"
     case Garbled => "garbled"
+    case Sqrt(v) => show"sqrt($v)"
   }
 }

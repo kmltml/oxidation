@@ -41,6 +41,7 @@ object Tag {
     final val StructCopy = 1 + Trim
     final val Elem = 1 + StructCopy
     final val ArrStore = 1 + Elem
+    final val Sqrt = 1 + ArrStore
   }
 
   object Val {

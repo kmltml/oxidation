@@ -92,6 +92,7 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Op.StructCopy => Op.StructCopy(readVal(), readSeq(() => readInt() -> readVal()).toMap)
     case Tag.Op.Elem => Op.Elem(readVal(), readVal())
     case Tag.Op.ArrStore => Op.ArrStore(readVal(), readVal(), readVal())
+    case Tag.Op.Sqrt => Op.Sqrt(readVal())
   }
 
   def readInfixOp(): InfixOp = readTag() match {

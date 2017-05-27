@@ -51,6 +51,7 @@ trait Pass {
         case ir.Op.Elem(arr, index) => (txVal(arr), txVal(index)).map2(ir.Op.Elem)
         case ir.Op.ArrStore(arr, index, value) => (txVal(arr), txVal(index), txVal(value)).map3(ir.Op.ArrStore)
         case ir.Op.Garbled => F.pure(ir.Op.Garbled)
+        case ir.Op.Sqrt(s) => txVal(s).map(ir.Op.Sqrt)
       }) map (o => Vector(ir.Inst.Eval(dest, o)))
 
       case lbl: ir.Inst.Label => F.pure(Vector[ir.Inst](lbl))

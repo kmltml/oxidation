@@ -216,6 +216,15 @@ object Codegen {
         )
       } yield Val.I(0, ir.Type.U0)
 
+    case Typed(ast.App(Typed(ast.Var(Symbol.Global(List("sqrt"))), _), List(param)), tpe) =>
+      for {
+        p <- compileExpr(param)
+        r <- genReg(translateType(tpe))
+        _ <- instructions(
+          Inst.Move(r, Op.Sqrt(p))
+        )
+      } yield Val.R(r)
+
     case Typed(ast.App(Typed(fn, fnType: analyze.Type.Fun), params), t) =>
       for {
         fnVal <- fn match {

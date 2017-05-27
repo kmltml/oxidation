@@ -61,11 +61,13 @@ trait Output {
   def subss(dest: Val, src: Val): M
   def mulss(dest: Val, src: Val): M
   def divss(dest: Val, src: Val): M
+  def sqrtss(dest: Val, src: Val): M
 
   def addsd(dest: Val, src: Val): M
   def subsd(dest: Val, src: Val): M
   def mulsd(dest: Val, src: Val): M
   def divsd(dest: Val, src: Val): M
+  def sqrtsd(dest: Val, src: Val): M
 
   def ucomiss(dest: Val, src: Val): M
   def ucomisd(dest: Val, src: Val): M
