@@ -364,6 +364,16 @@ object Codegen {
         }
       } yield Val.I(0, ir.Type.U0)
 
+    case Typed(ast.Select(src @ Typed(_, analyze.Type.Ptr(structType: analyze.Type.Struct)), member), typ) =>
+      for {
+        srcv <- compileExpr(src)
+        struct = translateType(structType).asInstanceOf[Type.Struct]
+        r <- genReg(Type.Ptr)
+        _ <- instructions(
+          Inst.Move(r, Op.Binary(InfixOp.Add, srcv, Val.I(struct.offset(structType.indexOf(member)), Type.I64)))
+        )
+      } yield Val.R(r)
+
     case Typed(ast.Select(src @ Typed(_, structType: analyze.Type.Struct), member), typ) =>
       for {
         srcv <- compileExpr(src)

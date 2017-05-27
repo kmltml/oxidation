@@ -86,6 +86,11 @@ object RegisterSpillPass extends Pass {
           case (_, ir.Val.R(reg)) => reg
         }
       } yield fillInsts :+ Inst.Eval(dest, Op.Call(fn, params.take(4) ++ newStackParams))
+
+    case Inst.Move(dest, sa: Op.Stackalloc) =>
+      for {
+        s <- spill(dest)
+      } yield Inst.Move(s._1, sa) +: s._2
   }
 
 }

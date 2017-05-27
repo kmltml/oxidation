@@ -278,17 +278,24 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
         }
       }
       "Select" - {
+        val fooStruct = Struct(g('foo),
+          StructMember("x", I32),
+          StructMember("y", I64)
+        )
         "Member" - {
-          val fooStruct = Struct(g('foo),
-            StructMember("x", I32),
-            StructMember("y", I64)
-          )
           val r0 = register(0, ir.Type.Struct(Vector(ir.Type.I32, ir.Type.I64)))
           compileExpr(ast.Select(ast.Var(l('x)) :: fooStruct, "y") :: I64)
             .run.runA(CodegenState(registerBindings = Map(l('x) -> r0), nextReg = 1)).value ==>
             (insts(
               Inst.Move(r(1, _.I64), Op.Member(r0, 1))
             ), Val.R(r(1, _.I64)))
+        }
+        "Ptr" - {
+          compileExpr(ast.Select(ast.Var(l('x)) :: Ptr(fooStruct), "y") :: Ptr(I64))
+            .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.Ptr)), nextReg = 1)).value ==>
+            (insts(
+              Inst.Move(r(1, _.Ptr), Op.Binary(InfixOp.Add, r(0, _.Ptr), i64(4)))
+            ), Val.R(r(1, _.Ptr)))
         }
       }
       "App" - {

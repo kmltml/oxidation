@@ -198,6 +198,8 @@ object Typer {
         memberType <- exprTyped.typ match {
           case t @ Struct(_, ms) =>
             ms.find(_.name == member).map(_.typ).toRight(TyperError.MemberNotFound(member, t))
+          case Ptr(s @ Struct(_, ms)) =>
+            ms.find(_.name == member).map(x => Ptr(x.typ)).toRight(TyperError.MemberNotFound(member, s))
           case t =>
             Left(TyperError.MemberNotFound(member, t))
         }

@@ -47,6 +47,8 @@ def bigfoo(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32): bigfoo =
 def threefoos(x: foo, y: foo, z: foo): threefoos =
     threefoos { x = x, y = y, z = z }
 
+def getF(ref: ptr[bigfoo]): i32 = ref.f()
+
 def structTests(): u0 = {
     assert({
         val x = foo(10, 20)
@@ -100,4 +102,16 @@ def structTests(): u0 = {
 
     assert(threefoos(foo(0, 1), foo(2, 3), foo(4, 5)) == threefoos { x = foo { int = 0, long = 1 }, y = foo { int = 2, long = 3 }, z = foo { int = 4, long = 5 } },
         "Call to function returning nested big struct")
+
+    assert({
+        val p = stackalloc[bigfoo]
+        p() = bigfoo(1, 2, 3, 4, 5, 6)
+        getF(p) == 6
+    }, "Pointer to member")
+
+    assert({
+        val p = stackalloc[twofoos]
+        p() = twofoos(foo(1, 2), foo(3, 4))
+        p.y.long() == 4
+    }, "Pointer to nested member")
 }

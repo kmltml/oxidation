@@ -198,10 +198,18 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
               ast.InfixAp(InfixOp.Add, ast.Var(l('x)) :: I32, ast.IntLit(1) :: I32) :: I32) :: U0
           ) :: U0)
       }
-      "struct member select" - {
-        findType(P.Select(P.Var(l('x)), "x"), ExpectedType.Undefined,
-          Ctxt.default.withTerms(Map(l('x) -> imm(Struct(g('s), StructMember("x", I32), StructMember("x", I64)))))) ==>
-          Right(I32)
+      "Select" - {
+        val s = Struct(g('s), StructMember("x", I32), StructMember("y", I64))
+        "struct" - {
+          findType(P.Select(P.Var(l('x)), "x"), ExpectedType.Undefined,
+            Ctxt.default.withTerms(Map(l('x) -> imm(s)))) ==>
+            Right(I32)
+        }
+        "ptr to struct" - {
+          solveType(P.Select(P.Var(l('x)), "y"), ExpectedType.Undefined,
+            Ctxt.default.withTerms(Map(l('x) -> imm(Ptr(s))))) ==>
+            Right(ast.Select(ast.Var(l('x)) :: Ptr(s), "y") :: Ptr(I64))
+        }
       }
       "Assign" - {
         "Var" - {
