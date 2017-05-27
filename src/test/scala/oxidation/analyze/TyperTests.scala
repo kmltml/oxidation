@@ -41,9 +41,9 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         solveType(P.CharLit('a'), ExpectedType.Undefined, Ctxt.default) ==> Right(ast.CharLit('a') :: U8)
       }
       "struct literals" - {
-        val Vec2 = Struct(g('Vec2), List(
+        val Vec2 = Struct(g('Vec2),
           StructMember("x", I32), StructMember("y", I64)
-        ))
+        )
         solveType(P.StructLit(g('Vec2), List(
           "x" -> P.IntLit(10), "y" -> P.IntLit(20)
         )), ExpectedType.Undefined, Ctxt.default.withTypes(Map(g('Vec2) -> Vec2))) ==>
@@ -153,13 +153,13 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         "Ptr" - {
           "without offset" - {
             solveType(P.App(P.Var(l('foo)), Nil), ExpectedType.Undefined,
-              Ctxt.default.withTerms(Map(l('foo) -> Ctxt.Immutable(Ptr(TypeName.Named(g('i32))))))) ==>
-              Right(ast.App(ast.Var(l('foo)) :: Ptr(TypeName.Named(g('i32))), Nil) :: I32)
+              Ctxt.default.withTerms(Map(l('foo) -> Ctxt.Immutable(Ptr(I32))))) ==>
+              Right(ast.App(ast.Var(l('foo)) :: Ptr(I32), Nil) :: I32)
           }
           "with offset" - {
             solveType(P.App(P.Var(l('foo)), List(P.IntLit(20))), ExpectedType.Undefined,
-              Ctxt.default.withTerms(Map(l('foo) -> Ctxt.Immutable(Ptr(TypeName.Named(g('i32))))))) ==>
-              Right(ast.App(ast.Var(l('foo)) :: Ptr(TypeName.Named(g('i32))), List(ast.IntLit(20) :: I64)) :: I32)
+              Ctxt.default.withTerms(Map(l('foo) -> Ctxt.Immutable(Ptr(I32))))) ==>
+              Right(ast.App(ast.Var(l('foo)) :: Ptr(I32), List(ast.IntLit(20) :: I64)) :: I32)
           }
         }
         "Arr" - {
@@ -200,7 +200,7 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
       }
       "struct member select" - {
         findType(P.Select(P.Var(l('x)), "x"), ExpectedType.Undefined,
-          Ctxt.default.withTerms(Map(l('x) -> imm(Struct(g('s), List(StructMember("x", I32), StructMember("x", I64))))))) ==>
+          Ctxt.default.withTerms(Map(l('x) -> imm(Struct(g('s), StructMember("x", I32), StructMember("x", I64)))))) ==>
           Right(I32)
       }
       "Assign" - {
@@ -217,16 +217,16 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
           }
         }
         "Ptr" - {
-          val intptr = Ptr(TypeName.Named(g('i32)))
+          val intptr = Ptr(I32)
           solveType(P.Assign(P.App(P.Var(l('foo)), Nil), None, P.IntLit(20)), ExpectedType.Undefined,
             Ctxt.default.withTerms(Map(l('foo) -> Ctxt.Mutable(intptr)))) ==>
             Right(ast.Assign(ast.App(ast.Var(l('foo)) :: intptr, Nil) :: I32, None, ast.IntLit(20) :: I32) :: U0)
         }
         "Select" - {
-          val struct = Struct(g('foo), List(
+          val struct = Struct(g('foo),
             StructMember("x", I32),
             StructMember("y", I64)
-          ))
+          )
           "mutable" - {
             solveType(P.Assign(P.Select(P.Var(l('x)), "x"), None, P.IntLit(10)),
               ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> mut(struct)))) ==>
@@ -278,14 +278,14 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
           "pointer to pointer" - {
             solveType(P.App(P.TypeApp(P.Var(g('cast)),
               List(TypeName.ptr(TypeName.Named(g('i32))))), List(P.Var(l('x)))),
-              ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> Ctxt.Immutable(Ptr(TypeName.Named(g('i8))))))) ==>
-              Right(ast.Reinterpret(ast.Var(l('x)) :: Ptr(TypeName.Named(g('i8)))) :: Ptr(TypeName.Named(g('i32))))
+              ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> Ctxt.Immutable(Ptr(I8))))) ==>
+              Right(ast.Reinterpret(ast.Var(l('x)) :: Ptr(I8)) :: Ptr(I32))
           }
         }
       }
       "Stackalloc" - {
         solveType(P.TypeApp(P.Var(g('stackalloc)), List(TypeName.Named(g('i64)))), ExpectedType.Undefined, Ctxt.default) ==>
-          Right(ast.Stackalloc(I64) :: Ptr(TypeName.Named(g('i64))))
+          Right(ast.Stackalloc(I64) :: Ptr(I64))
       }
       "Array Literal" - {
         "fully explicit list" - {

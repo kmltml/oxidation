@@ -23,15 +23,33 @@ object TypeInterpreterTests extends TestSuite with SymbolSyntax {
         ), ctxt) ==> Right(ctxt.withTypes(Map(g('int) -> I32, g('char) -> I32)))
       }
       "a struct def" - {
-        solveTree(Vector(
+        val Right(c) = solveTree(Vector(
           StructDef(g('foo), None, List(
             StructMemberDef("x", TypeName.Named(g('i32))),
             StructMemberDef("y", TypeName.Named(g('u1)))
           ))
-        ), ctxt) ==> Right(ctxt.withTypes(Map(g('foo) -> Struct(g('foo), List(
+        ), ctxt)
+        val foo = c.types(g('foo)).asInstanceOf[Struct]
+        foo.name ==> g('foo)
+        foo.members ==> List(
           StructMember("x", I32),
           StructMember("y", U1)
-        )))))
+        )
+      }
+      "a recursive struct def" - {
+        val Right(c) = solveTree(Vector(
+          StructDef(g('List), None, List(
+            StructMemberDef("head", TypeName.Named(g('i32))),
+            StructMemberDef("tail", TypeName.ptr(TypeName.Named(g('List))))
+          ))
+        ), ctxt)
+        val list = c.types(g('List)).asInstanceOf[Struct]
+        list.members(0) ==> StructMember("head", I32)
+        list.members(1) match {
+          case StructMember(name, Ptr(pointee)) =>
+            name ==> "tail"
+            assert(pointee eq list)
+        }
       }
     }
   }

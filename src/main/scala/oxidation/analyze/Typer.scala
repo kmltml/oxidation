@@ -45,7 +45,7 @@ object Typer {
       solveType(src, ExpectedType.Undefined, ctxt).map(cast(target, _, ctxt))
 
     case P.TypeApp(P.Var(Symbol.Global(List("stackalloc"))), List(pointee)) =>
-      unifyType(Typed(ast.Stackalloc(lookupType(pointee, ctxt)), Ptr(pointee)), expected)
+      unifyType(Typed(ast.Stackalloc(lookupType(pointee, ctxt)), Ptr(lookupType(pointee, ctxt))), expected)
 
     case P.App(P.TypeApp(P.Var(Symbol.Global(List("arr"))), membertn :: typeTail), termParams) =>
       for {
@@ -180,7 +180,7 @@ object Typer {
         }
         valType <- fnTyped.typ match {
           case Fun(_, retType) => Right(retType)
-          case Ptr(pointee) => Right(lookupType(pointee, ctxt))
+          case Ptr(pointee) => Right(pointee)
           case Arr(member, _) => Right(member)
         }
         t <- unifyType(Typed(ast.App(fnTyped, typedParams), valType), expected)
@@ -313,7 +313,7 @@ object Typer {
     }
 
   def lookupType(t: TypeName, ctxt: Ctxt): Type = t match {
-    case TypeName.App(TypeName.Named(Symbol.Global(List("ptr"))), List(pointee)) => Type.Ptr(pointee)
+    case TypeName.App(TypeName.Named(Symbol.Global(List("ptr"))), List(pointee)) => Type.Ptr(lookupType(pointee, ctxt))
     case TypeName.App(TypeName.Named(Symbol.Global(List("arr"))), List(member, TypeName.IntLiteral(size))) =>
       Type.Arr(lookupType(member, ctxt), size.toInt)
     case TypeName.Named(s) => ctxt.types(s)

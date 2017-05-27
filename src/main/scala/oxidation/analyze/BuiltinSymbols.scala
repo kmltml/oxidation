@@ -5,10 +5,10 @@ import Type._
 
 object BuiltinSymbols {
 
-  val StrType: Type = Struct(Symbol.Global(List("str")), List(
-    StructMember("data", Ptr(TypeName.Named(Symbol.Global(List("u8"))))),
+  val StrType: Type = Struct(Symbol.Global(List("str")),
+    StructMember("data", Ptr(U8)),
     StructMember("length", U32)
-  ))
+  )
 
   val typeNames: Map[String, Type] = Map(
     "i8" -> I8, "i16" -> I16, "i32" -> I32, "i64" -> I64,

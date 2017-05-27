@@ -40,17 +40,35 @@ object Type {
   case object U1 extends Type
   case object U0 extends Type
 
-  // pointee is an unresolved type, to allow for self-referencing structs (eg. `enum List[A] = { Cons { head: A; tail: ptr[List[A]] }; Nil }`)
-  final case class Ptr(pointee: TypeName) extends Type
+  final case class Ptr(pointee: Type) extends Type
 
   final case class Arr(member: Type, size: Int) extends Type
 
   final case class Fun(params: List[Type], ret: Type) extends Type
 
-  final case class Struct(name: Symbol, members: List[StructMember]) extends Type {
+  final class Struct(val name: Symbol, membersF: Struct => List[StructMember]) extends Type {
+
+    val members = membersF(this)
 
     def indexOf(memberName: String): Int =
       members.indexWhere(_.name == memberName)
+
+    override def equals(obj: Any): Boolean = obj match {
+      case s: Struct => (this eq s) || (name == s.name)
+      case _ => false
+    }
+
+    override def toString: String = s"Struct($name)"
+
+  }
+
+  object Struct {
+
+    def apply(name: Symbol, members: StructMember*): Struct = new Struct(name, _ => members.toList)
+
+    def apply(name: Symbol)(members: Struct => List[StructMember]): Struct = new Struct(name, members)
+
+    def unapply(s: Struct): Option[(Symbol, List[StructMember])] = Some((s.name, s.members))
 
   }
 

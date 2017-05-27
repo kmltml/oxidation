@@ -43,7 +43,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
       }
       "StructLit" - {
         compileExpr(ast.StructLit(g('str), List(
-          "data" -> (ast.Var(l('x)) :: Ptr(TypeName.Named(g('u8)))),
+          "data" -> (ast.Var(l('x)) :: Ptr(U8)),
           "length" -> (ast.IntLit(10) :: U32)
         )) :: BuiltinSymbols.StrType).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.Ptr)), nextReg = 1)).value ==>
           (insts(), Val.Struct(Vector(r(0, _.Ptr), Val.I(10, ir.Type.U32))))
@@ -143,7 +143,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
           ), Val.R(r(1, _.I32)))
       }
       "Reinterpret" - {
-        compileExpr(ast.Reinterpret(ast.Var(l('x)) :: Ptr(TypeName.Named(g('i32)))) :: Ptr(TypeName.Named(g('i64))))
+        compileExpr(ast.Reinterpret(ast.Var(l('x)) :: Ptr(I32)) :: Ptr(I64))
           .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.Ptr)), nextReg = 1)).value ==>
           (insts(
             Inst.Move(r(1, _.Ptr), Op.Copy(r(0, _.Ptr)))
@@ -245,7 +245,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             ), u0)
         }
         "ptr" - {
-          compileExpr(ast.Assign(ast.App(ast.Var(l('p)) :: Ptr(TypeName.Named(g('i32))), List(ast.IntLit(8) :: I64)) :: I32,
+          compileExpr(ast.Assign(ast.App(ast.Var(l('p)) :: Ptr(I32), List(ast.IntLit(8) :: I64)) :: I32,
             None, ast.IntLit(20) :: I32) :: U0).run.runA(CodegenState(registerBindings = Map(l('p) -> r(0, _.Ptr)), nextReg = 1)).value ==>
             (insts(
               Inst.Move(r(1, _.I64), Op.Binary(InfixOp.Mul, Val.I(8, ir.Type.I64), Val.I(4, ir.Type.I64))),
@@ -253,10 +253,10 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             ), u0)
         }
         "struct member" - {
-          val struct = Struct(g('foo), List(
+          val struct = Struct(g('foo),
             StructMember("x", I64),
             StructMember("y", I32)
-          ))
+          )
           val r0 = r(0, _.Struct(Vector(ir.Type.I64, ir.Type.I32)))
           compileExpr(ast.Assign(ast.Select(ast.Var(l('x)) :: struct, "x") :: I64, None, ast.IntLit(20) :: I64) :: U0)
             .run.runA(CodegenState(registerBindings = Map(l('x) -> r0), nextReg = 1)).value ==>
@@ -267,7 +267,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
         "arr ptr" - {
           compileExpr(ast.Assign(
             ast.App(
-              ast.App(ast.Var(l('foo)) :: Ptr(TypeName.arr(TypeName.Named(g('i32)), 10)), Nil) :: Arr(I32, 10),
+              ast.App(ast.Var(l('foo)) :: Ptr(Arr(I32, 10)), Nil) :: Arr(I32, 10),
               List(ast.IntLit(5) :: I64)) :: I32,
             None, ast.IntLit(42) :: I32
           ) :: U0).run.runA(CodegenState(registerBindings = Map(l('foo) -> r(0, _.Ptr)), nextReg = 1)).value ==>
@@ -279,10 +279,10 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
       }
       "Select" - {
         "Member" - {
-          val fooStruct = Struct(g('foo), List(
+          val fooStruct = Struct(g('foo),
             StructMember("x", I32),
             StructMember("y", I64)
-          ))
+          )
           val r0 = register(0, ir.Type.Struct(Vector(ir.Type.I32, ir.Type.I64)))
           compileExpr(ast.Select(ast.Var(l('x)) :: fooStruct, "y") :: I64)
             .run.runA(CodegenState(registerBindings = Map(l('x) -> r0), nextReg = 1)).value ==>
@@ -302,13 +302,13 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             ), Val.R(r(2, _.I32)))
         }
         "pointer" - {
-          compileExpr(ast.App(ast.Var(l('p)) :: Ptr(TypeName.Named(g('i32))), Nil) :: I32)
+          compileExpr(ast.App(ast.Var(l('p)) :: Ptr(I32), Nil) :: I32)
             .run.runA(CodegenState(registerBindings = Map(l('p) -> r(0, _.Ptr)), nextReg = 1)).value ==>
             (insts(
               Inst.Move(r(1, _.I32), Op.Load(r(0, _.Ptr), Val.I(0, ir.Type.I64)))
             ), Val.R(r(1, _.I32)))
           "with offset" - {
-            compileExpr(ast.App(ast.Var(l('p)) :: Ptr(TypeName.Named(g('i32))), List(ast.IntLit(10) :: I64)) :: I32)
+            compileExpr(ast.App(ast.Var(l('p)) :: Ptr(I32), List(ast.IntLit(10) :: I64)) :: I32)
               .run.runA(CodegenState(registerBindings = Map(l('p) -> r(0, _.Ptr)), nextReg = 1)).value ==>
               (insts(
                 Inst.Move(r(1, _.I64), Op.Binary(InfixOp.Mul, Val.I(10, ir.Type.I64), Val.I(4, ir.Type.I64))),
@@ -318,7 +318,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
         }
         "array pointer" - {
           compileExpr(ast.App(
-            ast.App(ast.Var(l('foo)) :: Ptr(TypeName.arr(TypeName.Named(g('i32)), 10)), Nil) :: Arr(I32, 10),
+            ast.App(ast.Var(l('foo)) :: Ptr(Arr(I32, 10)), Nil) :: Arr(I32, 10),
             List(ast.IntLit(5) :: I64)) :: I32).run.runA(CodegenState(registerBindings = Map(l('foo) -> r(0, _.Ptr)), nextReg = 1)).value ==>
             (insts(
               Inst.Move(r(1, _.I64), Op.Binary(InfixOp.Mul, i64(5), i64(ir.Type.I32.size))),
@@ -334,7 +334,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
         }
       }
       "Stackalloc" - {
-        compileExpr(ast.Stackalloc(I64) :: Ptr(TypeName.Named(g('i64))))
+        compileExpr(ast.Stackalloc(I64) :: Ptr(I64))
           .run.runA(CodegenState()).value ==>
           (insts(
             Inst.Move(r(0, _.Ptr), Op.Stackalloc(8))
@@ -398,7 +398,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Def.TrivialVal(Name.Global(List("foo")), Val.I(42, ir.Type.I32))
           }
           "struct" - {
-            val struct = Struct(g('foo), List(StructMember("a", I64)))
+            val struct = Struct(g('foo), StructMember("a", I64))
             compileDef(ast.ValDef(g('foo), None, ast.StructLit(g('foo), List("a" -> (ast.IntLit(20) :: I64))) :: struct)) ==>
               Def.TrivialVal(Name.Global(List("foo")), Val.Struct(Vector(Val.I(20, ir.Type.I64))))
 

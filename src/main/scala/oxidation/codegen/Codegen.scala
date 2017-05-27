@@ -333,7 +333,7 @@ object Codegen {
         )
       } yield Val.I(0, ir.Type.U0)
 
-    case Typed(ast.Assign(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), params), pointee), None, rval), _) =>
+    case Typed(ast.Assign(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(pointee)), params), _), None, rval), _) =>
       // TODO pointee should be extracted from the pointer type, but Type.Ptr(_) contains an unresolved typename, some consideration is needed here
       for {
         right <- compileExpr(rval)
