@@ -42,6 +42,12 @@ class Serialize(val out: DataOutputStream) {
       writeTag(Tag.Def.TrivialVal)
       writeName(name)
       writeVal(v)
+    case Def.ComputedVal(name, body, typ, constantPool) =>
+      writeTag(Tag.Def.ComputedVal)
+      writeName(name)
+      writeSeq(body)(writeBlock)
+      writeType(typ)
+      writeSeq(constantPool.toSeq)(writeConstantPoolEntry)
   }
 
   def writeConstantPoolEntry(e: ConstantPoolEntry): Unit = e match {

@@ -82,6 +82,7 @@ object Compile {
       passes: List[Pass] = List(
         pass.ArrInit,
         pass.ExplicitBlocks,
+        pass.ValInterpretPass,
         pass.StructLowering,
         pass.UnitRemoval,
         pass.ArrayDealiasing,

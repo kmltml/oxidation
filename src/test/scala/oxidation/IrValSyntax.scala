@@ -15,6 +15,7 @@ trait IrValSyntax {
   protected def u16(i: Int): Val = Val.I(i, ir.Type.U16)
   protected def u32(i: Long): Val = Val.I(i, ir.Type.U32)
   protected def u64(i: Long): Val = Val.I(i, ir.Type.U64)
+  protected def u1(b: Boolean): Val = Val.I(if(b) 1 else 0, ir.Type.U1)
 
   protected val u0: Val = Val.I(0, ir.Type.U0)
 

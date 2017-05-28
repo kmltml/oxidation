@@ -13,6 +13,7 @@ object Tag {
     final val Fun = 0
     final val ExternFun = 1 + Fun
     final val TrivialVal = 1 + ExternFun
+    final val ComputedVal = 1 + TrivialVal
   }
 
   object ConstantPoolEntry {

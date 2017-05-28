@@ -427,7 +427,8 @@ object Codegen {
       val (log, valueVal) = compileExpr(value).run.runA(CodegenState()).value
       if(log.insts.isEmpty) {
         Def.TrivialVal(Name.Global(name), valueVal)
-      } else throw new NotImplementedError("Top-level vals have to be trivial")
+      } else Def.ComputedVal(Name.Global(name), Vector(Block(Name.Local("body", 0), log.insts, FlowControl.Return(valueVal))),
+                             translateType(value.typ), log.consts.toSet)
   }
 
   private def translateType(t: analyze.Type): ir.Type = t match {

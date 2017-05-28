@@ -1,5 +1,15 @@
 val GlobalInt: i32 = 42
 
+val NonTrivialInt: i32 = {
+    var i = 0
+    var s = 0
+    while(i <= 10) {
+        s += i
+        i += 1
+    }
+    s
+}
+
 def basicTests() = {
     val two = 2
     val five = 5
@@ -26,6 +36,8 @@ def basicTests() = {
     }, "unsigned long arithmetic")
 
     assert(sum(1, 2, 3, 4, 5, 6) == 21, "Function taking more than four integer arguments")
+
+    assert(NonTrivialInt == 55, "Non-trivial global val")
 
     shortcircuit()
 }

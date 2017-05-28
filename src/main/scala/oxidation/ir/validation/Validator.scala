@@ -19,6 +19,13 @@ object Validator {
         case _ => None
       }.toSet).toMap
       blocks.traverse_(validateBlock(name, _, written, params.toSet, graph))
+    case Def.ComputedVal(name, blocks, typ, constantPool) =>
+      val graph = FlowGraph(blocks)
+      val written: Map[Name, Set[Register]] = blocks.map(b => b.name -> b.instructions.flatMap {
+        case Inst.Move(dest, _) => Some(dest)
+        case _ => None
+      }.toSet).toMap
+      blocks.traverse_(validateBlock(name, _, written, Set.empty, graph))
     case Def.ExternFun(_, _, _) => Right(())
     case Def.TrivialVal(n, v) => valType(Location(n, n, 0), v).value.runEmptyA.value as ()
   }
