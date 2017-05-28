@@ -80,7 +80,7 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
       } yield ()
     }
     val edges = f.written.runA(inputs).value ++ inputs.subsets(2).map(_.toList match { case List(a, b) => a -> b })
-    assert(edges.forall(t => includeRegister(t._1) && includeRegister(t._2)))
+    assert(edges.forall(t => (includeRegister(t._1) || virtualRegs.contains(t._1)) && (includeRegister(t._2) || virtualRegs.contains(t._2))))
     val moves = instrs.collect {
       case (ir.Inst.Move(dest, ir.Op.Copy(ir.Val.R(src))), _)
         if includeRegister(dest) && includeRegister(src) => dest -> src
