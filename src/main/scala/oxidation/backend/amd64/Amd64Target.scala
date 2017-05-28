@@ -422,9 +422,21 @@ class Amd64Target { this: Output =>
             F.tell(Vector(
               op match {
                 case InfixOp.Eq => cmpeqss(toVal(left), toVal(right))
+                case InfixOp.Neq => cmpneqss(toVal(left), toVal(right))
               },
               move(toVal(dest).withSize(RegSize.DWord), left),
               neg(toVal(dest).withSize(RegSize.DWord))
+            ).combineAll)
+
+          case InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq =>
+            F.tell(Vector(
+              ucomiss(toVal(left), toVal(right)),
+              op match {
+                case InfixOp.Lt => setb(toVal(dest))
+                case InfixOp.Leq => setbe(toVal(dest))
+                case InfixOp.Gt => seta(toVal(dest))
+                case InfixOp.Geq => setae(toVal(dest))
+              }
             ).combineAll)
         }
         case ir.Type.F64 => op match {
@@ -442,9 +454,21 @@ class Amd64Target { this: Output =>
             F.tell(Vector(
               op match {
                 case InfixOp.Eq => cmpeqsd(toVal(left), toVal(right))
+                case InfixOp.Neq => cmpneqsd(toVal(left), toVal(right))
               },
               move(toVal(dest).withSize(RegSize.QWord), left),
               neg(toVal(dest).withSize(RegSize.QWord))
+            ).combineAll)
+
+          case InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq =>
+            F.tell(Vector(
+              ucomisd(toVal(left), toVal(right)),
+              op match {
+                case InfixOp.Lt => setb(toVal(dest))
+                case InfixOp.Leq => setbe(toVal(dest))
+                case InfixOp.Gt => seta(toVal(dest))
+                case InfixOp.Geq => setae(toVal(dest))
+              }
             ).combineAll)
         }
 

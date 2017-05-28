@@ -72,7 +72,9 @@ trait Output {
   def ucomiss(dest: Val, src: Val): M
   def ucomisd(dest: Val, src: Val): M
   def cmpeqss(dest: Val, src: Val): M
+  def cmpneqss(dest: Val, src: Val): M
   def cmpeqsd(dest: Val, src: Val): M
+  def cmpneqsd(dest: Val, src: Val): M
 
   def setl(dest: Val): M
   def setle(dest: Val): M
@@ -80,6 +82,10 @@ trait Output {
   def setge(dest: Val): M
   def sete(dest: Val): M
   def setne(dest: Val): M
+  def seta(dest: Val): M
+  def setae(dest: Val): M
+  def setb(dest: Val): M
+  def setbe(dest: Val): M
 
   def push(src: Val): M
   def pop(dest: Val): M

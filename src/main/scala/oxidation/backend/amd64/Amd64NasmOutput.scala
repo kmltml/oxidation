@@ -173,8 +173,13 @@ trait Amd64NasmOutput extends Output {
 
   def cmpeqss(dest: Val, src: Val): M =
     ln(show"cmpeqss $dest, $src")
+  def cmpneqss(dest: Val, src: Val): M =
+    ln(show"cmpneqss $dest, $src")
+
   def cmpeqsd(dest: Val, src: Val): M =
     ln(show"cmpeqsd $dest, $src")
+  def cmpneqsd(dest: Val, src: Val): M =
+    ln(show"cmpneqsd $dest, $src")
 
   def setl(dest: Val): M = ln(show"setl $dest")
   def setle(dest: Val): M = ln(show"setle $dest")
@@ -182,6 +187,10 @@ trait Amd64NasmOutput extends Output {
   def setge(dest: Val): M = ln(show"setge $dest")
   def sete(dest: Val): M = ln(show"sete $dest")
   def setne(dest: Val): M = ln(show"setne $dest")
+  def seta(dest: Val): M = ln(show"seta $dest")
+  def setae(dest: Val): M = ln(show"setae $dest")
+  def setb(dest: Val): M = ln(show"setb $dest")
+  def setbe(dest: Val): M = ln(show"setbe $dest")
 
   override def push(src: Val): M =
     ln(show"push $src")
