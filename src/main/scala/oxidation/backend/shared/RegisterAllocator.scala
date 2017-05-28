@@ -212,8 +212,10 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
     }
 
     def spill(spilled: Set[ir.Register], graph: Graph, candidates: Set[Set[ir.Register]]): Eval[(Map[ir.Register, Alloc], ir.Def.Fun)] = {
-      val spillable = candidates.filter(!graph.colours.contains(_))
-      val regToSpill = spillable.find(_.size == 1).getOrElse(spillable.head).head
+      val spillable = candidates.filter(!graph.colours.contains(_)).toVector.sortBy { r =>
+        - graph.neighbors(r).size // Sort by most neighbours
+      }
+      val regToSpill = spillable.head.head
       val newSpilled = spilled + regToSpill
       val spillfill = rebuildAfterSpill(originalFun, newSpilled)
       val g = buildInterferenceGraph(spillfill) -- newSpilled
