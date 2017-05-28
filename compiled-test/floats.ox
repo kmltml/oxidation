@@ -41,6 +41,27 @@ def floatTests(): u0 = {
         assert(two >= one, "1 >= 2")
         assert(two >= two, "2 >= 2")
     }
+    spillTest()
+}
+
+def spillTest(): u0 = {
+    val a = 1.0
+    val b = 2.0
+    val c = 3.0
+    val d = 4.0
+    val e = 5.0
+    val f = 6.0
+    val g = 7.0
+    val h = 8.0
+    val i = 9.0
+    val j = 10.0
+    val k = 11.0
+    val l = 12.0
+    val m = 13.0
+    val n = 14.0
+    val o = 15.0
+    dummy()
+    assert(a + b + c + d + e + f + g + h + i + j + k + l + m + n + o == 120.0, "Float spills")
 }
 
 def sumFloats(a: f64, b: f64, c: f64, d: f64, e: f64, f: f64) = a + b + c + d + e + f
@@ -62,3 +83,5 @@ def vecAdd(a: Vec2d, b: Vec2d): Vec2d =
 
 def Vec5d(x: f64, y: f64, z: f64, w: f64, v: f64) =
     Vec5d { x = x, y = y, z = z, w = w, v = v }
+
+def dummy(): u0 = {}

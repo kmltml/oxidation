@@ -82,7 +82,7 @@ class Amd64Target { this: Output =>
       new RegisterAllocator[RegLoc](RegLoc.calleeSaved, RegLoc.callerSaved) {
 
         override def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun =
-          RegisterSpillPass.txDef(fun).runEmptyA.run(spilled).head.asInstanceOf[ir.Def.Fun]
+          IntSpillPass.txDef(fun).runEmptyA.run(spilled).head.asInstanceOf[ir.Def.Fun]
 
         override def includeRegister(register: ir.Register): Boolean = {
           val passedOnStack = stackParams.contains(register)
@@ -124,7 +124,8 @@ class Amd64Target { this: Output =>
     val allocator: RegisterAllocator[Xmm] =
       new RegisterAllocator[Xmm](Xmm.calleeSaved, Xmm.callerSaved) {
 
-        override def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun = ??? // TODO float spills
+        override def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun =
+          FloatSpillPass.txDef(fun).runEmptyA.run(spilled).head.asInstanceOf[ir.Def.Fun]
 
         override def includeRegister(register: ir.Register): Boolean = {
           val passedOnStack = stackParams.contains(register)

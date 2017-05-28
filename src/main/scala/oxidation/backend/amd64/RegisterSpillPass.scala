@@ -10,7 +10,7 @@ import ir._
 
 import oxidation.codegen.pass.Pass
 
-object RegisterSpillPass extends Pass {
+class RegisterSpillPass extends Pass {
 
   override def name = "register-spill"
 
