@@ -50,7 +50,9 @@ object Compile {
     sys.exit(1)
   }, identity)
 
-  def compile(implicit options: Options): Either[CompileError, File] = {
+  final case class Stats(spillCount: Int)
+
+  def compile(implicit options: Options): Either[CompileError, (File, Stats)] = {
     val parser = new Parser
     for {
       parsed <- options.infiles.toVector.traverse { f =>
@@ -128,7 +130,7 @@ object Compile {
         .left.map(AssemblerError)
       _ <- run("gcc", objFile.getAbsolutePath, show"-Wl,-e${target.EntryPointName}", "-o", exeFile.getAbsolutePath)
         .left.map(LinkerError)
-    } yield exeFile
+    } yield (exeFile, Stats(target.spillCount))
   }
 
   private def run(commandline: String*): Either[String, Unit] = {

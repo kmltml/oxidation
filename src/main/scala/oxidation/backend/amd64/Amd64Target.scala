@@ -14,6 +14,10 @@ import oxidation.ir.ConstantPoolEntry
 
 class Amd64Target { this: Output =>
 
+  private var _spillCount: Int = 0
+
+  def spillCount = _spillCount
+
   type F[A] = Writer[M, A]
 
   val F = implicitly[MonadWriter[F, M]]
@@ -220,6 +224,12 @@ class Amd64Target { this: Output =>
         case (ir.Val.F32(f), n) => dd(n, java.lang.Float.floatToRawIntBits(f))
         case (ir.Val.F64(d), n) => dq(n, java.lang.Double.doubleToRawLongBits(d))
       }.toVector.combineAll
+
+      _spillCount += _ctxt.stack.allocs.count {
+        case (StackAlloc.Spill, _) => true
+        case _ => false
+      }
+
       Vector(
         global(name),
         label(name),

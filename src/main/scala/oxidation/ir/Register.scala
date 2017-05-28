@@ -14,7 +14,11 @@ trait RegisterNamespace {
 
 }
 
-final case class Register(ns: RegisterNamespace, index: Int, typ: Type)
+final case class Register(ns: RegisterNamespace, index: Int, typ: Type) {
+
+  override def toString: String = this.show
+
+}
 
 object Register {
 

@@ -71,6 +71,15 @@ class RegisterSpillPass extends Pass {
         else F.pure(Vector(m))
       } yield res
 
+    case m @ Inst.Move(dest, o @ Op.Widen(ir.Val.R(src))) =>
+      for {
+        spilled <- spilledRegisters
+        res <- if(spilled(src)) for {
+          d <- spill(dest)
+        } yield Inst.Move(d._1, o) +: d._2
+        else F.pure(Vector(m))
+      } yield res
+
     case Inst.Move(dest, Op.Binary(op @ (InfixOp.Eq | InfixOp.Neq | InfixOp.Gt | InfixOp.Geq | InfixOp.Lt | InfixOp.Leq),
                                    ir.Val.R(left), ir.Val.R(right))) =>
       for {

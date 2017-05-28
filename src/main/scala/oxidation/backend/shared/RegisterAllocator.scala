@@ -20,15 +20,15 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
 
   sealed trait Event extends Product with Serializable
     { def location: Int }
-  final case class Start(location: Int, register: ir.Register) extends Event
+  final case class Write(location: Int, register: ir.Register, exclude: Set[ir.Register]) extends Event
   final case class End(location: Int, register: ir.Register) extends Event
   final case class Call(location: Int) extends Event
 
   implicit val eventOrder: Ordering[Event] = {
-    case (Start(x, _), End(y, _)) if x == y => 1
-    case (Start(x, _), Call(y)) if x == y => 1
-    case (End(x, _), Start(y, _)) if x == y => -1
-    case (Call(x), Start(y, _)) if x == y => -1
+    case (Write(x, _, _), End(y, _)) if x == y => 1
+    case (Write(x, _, _), Call(y)) if x == y => 1
+    case (End(x, _), Write(y, _, _)) if x == y => -1
+    case (Call(x), Write(y, _, _)) if x == y => -1
     case (a, b) => a.location - b.location
   }
 
@@ -48,12 +48,18 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
     val calls = instrs.collect {
       case (ir.Inst.Eval(_, ir.Op.Call(_, _)), i) => Call(i)
     }
+    val (writes, moves) = instrs.foldMap {
+      case (ir.Inst.Move(r, ir.Op.Copy(ir.Val.R(src))), i) => (Vector(Write(i, r, Set(src))), Vector(r -> src))
+      case (ir.Inst.Move(r, ir.Op.Widen(ir.Val.R(src))), i) => (Vector(Write(i, r, Set(src))), Vector(r -> src))
+      case (ir.Inst.Move(r, _), i) => (Vector(Write(i, r, Set.empty)), Vector.empty)
+      case _ => (Vector.empty, Vector.empty)
+    } match {
+      case (ws, mvs) => (ws.filter(w => includeRegister(w.register)), mvs.filter { case (a, b) => includeRegister(a) && includeRegister(b) })
+    }
     val sorted = (lifetimes.flatMap {
-      case (r, (Some(s), Some(e))) => Vector(Start(s, r), End(e, r))
-      case (r, (Some(s), None)) => Vector(Start(s, r))
-      case (r, (None, Some(e))) => Vector(End(e, r))
+      case (r, (_, Some(e))) => Vector(End(e, r))
       case _ => Vector.empty
-    }.toVector ++ calls).sorted
+    }.toVector ++ calls ++ writes).sorted
     type F[A] = WriterT[State[Set[ir.Register], ?], Set[(ir.Register, ir.Register)], A]
     val W = MonadWriter[F, Set[(ir.Register, ir.Register)]]
     val S = new MonadState[F, Set[ir.Register]] {
@@ -64,14 +70,14 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
       override def pure[A](x: A): F[A] = W.pure(x)
     }
     assert(sorted.collect {
-      case Start(_, r) => r
+      case Write(_, r, _) => r
       case End(_, r) => r
     }.forall(includeRegister))
     val f: F[Unit] = sorted.traverse_ {
-      case Start(_, r) => for {
+      case Write(_, r, ex) => for {
         live <- S.get
         _ <- S.modify(_ + r)
-        _ <- W.tell(live.map(r -> _))
+        _ <- W.tell((live -- ex - r).map(r -> _))
       } yield ()
       case End(_, r) => S.modify(_ - r)
       case Call(_) => for {
@@ -81,12 +87,6 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
     }
     val edges = f.written.runA(inputs).value ++ inputs.subsets(2).map(_.toList match { case List(a, b) => a -> b })
     assert(edges.forall(t => (includeRegister(t._1) || virtualRegs.contains(t._1)) && (includeRegister(t._2) || virtualRegs.contains(t._2))))
-    val moves = instrs.collect {
-      case (ir.Inst.Move(dest, ir.Op.Copy(ir.Val.R(src))), _)
-        if includeRegister(dest) && includeRegister(src) => dest -> src
-      case (ir.Inst.Move(dest, ir.Op.Widen(ir.Val.R(src))), _)
-        if includeRegister(dest) && includeRegister(src) => dest -> src // seems reasonable, but i'm not sure, should be tested further
-    }
     assert(moves.forall(t => includeRegister(t._1) && includeRegister(t._2)))
     val callVRegs = if(calls.isEmpty) Set() else virtualRegs.keySet
     InterferenceGraph.empty
@@ -155,7 +155,7 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
     case (node, neighbors) :: rest =>
       assert(graph.nodes.forall(graph.precoloured), graph.nodes.filterNot(graph.precoloured).toString + " " + removed)
       val actualNeighbors = neighbors
-        .map(n => graph.nodes.find(n subsetOf _).getOrElse(throw new AssertionError(s"neighbor $n not found in $graph")))
+        .map(n => graph.nodes.find(n subsetOf _).getOrElse(throw new AssertionError(s"neighbor $n not found in $graph, removed = $removed")))
       val neighborColors = actualNeighbors.map(graph.colours(_))
       // Simplify should only remove nodes in such way, that there will be a color available when re-inserting it
       // This failing to find a register would signify a bug in the simplify method, not here.
