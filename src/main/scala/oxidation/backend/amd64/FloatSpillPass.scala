@@ -15,6 +15,10 @@ object FloatSpillPass extends RegisterSpillPass {
       for {
         d <- spill(dest)
       } yield Inst.Move(d._1, Op.Copy(src)) +: d._2
+    case Inst.Move(dest, Op.Sqrt(src)) =>
+      for {
+        d <- spill(dest)
+      } yield Inst.Move(d._1, Op.Sqrt(src)) +: d._2
   }
 
   override def onInstruction = extraOnInstruction orElse super.onInstruction
