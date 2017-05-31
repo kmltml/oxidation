@@ -43,6 +43,7 @@ trait Pass {
         case ir.Op.Store(addr, offset, value) => (txVal(addr), txVal(offset), txVal(value)).map3(ir.Op.Store)
         case ir.Op.Widen(v) => txVal(v).map(ir.Op.Widen)
         case ir.Op.Trim(v) => txVal(v).map(ir.Op.Trim)
+        case ir.Op.Convert(v, t) => txVal(v).map(ir.Op.Convert(_, t))
         case ir.Op.Member(src, index) => txVal(src).map(ir.Op.Member(_, index))
         case o: ir.Op.Stackalloc => F.pure(o)
         case ir.Op.StructCopy(src, substs) =>

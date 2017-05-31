@@ -153,12 +153,12 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         "Ptr" - {
           "without offset" - {
             solveType(P.App(P.Var(l('foo)), Nil), ExpectedType.Undefined,
-              Ctxt.default.withTerms(Map(l('foo) -> Ctxt.Immutable(Ptr(I32))))) ==>
+              Ctxt.default.withTerms(Map(l('foo) -> imm(Ptr(I32))))) ==>
               Right(ast.App(ast.Var(l('foo)) :: Ptr(I32), Nil) :: I32)
           }
           "with offset" - {
             solveType(P.App(P.Var(l('foo)), List(P.IntLit(20))), ExpectedType.Undefined,
-              Ctxt.default.withTerms(Map(l('foo) -> Ctxt.Immutable(Ptr(I32))))) ==>
+              Ctxt.default.withTerms(Map(l('foo) -> imm(Ptr(I32))))) ==>
               Right(ast.App(ast.Var(l('foo)) :: Ptr(I32), List(ast.IntLit(20) :: I64)) :: I32)
           }
         }
@@ -191,7 +191,7 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         solveType(P.While(
           P.InfixAp(InfixOp.Lt, P.Var(l('x)), P.IntLit(10)),
           P.Assign(P.Var(l('x)), Some(InfixOp.Add), P.IntLit(1))
-        ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> Ctxt.Mutable(I32)))) ==>
+        ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> mut(I32)))) ==>
           Right(ast.While(
             ast.InfixAp(InfixOp.Lt, ast.Var(l('x)) :: I32, ast.IntLit(10) :: I32) :: U1,
             ast.Assign(ast.Var(l('x)) :: I32, None,
@@ -215,19 +215,19 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         "Var" - {
           "mutable" - {
             solveType(P.Assign(P.Var(l('x)), None, P.IntLit(20)), ExpectedType.Undefined,
-              Ctxt.default.withTerms(Map(l('x) -> Ctxt.Mutable(I64)))) ==>
+              Ctxt.default.withTerms(Map(l('x) -> mut(I64)))) ==>
               Right(ast.Assign(ast.Var(l('x)) :: I64, None, ast.IntLit(20) :: I64) :: U0)
           }
           "immutable" - {
             solveType(P.Assign(P.Var(l('x)), None, P.IntLit(20)), ExpectedType.Undefined,
-              Ctxt.default.withTerms(Map(l('x) -> Ctxt.Immutable(I64)))) ==>
+              Ctxt.default.withTerms(Map(l('x) -> imm(I64)))) ==>
               Left(TyperError.ImmutableAssign(l('x)))
           }
         }
         "Ptr" - {
           val intptr = Ptr(I32)
           solveType(P.Assign(P.App(P.Var(l('foo)), Nil), None, P.IntLit(20)), ExpectedType.Undefined,
-            Ctxt.default.withTerms(Map(l('foo) -> Ctxt.Mutable(intptr)))) ==>
+            Ctxt.default.withTerms(Map(l('foo) -> mut(intptr)))) ==>
             Right(ast.Assign(ast.App(ast.Var(l('foo)) :: intptr, Nil) :: I32, None, ast.IntLit(20) :: I32) :: U0)
         }
         "Select" - {
@@ -253,7 +253,7 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
         }
         "composite" - {
           solveType(P.Assign(P.Var(l('x)), Some(InfixOp.Add), P.IntLit(20)), ExpectedType.Undefined,
-            Ctxt.default.withTerms(Map(l('x) -> Ctxt.Mutable(I64)))) ==>
+            Ctxt.default.withTerms(Map(l('x) -> mut(I64)))) ==>
             Right(ast.Assign(ast.Var(l('x)) :: I64, None, ast.InfixAp(InfixOp.Add, ast.Var(l('x)) :: I64, ast.IntLit(20) :: I64) :: I64) :: U0)
         }
         "An rval" - {
@@ -274,20 +274,46 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
       "Cast" - {
         "widen" - {
           solveType(P.App(P.TypeApp(P.Var(g('cast)), List(TypeName.Named(g('i64)))), List(P.Var(l('x)))),
-            ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> Ctxt.Immutable(I8)))) ==>
+            ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(I8)))) ==>
             Right(ast.Widen(ast.Var(l('x)) :: I8) :: I64)
         }
         "trim" - {
           solveType(P.App(P.TypeApp(P.Var(g('cast)), List(TypeName.Named(g('i8)))), List(P.Var(l('x)))),
-            ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> Ctxt.Immutable(I64)))) ==>
+            ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(I64)))) ==>
             Right(ast.Trim(ast.Var(l('x)) :: I64) :: I8)
         }
         "reinterpret" - {
           "pointer to pointer" - {
             solveType(P.App(P.TypeApp(P.Var(g('cast)),
               List(TypeName.ptr(TypeName.Named(g('i32))))), List(P.Var(l('x)))),
-              ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> Ctxt.Immutable(Ptr(I8))))) ==>
+              ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(Ptr(I8))))) ==>
               Right(ast.Reinterpret(ast.Var(l('x)) :: Ptr(I8)) :: Ptr(I32))
+          }
+        }
+        "convert" - {
+          "f32 to i32" - {
+            solveType(P.App(P.TypeApp(P.Var(g('cast)),
+              List(TypeName.Named(g('i32)))), List(P.Var(l('x)))),
+              ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(F32)))) ==>
+              Right(ast.Convert(ast.Var(l('x)) :: F32) :: I32)
+          }
+          "f64 to i32" - {
+            solveType(P.App(P.TypeApp(P.Var(g('cast)),
+              List(TypeName.Named(g('i32)))), List(P.Var(l('x)))),
+              ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(F64)))) ==>
+              Right(ast.Convert(ast.Var(l('x)) :: F64) :: I32)
+          }
+          "f32 to i64" - {
+            solveType(P.App(P.TypeApp(P.Var(g('cast)),
+              List(TypeName.Named(g('i64)))), List(P.Var(l('x)))),
+              ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(F32)))) ==>
+              Right(ast.Convert(ast.Var(l('x)) :: F32) :: I64)
+          }
+          "f64 to i64" - {
+            solveType(P.App(P.TypeApp(P.Var(g('cast)),
+              List(TypeName.Named(g('i64)))), List(P.Var(l('x)))),
+              ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(F64)))) ==>
+              Right(ast.Convert(ast.Var(l('x)) :: F64) :: I64)
           }
         }
       }

@@ -85,6 +85,7 @@ object Validator {
     case Op.Copy(src) => valType(loc, src).map(Some(_))
     case Op.Widen(v)  => valType(loc, v).as(None)
     case Op.Trim(v)  => valType(loc, v).as(None)
+    case Op.Convert(v, t) => valType(loc, v).as(Some(t))
     case Op.Sqrt(v) =>
       for {
         vt <- valType(loc, v)

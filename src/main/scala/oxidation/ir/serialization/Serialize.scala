@@ -108,6 +108,7 @@ class Serialize(val out: DataOutputStream) {
     case Op.Load(a, o) => writeTag(Tag.Op.Load); writeVal(a); writeVal(o)
     case Op.Store(a, o, v) => writeTag(Tag.Op.Store); writeVal(a); writeVal(o); writeVal(v)
     case Op.Widen(v) => writeTag(Tag.Op.Widen); writeVal(v)
+    case Op.Convert(v, t) => writeTag(Tag.Op.Convert); writeVal(v); writeType(t)
     case Op.Garbled => writeTag(Tag.Op.Garbled)
     case Op.Member(src, index) => writeTag(Tag.Op.Member); writeVal(src); writeInt(index)
     case Op.Stackalloc(size) => writeTag(Tag.Op.Stackalloc); writeInt(size)

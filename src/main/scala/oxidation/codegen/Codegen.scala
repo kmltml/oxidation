@@ -120,6 +120,15 @@ object Codegen {
         )
       } yield Val.R(r)
 
+    case Typed(ast.Convert(src), valType) =>
+      for {
+        v <- compileExpr(src)
+        r <- genReg(translateType(valType))
+        _ <- instructions(
+          Inst.Move(r, Op.Convert(v, r.typ))
+        )
+      } yield Val.R(r)
+
     case Typed(ast.Ignore(expr), analyze.Type.U0) =>
       for {
         _ <- compileExpr(expr)

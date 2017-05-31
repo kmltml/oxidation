@@ -37,6 +37,7 @@ trait Ast {
   // Synthetic expressions (not created by the parser)
   final case class Widen(expr: Typed[Expression]) extends Expression
   final case class Trim(expr: Typed[Expression]) extends Expression
+  final case class Convert(expr: Typed[Expression]) extends Expression
   final case class Reinterpret(expr: Typed[Expression]) extends Expression
   final case class Ignore(expr: Typed[Expression]) extends Expression
   final case class Stackalloc(pointee: TypeInfo) extends Expression

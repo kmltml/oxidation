@@ -42,6 +42,13 @@ def floatTests(): u0 = {
         assert(two >= two, "2 >= 2")
     }
     spillTest()
+    assert(cast[i32](42.0) == 42, "convert f64 -> i32")
+    assert(cast[i64](42.0) == 42, "convert f64 -> i64")
+    {
+        val x: f32 = 42.0
+        assert(cast[i32](x) == 42, "convert f32 -> i32")
+        assert(cast[i64](x) == 42, "convert f32 -> i64")
+    }
 }
 
 def spillTest(): u0 = {

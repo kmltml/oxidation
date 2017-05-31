@@ -57,6 +57,12 @@ trait Output {
   def movss(dest: Val, src: Val): M
   def movsd(dest: Val, src: Val): M
 
+  def cvttss2si(dest: Val, src: Val): M
+  def cvttsd2si(dest: Val, src: Val): M
+  def cvtsi2ss(dest: Val, src: Val): M
+  def cvtsi2sd(dest: Val, src: Val): M
+
+
   def addss(dest: Val, src: Val): M
   def subss(dest: Val, src: Val): M
   def mulss(dest: Val, src: Val): M

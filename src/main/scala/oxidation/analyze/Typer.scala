@@ -307,10 +307,14 @@ object Typer {
   private def cast(target: TypeName, src: Typed[ast.Expression], ctxt: Ctxt): Typed[ast.Expression] =
     (lookupType(target, ctxt), src.typ) match {
       case (a, b) if a == b => src
-      case (t: Num, s: Num) =>
+      case (t: Integral, s: Integral) =>
         val w = wider(t, s)
         if(w == t) widen(src, t)
         else trim(src, t)
+      case (t: Integral, s: Type.F) =>
+        Typed(ast.Convert(src), t)
+      case (t: Type.F, s: Integral) =>
+        Typed(ast.Convert(src), t)
       case (t @ Ptr(_), Ptr(_) | U64) => Typed(ast.Reinterpret(src), t)
     }
 

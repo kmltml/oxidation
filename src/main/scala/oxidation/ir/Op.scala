@@ -21,6 +21,7 @@ sealed trait Op {
     case Op.Store(a, o, v) => Set(a, o, v)
     case Op.Widen(v) => Set(v)
     case Op.Trim(v) => Set(v)
+    case Op.Convert(v, _) => Set(v)
     case Op.Member(s, _) => Set(s)
     case Op.Elem(a, i) => Set(a, i)
     case Op.ArrStore(a, i, v) => Set(a, i, v)
@@ -41,6 +42,7 @@ object Op {
   final case class Store(addr: Val, offset: Val, value: Val) extends Op
   final case class Widen(v: Val) extends Op
   final case class Trim(v: Val) extends Op
+  final case class Convert(v: Val, to: Type) extends Op
   final case class Member(src: Val, index: Int) extends Op
   final case class Stackalloc(size: Int) extends Op
   final case class StructCopy(src: Val, substs: Map[Int, Val]) extends Op

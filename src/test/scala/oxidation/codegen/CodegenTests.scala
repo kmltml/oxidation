@@ -149,6 +149,22 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             Inst.Move(r(1, _.Ptr), Op.Copy(r(0, _.Ptr)))
           ), Val.R(r(1, _.Ptr)))
       }
+      "Convert" - {
+        "f32 -> i64" - {
+          compileExpr(ast.Convert(ast.Var(l('x)) :: F32) :: I64)
+            .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.F32)), nextReg = 1)).value ==>
+            (insts(
+              Inst.Move(r(1, _.I64), Op.Convert(r(0, _.F32), ir.Type.I64))
+            ), Val.R(r(1, _.I64)))
+        }
+        "f64 -> i32" - {
+          compileExpr(ast.Convert(ast.Var(l('x)) :: F64) :: I32)
+            .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.F64)), nextReg = 1)).value ==>
+            (insts(
+              Inst.Move(r(1, _.I32), Op.Convert(r(0, _.F64), ir.Type.I32))
+            ), Val.R(r(1, _.I32)))
+        }
+      }
       "Ignore" - {
         compileExpr(ast.Ignore(ast.App(ast.Var(g('foo)) :: Fun(List(I32), I32), List(ast.IntLit(42) :: I32)) :: I32) :: U0)
           .run.runA(CodegenState()).value ==>
