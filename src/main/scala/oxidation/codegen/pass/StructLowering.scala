@@ -150,6 +150,9 @@ object StructLowering extends Pass {
         res <- txInstruction(Inst.Move(dest, Op.Copy(Val.R(bindings(i)))))
       } yield res
 
+    case Inst.Move(dest, Op.Member(Val.Struct(members), i)) =>
+      F.pure(Vector(Inst.Move(dest, Op.Copy(members(i)))))
+
     case Inst.Move(dest, Op.StructCopy(Val.R(src), substs)) =>
       for {
         srcRegs <- binding(src)

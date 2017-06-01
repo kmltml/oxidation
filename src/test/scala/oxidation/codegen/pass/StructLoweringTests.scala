@@ -185,6 +185,14 @@ object StructLoweringTests extends TestSuite with IrValSyntax {
           Inst.Move(sl(9, I64), Op.Member(sl(0, foo), 8))
         ))
     }
+
+    "selecting member from a struct literal" - {
+      pass.txInstruction(Inst.Move(register(0, I32), Op.Member(Val.Struct(Vector(i32(10), i64(20), i8(30))), 0)))
+        .run(pass.S()).value ==>
+        (pass.S(), Vector(
+          Inst.Move(register(0, I32), Op.Copy(i32(10)))
+        ))
+    }
   }
 
 }
