@@ -230,6 +230,7 @@ class Parser {
     ( LiteralStr("\\\"").as("\"")
     | LiteralStr("\\\\").as("\\")
     | LiteralStr("\\n").as("\n")
+    | LiteralStr("\\0").as("\0")
     )
     val stringChars = CharsWhile(!"\\\"".contains(_))
     P("\"".~/ ~~ (stringChars.! | escapeSequence).repX ~~ "\"").map(strs => StringLit(strs.mkString))

@@ -42,6 +42,7 @@ object ParserTests extends TestSuite {
       }
       "string literals" - {
         expr.parse(""" "Hello, \"world\"!\n" """).get.value ==> StringLit("Hello, \"world\"!\n")
+        expr.parse(""" "Hello, obsolete, zero-terminated world!\0" """).get.value ==> StringLit("Hello, obsolete, zero-terminated world!\0")
       }
       "struct literals" - {
         expr.parse(

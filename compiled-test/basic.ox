@@ -39,6 +39,11 @@ def basicTests() = {
 
     assert(NonTrivialInt == 55, "Non-trivial global val")
 
+    assert({
+        val s = "Hello\0"
+        s.data(s.length - 1) == 0
+    }, "Zero byte escape in string literal")
+
     shortcircuit()
 }
 
