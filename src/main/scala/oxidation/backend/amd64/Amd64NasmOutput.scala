@@ -149,9 +149,9 @@ trait Amd64NasmOutput extends Output {
   def cvttsd2si(dest: Val, src: Val): M =
     ln(show"cvttsd2si $dest, $src")
   def cvtsi2ss(dest: Val, src: Val): M =
-    ln(show"cvtsd2ss $dest, $src")
+    ln(show"cvtsi2ss $dest, $src")
   def cvtsi2sd(dest: Val, src: Val): M =
-    ln(show"cvtsd2sd $dest, $src")
+    ln(show"cvtsi2sd $dest, $src")
 
 
   def addss(dest: Val, src: Val): M =
