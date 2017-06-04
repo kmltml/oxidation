@@ -21,6 +21,12 @@ object FloatSpillPass extends RegisterSpillPass {
       } yield Inst.Move(d._1, Op.Sqrt(src)) +: d._2
     case Inst.Move(dest, op @ Op.Convert(_, Type.F(_))) =>
       spill(dest).map { case (d, insts) => Inst.Move(d, op) +: insts }
+    case Inst.Move(dest, Op.Binary(op @ (InfixOp.Add | InfixOp.Sub | InfixOp.Mul | InfixOp.Div), left, right)) =>
+      for {
+        d <- spill(dest)
+      } yield Inst.Move(d._1, Op.Binary(op, left, right)) +: d._2
+    case Inst.Move(dest, Op.Binary(op @ (InfixOp.Gt | InfixOp.Lt | InfixOp.Leq | InfixOp.Geq), l, r)) =>
+      fill(l).map { case (insts, left) => insts :+ Inst.Move(dest, Op.Binary(op, left, r)) }
   }
 
   override def onInstruction = extraOnInstruction orElse super.onInstruction
