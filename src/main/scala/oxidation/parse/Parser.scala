@@ -5,13 +5,13 @@ import fastparse.noApi._
 import fastparse.WhitespaceApi
 import sourcecode.Name
 import oxidation.parse.ast._
-
 import cats._
 import cats.data._
 import cats.implicits._
+import fastparse.core.Implicits.Sequencer
 
 //noinspection ForwardReference
-class Parser {
+class Parser(file: Option[String]) {
 
   val blockComment: P0 = {
     import fastparse.all._
@@ -41,6 +41,9 @@ class Parser {
 
   def whole[A](p: P[A]): P[A] = p ~ End
 
+  def located[A, R](p: P[A])(implicit seq: Sequencer[A, Span, R]): P[R] =
+    (Index ~~ p ~~ Index) map { case (s, a, e) => seq(a, Span(file, s, e)) }
+
   val compilationUnit: P[Vector[TLD]] =
     P((WS ~~ tld).repX(sep = semi).map(_.toVector) ~~ End)
 
@@ -53,10 +56,10 @@ class Parser {
     case (exp, postfixes) => postfixes.foldLeft(exp)((e, f) => f(e))
   }
   private val expression2: P[Expression] = P(
-    prefixOp.? ~ expression1
+    located(prefixOp.? ~ expression1)
   ).map {
-    case (Some(op), expr) => PrefixAp(op, expr)
-    case (None, expr) => expr
+    case (Some(op), expr, loc) => PrefixAp(op, expr, loc)
+    case (None, expr, _) => expr
   }
   private val expression3: P[Expression] = infixl(expression2, op3)
   private val expression4: P[Expression] = infixl(expression3, op4)
@@ -69,9 +72,9 @@ class Parser {
   private val expression11: P[Expression] = infixl(expression10, op11)
   private val expression12: P[Expression] = infixl(expression11, op12)
   private val expression13: P[Expression] =
-    P(expression12 ~ (assignOp ~ expression).?).map {
-      case (e, None) => e
-      case (lval, Some((op, rval))) => Assign(lval, op, rval)
+    P(located(expression12 ~ (assignOp ~ expression).?)).map {
+      case (e, None, _) => e
+      case (lval, Some((op, rval)), loc) => Assign(lval, op, rval, loc)
     }
 
   val expression: P[Expression] = P(expression13)
@@ -101,11 +104,11 @@ class Parser {
   private val postfix: P[Postfix] =
     P(typeApply | apply | select)
   private val apply: P[Expression => App] =
-    P(WSNoNL ~~ "(" ~/ expression.rep(sep = ",").map(_.toList) ~ ")").map(params => App(_, params))
+    P(WSNoNL ~~ "(" ~/ expression.rep(sep = ",").map(_.toList) ~ ")" ~~ Index).map { case (params, end) => prefix => App(prefix, params, prefix.loc.copy(end = end)) }
   private val typeApply: P[Expression => TypeApp] =
-    P(WSNoNL ~~ typeParams).map(params => TypeApp(_, params))
+    P(WSNoNL ~~ typeParams ~~ Index).map { case (params, end) => prefix => TypeApp(prefix, params, prefix.loc.copy(end = end)) }
   private val select: P[Expression => Select] =
-    P(WS ~~ "." ~/ id.!).map(id => Select(_, id))
+    P(WS ~~ "." ~/ id.! ~~ Index).map { case (id, end) => prefix => Select(prefix, id, prefix.loc.copy(end = end)) }
 
   private val semi: P0 =
     P(WSNoNL ~~ (";" | NL) ~~ WS)
@@ -116,7 +119,7 @@ class Parser {
   private def infixl(exp: => P[Expression], op: => P[InfixOp]): P[Expression] = P(
     exp ~ (op ~/ exp).rep
   ).map { case (head, bs) =>
-    bs.foldLeft(head) { case (a, (op, b)) => InfixAp(op, a, b) }
+    bs.foldLeft(head) { case (a, (op, b)) => InfixAp(op, a, b, Span(file, a.loc.start, b.loc.end)) }
   }
 
   private def K(p: P0): P0 = p ~~ !CharPred(c => c.isLetterOrDigit || idSpecialChars.contains(c))
@@ -154,7 +157,7 @@ class Parser {
     val param = (id.! ~ ":" ~ typ).map(Param.tupled)
     val paramList = "(" ~ param.rep(sep = ",").map(_.toList) ~ ")"
 
-    val extern = K("extern").as(Extern())
+    val extern = located(K("extern")).map(Extern)
 
     P(K("def") ~/ sym ~ paramList.? ~ (":" ~/ typ).? ~ "=" ~ (expression | extern)).map(DefDef.tupled)
   }
@@ -193,7 +196,7 @@ class Parser {
   private val digits: P0 = CharsWhile(_.isDigit)
 
   private val intLiteral: P[IntLit] =
-    P(hexInt | decimalInt).map(IntLit)
+    P(located(hexInt | decimalInt)).map(IntLit.tupled)
   private val decimalInt: P[Long] =
     digits.!.map(java.lang.Long.parseUnsignedLong)
   private val hexInt: P[Long] =
@@ -201,29 +204,30 @@ class Parser {
       .map(java.lang.Long.parseUnsignedLong(_, 16))
 
   private val floatLiteral: P[FloatLit] =
-    P( digits ~~ "." ~~ digits ~~ exponent.?
-     | digits ~~ exponent).!.map(s => FloatLit(BigDecimal(s)))
+    P(located(
+     ( digits ~~ "." ~~ digits ~~ exponent.?
+     | digits ~~ exponent).!)).map { case (s, loc) => FloatLit(BigDecimal(s), loc) }
   private val exponent: P0 =
     P(CharIn("eE") ~~ CharIn("+-").? ~~ digits)
 
 
   private val boolLiteral: P[BoolLit] = P(
-    K("true").as(BoolLit(true))
-  | K("false").as(BoolLit(false))
+    located(K("true")).map(BoolLit(true, _))
+  | located(K("false")).map(BoolLit(false, _))
   )
 
   private val charLiteral: P[CharLit] = P(
-    "'" ~~
+    located("'" ~~
     ( LiteralStr("\\\\").as('\\')
     | LiteralStr("\\'").as('\'')
     | LiteralStr("\\n").as('\n')
     | LiteralStr("\\0").as('\0')
     | CharPred(_ != '\'').!.map(_.head)
-    ) ~~ "'"
-  ).map(CharLit)
+    ) ~~ "'")
+  ).map(CharLit.tupled)
 
   private val unitLiteral: P[UnitLit] =
-    P("()").as(UnitLit())
+    P(located("()")).map(UnitLit)
 
   private val stringLiteral: P[StringLit] = {
     val escapeSequence =
@@ -233,30 +237,30 @@ class Parser {
     | LiteralStr("\\0").as("\0")
     )
     val stringChars = CharsWhile(!"\\\"".contains(_))
-    P("\"".~/ ~~ (stringChars.! | escapeSequence).repX ~~ "\"").map(strs => StringLit(strs.mkString))
+    P(located("\"".~/ ~~ (stringChars.! | escapeSequence).repX ~~ "\"")).map { case (strs, loc) => StringLit(strs.mkString, loc) }
   }
 
   private val structLit: P[StructLit] = {
     val member = P(id.! ~ "=" ~ expression)
-    P(sym ~ "{" ~/ member.repX(sep = semiOrComa).map(_.toList) ~ "}").map(StructLit.tupled)
+    P(located(sym ~ "{" ~/ member.repX(sep = semiOrComa).map(_.toList) ~ "}")).map(StructLit.tupled)
   }
 
   private val varacc: P[Var] =
-    P(sym).map(Var)
+    P(located(sym)).map(Var.tupled)
 
   private val parexp: P[Expression] =
-    P("(" ~/ expression ~ ")")
+    P(located("(" ~/ expression ~ ")")).map { case (e, loc) => e.withLoc(loc) }
 
   private val blockexpr: P[Block] =
-    P("{" ~/ (expression | definition).repX(sep = semi) ~ "}").map(s => Block(s.toVector))
+    P(located("{" ~/ (expression | definition).repX(sep = semi) ~ "}")).map { case (s, loc) => Block(s.toVector, loc) }
 
   private val ifexp: P[If] = {
     val els = P(K("else") ~/ expression)
-    P(K("if") ~/ "(" ~ expression ~ ")" ~/ expression ~ els.?).map(If.tupled)
+    P(located(K("if") ~/ "(" ~ expression ~ ")" ~/ expression ~ els.?)).map(If.tupled)
   }
 
   private val whileexp: P[While] =
-    P(K("while") ~/ "(" ~ expression ~ ")" ~/ expression).map(While.tupled)
+    P(located(K("while") ~/ "(" ~ expression ~ ")" ~/ expression)).map(While.tupled)
 
   private val prefixOp: P[PrefixOp] = P(
     O("-").as(PrefixOp.Neg)

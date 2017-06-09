@@ -4,6 +4,7 @@ package oxidation
 import cats._
 import cats.data._
 import cats.implicits._
+import oxidation.parse.Span
 
 trait Ast {
 
@@ -12,36 +13,68 @@ trait Ast {
 
   sealed trait BlockStatement
 
-  sealed trait Expression extends BlockStatement with Product with Serializable
+  sealed trait Expression extends BlockStatement with Product with Serializable {
 
-  final case class IntLit(value: Long) extends Expression
-  final case class FloatLit(value: BigDecimal) extends Expression
-  final case class BoolLit(value: Boolean) extends Expression
-  final case class CharLit(value: Char) extends Expression
-  final case class StringLit(value: String) extends Expression
-  final case class StructLit(name: Symbol, members: List[(String, Typed[Expression])]) extends Expression
-  final case class UnitLit() extends Expression
-  final case class InfixAp(operator: InfixOp, left: Typed[Expression], right: Typed[Expression]) extends Expression
-  final case class PrefixAp(operator: PrefixOp, expr: Typed[Expression]) extends Expression
-  final case class Var(name: Symbol) extends Expression
-  final case class Block(body: Vector[Typed[BlockStatement]]) extends Expression
-  final case class App(expr: Typed[Expression], params: List[Typed[Expression]]) extends Expression
-  final case class TypeApp(expr: Typed[Expression], params: List[TypeName]) extends Expression
-  final case class Select(expr: Typed[Expression], member: String) extends Expression
-  final case class If(cond: Typed[Expression], positive: Typed[Expression], negative: Option[Typed[Expression]]) extends Expression
-  final case class While(cond: Typed[Expression], body: Typed[Expression]) extends Expression
-  final case class Assign(lval: Typed[Expression], op: Option[InfixOp], rval: Typed[Expression]) extends Expression
+    def loc: Span
 
-  final case class Extern() extends Expression
+    def withLoc(loc: Span): Expression = this match {
+      case x: IntLit => x.copy(loc = loc)
+      case x: FloatLit => x.copy(loc = loc)
+      case x: BoolLit => x.copy(loc = loc)
+      case x: CharLit => x.copy(loc = loc)
+      case x: StringLit => x.copy(loc = loc)
+      case x: StructLit => x.copy(loc = loc)
+      case x: UnitLit => x.copy(loc = loc)
+      case x: InfixAp => x.copy(loc = loc)
+      case x: PrefixAp => x.copy(loc = loc)
+      case x: Var => x.copy(loc = loc)
+      case x: Block => x.copy(loc = loc)
+      case x: App => x.copy(loc = loc)
+      case x: TypeApp => x.copy(loc = loc)
+      case x: Select => x.copy(loc = loc)
+      case x: If => x.copy(loc = loc)
+      case x: While => x.copy(loc = loc)
+      case x: Assign => x.copy(loc = loc)
+      case x: Extern => x.copy(loc = loc)
+      case x: Widen => x.copy(loc = loc)
+      case x: Trim => x.copy(loc = loc)
+      case x: Convert => x.copy(loc = loc)
+      case x: Reinterpret => x.copy(loc = loc)
+      case x: Ignore => x.copy(loc = loc)
+      case x: Stackalloc => x.copy(loc = loc)
+      case x: ArrLit => x.copy(loc = loc)
+    }
+
+  }
+
+  final case class IntLit(value: Long, loc: Span) extends Expression
+  final case class FloatLit(value: BigDecimal, loc: Span) extends Expression
+  final case class BoolLit(value: Boolean, loc: Span) extends Expression
+  final case class CharLit(value: Char, loc: Span) extends Expression
+  final case class StringLit(value: String, loc: Span) extends Expression
+  final case class StructLit(name: Symbol, members: List[(String, Typed[Expression])], loc: Span) extends Expression
+  final case class UnitLit(loc: Span) extends Expression
+  final case class InfixAp(operator: InfixOp, left: Typed[Expression], right: Typed[Expression], loc: Span) extends Expression
+  final case class PrefixAp(operator: PrefixOp, expr: Typed[Expression], loc: Span) extends Expression
+  final case class Var(name: Symbol, loc: Span) extends Expression
+  final case class Block(body: Vector[Typed[BlockStatement]], loc: Span) extends Expression
+  final case class App(expr: Typed[Expression], params: List[Typed[Expression]], loc: Span) extends Expression
+  final case class TypeApp(expr: Typed[Expression], params: List[TypeName], loc: Span) extends Expression
+  final case class Select(expr: Typed[Expression], member: String, loc: Span) extends Expression
+  final case class If(cond: Typed[Expression], positive: Typed[Expression], negative: Option[Typed[Expression]], loc: Span) extends Expression
+  final case class While(cond: Typed[Expression], body: Typed[Expression], loc: Span) extends Expression
+  final case class Assign(lval: Typed[Expression], op: Option[InfixOp], rval: Typed[Expression], loc: Span) extends Expression
+
+  final case class Extern(loc: Span) extends Expression
 
   // Synthetic expressions (not created by the parser)
-  final case class Widen(expr: Typed[Expression]) extends Expression
-  final case class Trim(expr: Typed[Expression]) extends Expression
-  final case class Convert(expr: Typed[Expression]) extends Expression
-  final case class Reinterpret(expr: Typed[Expression]) extends Expression
-  final case class Ignore(expr: Typed[Expression]) extends Expression
-  final case class Stackalloc(pointee: TypeInfo) extends Expression
-  final case class ArrLit(elems: List[Typed[Expression]]) extends Expression
+  final case class Widen(expr: Typed[Expression], loc: Span) extends Expression
+  final case class Trim(expr: Typed[Expression], loc: Span) extends Expression
+  final case class Convert(expr: Typed[Expression], loc: Span) extends Expression
+  final case class Reinterpret(expr: Typed[Expression], loc: Span) extends Expression
+  final case class Ignore(expr: Typed[Expression], loc: Span) extends Expression
+  final case class Stackalloc(pointee: TypeInfo, loc: Span) extends Expression
+  final case class ArrLit(elems: List[Typed[Expression]], loc: Span) extends Expression
 
 
   sealed trait TLD
@@ -77,29 +110,29 @@ trait Ast {
       case _: IntLit | _: StringLit | _: BoolLit | _: Var | _: Extern |
            _: TypeAliasDef | _: StructDef | _: EnumDef | _: CharLit |
            _: UnitLit | _: FloatLit => Vector.empty[A]
-      case InfixAp(_, left, right) => traverse(left)(f) ++ traverse(right)(f)
-      case PrefixAp(_, e) => traverse(e)(f)
-      case Block(stmnts) => stmnts.foldMap(traverse(_)(f))
-      case App(e, params) => traverse(e)(f) ++ params.foldMap(traverse(_)(f))
-      case TypeApp(e, _) => traverse(e)(f)
-      case Select(e, _) => traverse(e)(f)
-      case If(c, p, n) =>
+      case InfixAp(_, left, right, _) => traverse(left)(f) ++ traverse(right)(f)
+      case PrefixAp(_, e, _) => traverse(e)(f)
+      case Block(stmnts, _) => stmnts.foldMap(traverse(_)(f))
+      case App(e, params, _) => traverse(e)(f) ++ params.foldMap(traverse(_)(f))
+      case TypeApp(e, _, _) => traverse(e)(f)
+      case Select(e, _, _) => traverse(e)(f)
+      case If(c, p, n, _) =>
         traverse(c)(f) ++ traverse(p)(f) ++ n.map(traverse(_)(f)).orEmpty
-      case While(c, b) => traverse(c)(f) ++ traverse(b)(f)
-      case Assign(l, _, r) => traverse(l)(f) ++ traverse(r)(f)
-      case StructLit(_, members) => members.map(_._2).foldMap(traverse(_)(f))
+      case While(c, b, _) => traverse(c)(f) ++ traverse(b)(f)
+      case Assign(l, _, r, _) => traverse(l)(f) ++ traverse(r)(f)
+      case StructLit(_, members, _) => members.map(_._2).foldMap(traverse(_)(f))
 
       case DefDef(_, _, _, b) => traverse(b)(f)
       case ValDef(_, _, v) => traverse(v)(f)
       case VarDef(_, _, v) => traverse(v)(f)
 
-      case Ignore(e) => traverse(e)(f)
+      case Ignore(e, _) => traverse(e)(f)
     }
     (result ++ more).toVector
   }
 
   def listTermSymbols(stmnt: Typed[BlockStatement]): Vector[Symbol] = traverse(stmnt) {
-    case Var(s) => s
+    case Var(s, _) => s
   }
 
 }

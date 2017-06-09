@@ -4,16 +4,19 @@ package analyze
 import utest._
 import parse.ast._
 import SymbolSearch._
+import oxidation.parse.Span
 
 object SymbolSearchTests extends TestSuite with SymbolSyntax {
+
+  val loc = Span(None, 0, 0)
 
   val tests = apply {
     "findSymbols" - {
       "symbols in default module" - {
         findSymbols(Vector(
-          DefDef(u('main), None, None, Block(Vector.empty)),
-          ValDef(u('foo), None, IntLit(2)),
-          VarDef(u('bar), None, IntLit(2)),
+          DefDef(u('main), None, None, Block(Vector.empty, loc)),
+          ValDef(u('foo), None, IntLit(2, loc)),
+          VarDef(u('bar), None, IntLit(2, loc)),
           StructDef(u('baz), None, Nil),
           EnumDef(u('foobar), None, Nil)
         )) ==> Right(Symbols(
@@ -23,21 +26,21 @@ object SymbolSearchTests extends TestSuite with SymbolSyntax {
       }
       "error on duplicate symbols" - {
         findSymbols(Vector(
-          DefDef(u('main), None, None, Block(Vector.empty)),
-          ValDef(u('main), None, IntLit(2))
+          DefDef(u('main), None, None, Block(Vector.empty, loc)),
+          ValDef(u('main), None, IntLit(2, loc))
         )).isLeft ==> true
       }
       "symbols in a module" - {
         findSymbols(Vector(
           Module(List("foo", "bar")),
-          DefDef(u('main), None, None, Block(Vector.empty))
+          DefDef(u('main), None, None, Block(Vector.empty, loc))
         )) ==> Right(Symbols.terms(g('foo, 'bar, 'main)))
       }
       "nested modules" - {
         findSymbols(Vector(
           Module(List("foo")),
           Module(List("bar")),
-          DefDef(u('main), None, None, Block(Vector.empty))
+          DefDef(u('main), None, None, Block(Vector.empty, loc))
         )) ==> Right(Symbols.terms(g('foo, 'bar, 'main)))
       }
     }

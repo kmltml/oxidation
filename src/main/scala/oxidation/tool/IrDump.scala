@@ -83,16 +83,18 @@ object IrDump extends App {
   }, identity)
 
   optParser.parse(args, Options()).foreach { implicit options =>
-    val parser = new Parser
     val parsed = phase("parse") {
-      options.infiles.map(f => parser.compilationUnit.parse(Source.fromFile(f).mkString).get.value)
+      options.infiles.map { f =>
+        val parser = new Parser(Some(f.getName))
+        parser.compilationUnit.parse(Source.fromFile(f).mkString).get.value
+      }
     }
     val symbols = phase("symbol-search") {
-      parsed.toVector.foldMap(tlds => get(SymbolSearch.findSymbols(tlds.toVector)))
+      parsed.toVector.foldMap(tlds => get(SymbolSearch.findSymbols(tlds)))
     }
     val scope = BuiltinSymbols.symbols |+| symbols
     val resolvedSymbols = phase("symbol-resolve") {
-      parsed.toVector.flatMap(tlds => get(SymbolResolver.resolveSymbols(tlds.toVector, scope)))
+      parsed.toVector.flatMap(tlds => get(SymbolResolver.resolveSymbols(tlds, scope)))
     }
 
     val typeDefs = resolvedSymbols.collect {

@@ -83,46 +83,46 @@ object SymbolResolver {
   }
 
   private def solveExpr(e: parse.ast.Expression, scope: Scope): Res[parse.ast.Expression] = e match {
-    case parse.ast.Var(Symbol.Unresolved(n)) =>
-      getOnlyOneSymbol(n, scope.terms).map(parse.ast.Var)
+    case parse.ast.Var(Symbol.Unresolved(n), loc) =>
+      getOnlyOneSymbol(n, scope.terms).map(parse.ast.Var(_, loc))
 
-    case parse.ast.StructLit(Symbol.Unresolved(name), members) =>
+    case parse.ast.StructLit(Symbol.Unresolved(name), members, loc) =>
       (getOnlyOneSymbol(name, scope.types), members.traverse {
         case (n, e) => solveExpr(e, scope).map(n -> _)
-      }).map2(parse.ast.StructLit(_, _))
+      }).map2(parse.ast.StructLit(_, _, loc))
 
-    case parse.ast.InfixAp(op, left, right) =>
+    case parse.ast.InfixAp(op, left, right, loc) =>
       (solveExpr(left, scope), solveExpr(right, scope))
-        .map2(parse.ast.InfixAp(op, _, _))
+        .map2(parse.ast.InfixAp(op, _, _, loc))
 
-    case parse.ast.PrefixAp(op, exp) =>
+    case parse.ast.PrefixAp(op, exp, loc) =>
       SymbolResolver.solveExpr(exp, scope)
-        .map(parse.ast.PrefixAp.apply(op, _))
+        .map(parse.ast.PrefixAp.apply(op, _, loc))
 
-    case parse.ast.App(expr, params) =>
+    case parse.ast.App(expr, params, loc) =>
       (solveExpr(expr, scope), params.traverse(solveExpr(_, scope)))
-        .map2(parse.ast.App)
+        .map2(parse.ast.App(_, _, loc))
 
-    case parse.ast.TypeApp(expr, params) =>
+    case parse.ast.TypeApp(expr, params, loc) =>
       (solveExpr(expr, scope), params.traverse(solveType(_, scope)))
-        .map2(parse.ast.TypeApp)
+        .map2(parse.ast.TypeApp(_, _, loc))
 
-    case parse.ast.Select(expr, member) =>
-      solveExpr(expr, scope).map(parse.ast.Select(_, member))
+    case parse.ast.Select(expr, member, loc) =>
+      solveExpr(expr, scope).map(parse.ast.Select(_, member, loc))
 
-    case parse.ast.If(cond, pos, neg) =>
+    case parse.ast.If(cond, pos, neg, loc) =>
       (solveExpr(cond, scope), solveExpr(pos, scope), neg.traverse(solveExpr(_, scope)))
-        .map3(parse.ast.If)
+        .map3(parse.ast.If(_, _, _, loc))
 
-    case parse.ast.While(cond, body) =>
+    case parse.ast.While(cond, body, loc) =>
       (solveExpr(cond, scope), solveExpr(body, scope))
-        .map2(parse.ast.While)
+        .map2(parse.ast.While(_, _, loc))
 
-    case parse.ast.Assign(left, op, right) =>
+    case parse.ast.Assign(left, op, right, loc) =>
       (solveExpr(left, scope), solveExpr(right, scope))
-        .map2(parse.ast.Assign(_, op, _))
+        .map2(parse.ast.Assign(_, op, _, loc))
 
-    case parse.ast.Block(stmnts) =>
+    case parse.ast.Block(stmnts, loc) =>
       // TODO should forward references be reported here, or should a later pass take care of them?
       val locals = stmnts.collect {
         case parse.ast.ValDef(Symbol.Unresolved(name), _, _) => name
@@ -132,12 +132,12 @@ object SymbolResolver {
       stmnts.toVector.traverse {
         case d: parse.ast.Def => solveDef(d, interiorScope, Local)
         case e: parse.ast.Expression => solveExpr(e, interiorScope)
-      }.map(parse.ast.Block)
+      }.map(parse.ast.Block(_, loc))
 
     case _: parse.ast.IntLit | _: parse.ast.BoolLit | _: parse.ast.StringLit | _: parse.ast.CharLit |
          _: parse.ast.Extern | _: parse.ast.UnitLit | _: parse.ast.FloatLit => Right(e)
 
-    case parse.ast.Widen(_) | parse.ast.Ignore(_) => ??? // theese should only be present after the typer
+    case parse.ast.Widen(_, _) | parse.ast.Ignore(_, _) => ??? // theese should only be present after the typer
   }
 
   private def solveType(t: TypeName, scope: Scope): Res[TypeName] = t match {

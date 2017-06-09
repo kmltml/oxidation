@@ -13,36 +13,48 @@ object ParserTests extends TestSuite {
 
   implicit def unresolvedSymbol(n: String): Symbol = Symbol.Unresolved(n)
 
+  implicit def span(s: (Int, Int)): Span = Span(None, s._1, s._2)
+
+  implicit class SpanConstruct(private val x: Int) {
+
+    def +>(l: Int): Span = x -> (x + l)
+
+  }
+
+  implicit class NewlineNormalizer(private val x: String) {
+    def normalize: String = x.replaceAll("\\r\\n", "\n")
+  }
+
   val tests = apply {
-    val p = new Parser
+    val p = new Parser(None)
     "expression should parse: " - {
       val expr = p.whole(p.expression)
       "int literals" - {
-        expr.parse("42").get.value ==> IntLit(42)
-        expr.parse("0xdeaf").get.value ==> IntLit(0xdeaf)
-        expr.parse("0xffffffffffffffff").get.value ==> IntLit(-1)
+        expr.parse("42").get.value ==> IntLit(42, 0 +> 2)
+        expr.parse("0xdeaf").get.value ==> IntLit(0xdeaf, 0 +> 6)
+        expr.parse("0xffffffffffffffff").get.value ==> IntLit(-1, 0 +> 18)
       }
       "FloatLit" - {
-        expr.parse("0.1").get.value ==> FloatLit(BigDecimal("0.1"))
-        expr.parse("1e+10").get.value ==> FloatLit(BigDecimal("1e+10"))
-        expr.parse("1e10").get.value ==> FloatLit(BigDecimal("1e10"))
-        expr.parse("1e-10").get.value ==> FloatLit(BigDecimal("1e-10"))
+        expr.parse("0.1").get.value ==> FloatLit(BigDecimal("0.1"), 0 +> 3)
+        expr.parse("1e+10").get.value ==> FloatLit(BigDecimal("1e+10"), 0 +> 5)
+        expr.parse("1e10").get.value ==> FloatLit(BigDecimal("1e10"), 0 +> 4)
+        expr.parse("1e-10").get.value ==> FloatLit(BigDecimal("1e-10"), 0 +> 5)
       }
       "bool literals" - {
-        expr.parse("true").get.value ==> BoolLit(true)
-        expr.parse("false").get.value ==> BoolLit(false)
+        expr.parse("true").get.value ==> BoolLit(true, 0 +> 4)
+        expr.parse("false").get.value ==> BoolLit(false, 0 +> 5)
       }
       "char literals" - {
-        expr.parse("'a'").get.value ==> CharLit('a')
-        expr.parse("'0'").get.value ==> CharLit('0')
-        expr.parse("'\\n'").get.value ==> CharLit('\n')
-        expr.parse("'\\\\'").get.value ==> CharLit('\\')
-        expr.parse("'\\''").get.value ==> CharLit('\'')
-        expr.parse("'\\0'").get.value ==> CharLit('\0')
+        expr.parse("'a'").get.value ==> CharLit('a', 0 +> 3)
+        expr.parse("'0'").get.value ==> CharLit('0', 0 +> 3)
+        expr.parse("'\\n'").get.value ==> CharLit('\n', 0 +> 4)
+        expr.parse("'\\\\'").get.value ==> CharLit('\\', 0 +> 4)
+        expr.parse("'\\''").get.value ==> CharLit('\'', 0 +> 4)
+        expr.parse("'\\0'").get.value ==> CharLit('\0', 0 +> 4)
       }
       "string literals" - {
-        expr.parse(""" "Hello, \"world\"!\n" """).get.value ==> StringLit("Hello, \"world\"!\n")
-        expr.parse(""" "Hello, obsolete, zero-terminated world!\0" """).get.value ==> StringLit("Hello, obsolete, zero-terminated world!\0")
+        expr.parse(""" "Hello, \"world\"!\n" """).get.value ==> StringLit("Hello, \"world\"!\n", 1 +> 21)
+        expr.parse(""" "Hello, obsolete, zero-terminated world!\0" """).get.value ==> StringLit("Hello, obsolete, zero-terminated world!\0", 1 +> 43)
       }
       "struct literals" - {
         expr.parse(
@@ -50,178 +62,172 @@ object ParserTests extends TestSuite {
             |  x = 10
             |  y = 20
             |}
-          """.stripMargin).get.value ==> StructLit("Vector", List(
-            "x" -> IntLit(10),
-            "y" -> IntLit(20)
-          ))
+          """.stripMargin.normalize).get.value ==> StructLit("Vector", List(
+            "x" -> IntLit(10, 15 +> 2),
+            "y" -> IntLit(20, 24 +> 2)
+          ), 0 +> 28)
         expr.parse(
           "Vector { x = 10, y = 20 }").get.value ==> StructLit("Vector", List(
-            "x" -> IntLit(10),
-            "y" -> IntLit(20)
-          ))
+            "x" -> IntLit(10, 13 +> 2),
+            "y" -> IntLit(20, 21 +> 2)
+          ), 0 +> 25)
       }
       "unit literal" - {
-        expr.parse("()").get.value ==> UnitLit()
+        expr.parse("()").get.value ==> UnitLit(0 +> 2)
       }
       "addition" - {
-        expr.parse("2 + 3").get.value ==> InfixAp(InfixOp.Add, IntLit(2), IntLit(3))
+        expr.parse("2 + 3").get.value ==> InfixAp(InfixOp.Add, IntLit(2, 0 +> 1), IntLit(3, 4 +> 1), 0 +> 5)
         expr.parse("2 + 3 + 4").get.value ==>
-          InfixAp(InfixOp.Add, InfixAp(InfixOp.Add, IntLit(2), IntLit(3)), IntLit(4))
+          InfixAp(InfixOp.Add, InfixAp(InfixOp.Add, IntLit(2, 0 +> 1), IntLit(3, 4 +> 1), 0 +> 5), IntLit(4, 8 +> 1), 0 +> 9)
       }
       "multiplication" - {
-        expr.parse("2 * 3").get.value ==> InfixAp(InfixOp.Mul, IntLit(2), IntLit(3))
+        expr.parse("2 * 3").get.value ==> InfixAp(InfixOp.Mul, IntLit(2, 0 +> 1), IntLit(3, 4 +> 1), 0 +> 5)
       }
       "InfixAp" - {
-        "And"    - { expr.parse("true && true").get.value ==> InfixAp(InfixOp.And, BoolLit(true), BoolLit(true)) }
-        "Or"     - { expr.parse("true || true").get.value ==> InfixAp(InfixOp.Or, BoolLit(true), BoolLit(true)) }
-        "BitOr"  - { expr.parse("true | true").get.value  ==> InfixAp(InfixOp.BitOr, BoolLit(true), BoolLit(true)) }
-        "BitAnd" - { expr.parse("true & true").get.value  ==> InfixAp(InfixOp.BitAnd, BoolLit(true), BoolLit(true)) }
-        "Xor"    - { expr.parse("true ^ true").get.value  ==> InfixAp(InfixOp.Xor, BoolLit(true), BoolLit(true)) }
+        "And"    - { expr.parse("true && true").get.value ==> InfixAp(InfixOp.And, BoolLit(true, 0 +> 4), BoolLit(true, 8 +> 4), 0 +> 12) }
+        "Or"     - { expr.parse("true || true").get.value ==> InfixAp(InfixOp.Or, BoolLit(true, 0 +> 4), BoolLit(true, 8 +> 4), 0 +> 12) }
+        "BitOr"  - { expr.parse("true | true").get.value  ==> InfixAp(InfixOp.BitOr, BoolLit(true, 0 +> 4), BoolLit(true, 7 +> 4), 0 +> 11) }
+        "BitAnd" - { expr.parse("true & true").get.value  ==> InfixAp(InfixOp.BitAnd, BoolLit(true, 0 +> 4), BoolLit(true, 7 +> 4), 0 +> 11) }
+        "Xor"    - { expr.parse("true ^ true").get.value  ==> InfixAp(InfixOp.Xor, BoolLit(true, 0 +> 4), BoolLit(true, 7 +> 4), 0 +> 11) }
       }
       "mixed priorities" - {
         expr.parse("2 + 3 * 4").get.value ==>
-          InfixAp(InfixOp.Add, IntLit(2), InfixAp(InfixOp.Mul, IntLit(3), IntLit(4)))
+          InfixAp(InfixOp.Add, IntLit(2, 0 +> 1), InfixAp(InfixOp.Mul, IntLit(3, 4 +> 1), IntLit(4, 8 +> 1), 4 +> 5), 0 +> 9)
       }
       "var access" - {
         for (name <- Seq("foo", "foo2", "Bar", "foo_bar", "$foobar", "_foo", "x", "if_", "definition")) {
-          expr.parse(name).get.value ==> Var(name)
+          expr.parse(name).get.value ==> Var(name, 0 +> name.length)
         }
         assertFail(expr.parse("foo bar"))
         assertFail(expr.parse("if"))
       }
       "simple arithmetic involving vars" - {
         expr.parse("i + 1").get.value ==>
-          InfixAp(InfixOp.Add, Var("i"), IntLit(1))
+          InfixAp(InfixOp.Add, Var("i", 0 +> 1), IntLit(1, 4 +> 1), 0 +> 5)
         expr.parse("foo >= bar").get.value ==>
-          InfixAp(InfixOp.Geq, Var("foo"), Var("bar"))
+          InfixAp(InfixOp.Geq, Var("foo", 0 +> 3), Var("bar", 7 +> 3), 0 +> 10)
       }
       "parenthesised expression" - {
         expr.parse("(a + b) * c").get.value ==>
-          InfixAp(InfixOp.Mul, InfixAp(InfixOp.Add, Var("a"), Var("b")), Var("c"))
+          InfixAp(InfixOp.Mul, InfixAp(InfixOp.Add, Var("a", 1 +> 1), Var("b", 5 +> 1), 0 +> 7), Var("c", 10 +> 1), 0 +> 11)
       }
       "a prefix operator application" - {
-        expr.parse("-1").get.value ==> PrefixAp(PrefixOp.Neg, IntLit(1))
-        expr.parse("~1").get.value ==> PrefixAp(PrefixOp.Inv, IntLit(1))
-        expr.parse("!1").get.value ==> PrefixAp(PrefixOp.Not, IntLit(1))
+        expr.parse("-1").get.value ==> PrefixAp(PrefixOp.Neg, IntLit(1, 1 +> 1), 0 +> 2)
+        expr.parse("~1").get.value ==> PrefixAp(PrefixOp.Inv, IntLit(1, 1 +> 1), 0 +> 2)
+        expr.parse("!1").get.value ==> PrefixAp(PrefixOp.Not, IntLit(1, 1 +> 1), 0 +> 2)
         expr.parse("-1 + ~2").get.value ==>
           InfixAp(InfixOp.Add,
-            PrefixAp(PrefixOp.Neg, IntLit(1)),
-            PrefixAp(PrefixOp.Inv, IntLit(2)))
+            PrefixAp(PrefixOp.Neg, IntLit(1, 1 +> 1), 0 +> 2),
+            PrefixAp(PrefixOp.Inv, IntLit(2, 6 +> 1), 5 +> 2), 0 +> 7)
       }
       "a block expression" - {
-        expr.parse("{ 1 }").get.value ==> Block(Vector(IntLit(1)))
+        expr.parse("{ 1 }").get.value ==> Block(Vector(IntLit(1, 2 +> 1)), 0 +> 5)
         expr.parse(
           """{
             |  foo
             |  bar; baz
             |}
-          """.stripMargin).get.value ==>
+          """.stripMargin.normalize).get.value ==>
             Block(Vector(
-              Var("foo"), Var("bar"), Var("baz")
-            ))
+              Var("foo", 4 +> 3), Var("bar", 10 +> 3), Var("baz", 15 +> 3)
+            ), 0 +> 20)
         assertFail(expr.parse("""{ foo bar }"""))
         expr.parse(
           """{
             |  foo
             |  (bar)
             |}
-          """.stripMargin).get.value ==>
+          """.stripMargin.normalize).get.value ==>
             Block(Vector(
-              Var("foo"), Var("bar")
-            ))
+              Var("foo", 4 +> 3), Var("bar", 10 +> 5)
+            ), 0 +> 17)
         expr.parse(
           """{
             |  val x = 10
             |  x + 1
             |}
-          """.stripMargin).get.value ==>
+          """.stripMargin.normalize).get.value ==>
             Block(Vector(
-              ValDef("x", None, IntLit(10)),
-              InfixAp(InfixOp.Add, Var("x"), IntLit(1))
-            ))
+              ValDef("x", None, IntLit(10, 12 +> 2)),
+              InfixAp(InfixOp.Add, Var("x", 17 +> 1), IntLit(1, 21 +> 1), 17 +> 5)
+            ), 0 +> 24)
         expr.parse(
           """{
             |  val x = 10
             |  val y = 20
             |  x + y
             |}
-          """.stripMargin).get.value ==>
+          """.stripMargin.normalize).get.value ==>
             Block(Vector(
-              ValDef("x", None, IntLit(10)),
-              ValDef("y", None, IntLit(20)),
-              InfixAp(InfixOp.Add, Var("x"), Var("y"))
-            ))
+              ValDef("x", None, IntLit(10, 12 +> 2)),
+              ValDef("y", None, IntLit(20, 25 +> 2)),
+              InfixAp(InfixOp.Add, Var("x", 30 +> 1), Var("y", 34 +> 1), 30 +> 5)
+            ), 0 +> 37)
         "whitespace before semicolon" - {
           expr.parse(
             """{
               |  val x = 10 // hello
               |  x + 20
               |}
-            """.stripMargin).get.value ==>
+            """.stripMargin.normalize).get.value ==>
             Block(Vector(
-              ValDef("x", None, IntLit(10)),
-              InfixAp(InfixOp.Add, Var("x"), IntLit(20))
-            ))
-          // Notice extra whitespace following the val declaration line
-          // It has to stay there for this test to fulfill it's purpose
+              ValDef("x", None, IntLit(10, 12 +> 2)),
+              InfixAp(InfixOp.Add, Var("x", 26 +> 1), IntLit(20, 30 +> 2), 26 +> 6)
+            ), 0 +> 34)
           expr.parse(
-            """{
-              |  val x = 10
-              |  x + 20
-              |}
-            """.stripMargin).get.value ==>
+            "{\n  val x = 10    \n  x + 20\n}").get.value ==>
             Block(Vector(
-              ValDef("x", None, IntLit(10)),
-              InfixAp(InfixOp.Add, Var("x"), IntLit(20))
-            ))
+              ValDef("x", None, IntLit(10, 12 +> 2)),
+              InfixAp(InfixOp.Add, Var("x", 21 +> 1), IntLit(20, 25 +> 2), 21 +> 6)
+            ), 0 +> 29)
           expr.parse(
             """{
               |  val x = 10 /* hidere */
               |  x + 20
               |}
-            """.stripMargin).get.value ==>
+            """.stripMargin.normalize).get.value ==>
             Block(Vector(
-              ValDef("x", None, IntLit(10)),
-              InfixAp(InfixOp.Add, Var("x"), IntLit(20))
-            ))
+              ValDef("x", None, IntLit(10, 12 +> 2)),
+              InfixAp(InfixOp.Add, Var("x", 30 +> 1), IntLit(20, 34 +> 2), 30 +> 6)
+            ), 0 +> 38)
         }
       }
       "a function call" - {
-        expr.parse("foo()").get.value ==> App(Var("foo"), Nil)
-        expr.parse("foo(1, 2)").get.value ==> App(Var("foo"), List(IntLit(1), IntLit(2)))
-        expr.parse("foo(1)(2)").get.value ==> App(App(Var("foo"), List(IntLit(1))), List(IntLit(2)))
+        expr.parse("foo()").get.value ==> App(Var("foo", 0 +> 3), Nil, 0 +> 5)
+        expr.parse("foo(1, 2)").get.value ==> App(Var("foo", 0 +> 3), List(IntLit(1, 4 +> 1), IntLit(2, 7 +> 1)), 0 +> 9)
+        expr.parse("foo(1)(2)").get.value ==> App(App(Var("foo", 0 +> 3), List(IntLit(1, 4 +> 1)), 0 +> 6), List(IntLit(2, 7 +> 1)), 0 +> 9)
       }
       "a template application" - {
-        expr.parse("foo[i32]").get.value ==> TypeApp(Var("foo"), List(TypeName.Named("i32")))
+        expr.parse("foo[i32]").get.value ==> TypeApp(Var("foo", 0 +> 3), List(TypeName.Named("i32")), 0 +> 8)
         expr.parse("identity[i32](42)").get.value ==>
-          App(TypeApp(Var("identity"), List(TypeName.Named("i32"))), List(IntLit(42)))
+          App(TypeApp(Var("identity", 0 +> 8), List(TypeName.Named("i32")), 0 +> 13), List(IntLit(42, 14 +> 2)), 0 +> 17)
       }
       "a member access" - {
-        expr.parse("foo.bar").get.value ==> Select(Var("foo"), "bar")
+        expr.parse("foo.bar").get.value ==> Select(Var("foo", 0 +> 3), "bar", 0 +> 7)
       }
       "an if expression" - {
-        expr.parse("if(true) 1 else 0").get.value ==> If(BoolLit(true), IntLit(1), Some(IntLit(0)))
-        expr.parse("if(foo) bar()").get.value ==> If(Var("foo"), App(Var("bar"), Nil), None)
+        expr.parse("if(true) 1 else 0").get.value ==> If(BoolLit(true, 3 +> 4), IntLit(1, 9 +> 1), Some(IntLit(0, 16 +> 1)), 0 +> 17)
+        expr.parse("if(foo) bar()").get.value ==> If(Var("foo", 3 +> 3), App(Var("bar", 8 +> 3), Nil, 8 +> 5), None, 0 +> 13)
       }
       "a while loop" - {
-        expr.parse("while(foo) bar()").get.value ==> While(Var("foo"), App(Var("bar"), Nil))
+        expr.parse("while(foo) bar()").get.value ==> While(Var("foo", 6 +> 3), App(Var("bar", 11 +> 3), Nil, 11 +> 5), 0 +> 16)
       }
       "a variable assignment" - {
-        expr.parse("foo = 42").get.value ==> Assign(Var("foo"), None, IntLit(42))
+        expr.parse("foo = 42").get.value ==> Assign(Var("foo", 0 +> 3), None, IntLit(42, 6 +> 2), 0 +> 8)
         expr.parse("foo.bar(32).baz += 6").get.value ==>
-          Assign(Select(App(Select(Var("foo"), "bar"), List(IntLit(32))), "baz"), Some(InfixOp.Add), IntLit(6))
+          Assign(Select(App(Select(Var("foo", 0 +> 3), "bar", 0 +> 7), List(IntLit(32, 8 +> 2)), 0 +> 11), "baz", 0 +> 15), Some(InfixOp.Add), IntLit(6, 19 +> 1), 0 +> 20)
 
-        expr.parse("foo = bar").get.value ==> Assign(Var("foo"), None, Var("bar"))
-        expr.parse("foo += bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Add), Var("bar"))
-        expr.parse("foo -= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Sub), Var("bar"))
-        expr.parse("foo *= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Mul), Var("bar"))
-        expr.parse("foo /= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Div), Var("bar"))
-        expr.parse("foo %= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Mod), Var("bar"))
-        expr.parse("foo <<= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Shl), Var("bar"))
-        expr.parse("foo >>= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Shr), Var("bar"))
-        expr.parse("foo ^= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.Xor), Var("bar"))
-        expr.parse("foo &= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.BitAnd), Var("bar"))
-        expr.parse("foo |= bar").get.value ==> Assign(Var("foo"), Some(InfixOp.BitOr), Var("bar"))
+        expr.parse("foo = bar").get.value ==> Assign(Var("foo", 0 +> 3), None, Var("bar", 6 +> 3), 0 +> 9)
+        expr.parse("foo += bar").get.value ==> Assign(Var("foo", 0 +> 3), Some(InfixOp.Add), Var("bar", 7 +> 3), 0 +> 10)
+        expr.parse("foo -= bar").get.value ==> Assign(Var("foo", 0 +> 3), Some(InfixOp.Sub), Var("bar", 7 +> 3), 0 +> 10)
+        expr.parse("foo *= bar").get.value ==> Assign(Var("foo", 0 +> 3), Some(InfixOp.Mul), Var("bar", 7 +> 3), 0 +> 10)
+        expr.parse("foo /= bar").get.value ==> Assign(Var("foo", 0 +> 3), Some(InfixOp.Div), Var("bar", 7 +> 3), 0 +> 10)
+        expr.parse("foo %= bar").get.value ==> Assign(Var("foo", 0 +> 3), Some(InfixOp.Mod), Var("bar", 7 +> 3), 0 +> 10)
+        expr.parse("foo <<= bar").get.value ==> Assign(Var("foo", 0 +> 3), Some(InfixOp.Shl), Var("bar", 8 +> 3), 0 +> 11)
+        expr.parse("foo >>= bar").get.value ==> Assign(Var("foo", 0 +> 3), Some(InfixOp.Shr), Var("bar", 8 +> 3), 0 +> 11)
+        expr.parse("foo ^= bar").get.value ==> Assign(Var("foo", 0 +> 3), Some(InfixOp.Xor), Var("bar", 7 +> 3), 0 +> 10)
+        expr.parse("foo &= bar").get.value ==> Assign(Var("foo", 0 +> 3), Some(InfixOp.BitAnd), Var("bar", 7 +> 3), 0 +> 10)
+        expr.parse("foo |= bar").get.value ==> Assign(Var("foo", 0 +> 3), Some(InfixOp.BitOr), Var("bar", 7 +> 3), 0 +> 10)
       }
     }
 
@@ -233,23 +239,23 @@ object ParserTests extends TestSuite {
             DefDef("foo",
               Some(List(Param("i", TypeName.Named("i32")))),
               Some(TypeName.Named("i32")),
-              InfixAp(InfixOp.Add, Var("i"), IntLit(2)))
+              InfixAp(InfixOp.Add, Var("i", 23 +> 1), IntLit(2, 27 +> 1), 23 +> 5))
         }
         "extern" - {
           defn.parse("def foo(i: i32): i32 = extern").get.value ==>
             DefDef("foo",
               Some(List(Param("i", TypeName.Named("i32")))),
               Some(TypeName.Named("i32")),
-              Extern())
+              Extern(23 +> 6))
         }
       }
       "a variable definition" - {
-        defn.parse("var foo = 10").get.value ==> VarDef("foo", None, IntLit(10))
-        defn.parse("var foo: i32 = 10").get.value ==> VarDef("foo", Some(TypeName.Named("i32")), IntLit(10))
+        defn.parse("var foo = 10").get.value ==> VarDef("foo", None, IntLit(10, 10 +> 2))
+        defn.parse("var foo: i32 = 10").get.value ==> VarDef("foo", Some(TypeName.Named("i32")), IntLit(10, 15 +> 2))
       }
       "a value binding" - {
-        defn.parse("val foo = 10").get.value ==> ValDef("foo", None, IntLit(10))
-        defn.parse("val foo: i32 = 10").get.value ==> ValDef("foo", Some(TypeName.Named("i32")), IntLit(10))
+        defn.parse("val foo = 10").get.value ==> ValDef("foo", None, IntLit(10, 10 +> 2))
+        defn.parse("val foo: i32 = 10").get.value ==> ValDef("foo", Some(TypeName.Named("i32")), IntLit(10, 15 +> 2))
       }
       "a struct definition" - {
         defn.parse(

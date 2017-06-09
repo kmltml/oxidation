@@ -1,7 +1,7 @@
 package oxidation
 package analyze
 
-import parse.{ast => P}
+import parse.{Span, ast => P}
 import Type._
 import cats._
 import cats.data._
@@ -12,42 +12,42 @@ object Typer {
   type TyperResult[A] = Either[TyperError, A]
 
   def solveType(expression: P.Expression, expected: ExpectedType, ctxt: Ctxt): TyperResult[Typed[ast.Expression]] = expression match {
-    case P.IntLit(i) =>
+    case P.IntLit(i, loc) =>
       expected match {
-        case ExpectedType.Numeric(None) | ExpectedType.Undefined => Right(Typed(ast.IntLit(i), I32))
-        case ExpectedType.Numeric(Some(t: Integral)) => Right(Typed(ast.IntLit(i), t))
-        case ExpectedType.Specific(t: Integral) => Right(Typed(ast.IntLit(i), t))
-        case _ => unifyType(Typed(ast.IntLit(i), I32), expected)
+        case ExpectedType.Numeric(None) | ExpectedType.Undefined => Right(Typed(ast.IntLit(i, loc), I32))
+        case ExpectedType.Numeric(Some(t: Integral)) => Right(Typed(ast.IntLit(i, loc), t))
+        case ExpectedType.Specific(t: Integral) => Right(Typed(ast.IntLit(i, loc), t))
+        case _ => unifyType(Typed(ast.IntLit(i, loc), I32), expected)
       }
 
-    case P.FloatLit(f) =>
+    case P.FloatLit(f, loc) =>
       expected match {
-        case ExpectedType.Numeric(None) | ExpectedType.Undefined => Right(Typed(ast.FloatLit(f), F64))
-        case ExpectedType.Numeric(Some(t: F)) => Right(Typed(ast.FloatLit(f), t))
-        case ExpectedType.Specific(t: F) => Right(Typed(ast.FloatLit(f), t))
-        case _ => unifyType(Typed(ast.FloatLit(f), F64), expected)
+        case ExpectedType.Numeric(None) | ExpectedType.Undefined => Right(Typed(ast.FloatLit(f, loc), F64))
+        case ExpectedType.Numeric(Some(t: F)) => Right(Typed(ast.FloatLit(f, loc), t))
+        case ExpectedType.Specific(t: F) => Right(Typed(ast.FloatLit(f, loc), t))
+        case _ => unifyType(Typed(ast.FloatLit(f, loc), F64), expected)
       }
 
-    case P.BoolLit(b) => unifyType(Typed(ast.BoolLit(b), U1), expected)
+    case P.BoolLit(b, loc) => unifyType(Typed(ast.BoolLit(b, loc), U1), expected)
 
-    case P.CharLit(c) => unifyType(Typed(ast.CharLit(c), U8), expected)
+    case P.CharLit(c, loc) => unifyType(Typed(ast.CharLit(c, loc), U8), expected)
 
-    case P.StringLit(s) => unifyType(Typed(ast.StringLit(s), BuiltinSymbols.StrType), expected)
+    case P.StringLit(s, loc) => unifyType(Typed(ast.StringLit(s, loc), BuiltinSymbols.StrType), expected)
 
-    case P.UnitLit() => unifyType(Typed(ast.UnitLit(), U0), expected)
+    case P.UnitLit(loc) => unifyType(Typed(ast.UnitLit(loc), U0), expected)
 
-    case P.Extern() => expected match {
-      case ExpectedType.Specific(t) => Right(Typed(ast.Extern(), t))
+    case P.Extern(loc) => expected match {
+      case ExpectedType.Specific(t) => Right(Typed(ast.Extern(loc), t))
       case _ => Left(TyperError.ExternNoExplicitType())
     }
 
-    case P.App(P.TypeApp(P.Var(Symbol.Global(List("cast"))), List(target)), List(src)) =>
-      solveType(src, ExpectedType.Undefined, ctxt).map(cast(target, _, ctxt))
+    case P.App(P.TypeApp(P.Var(Symbol.Global(List("cast")), _), List(target), _), List(src), loc) =>
+      solveType(src, ExpectedType.Undefined, ctxt).map(cast(target, _, loc, ctxt))
 
-    case P.TypeApp(P.Var(Symbol.Global(List("stackalloc"))), List(pointee)) =>
-      unifyType(Typed(ast.Stackalloc(lookupType(pointee, ctxt)), Ptr(lookupType(pointee, ctxt))), expected)
+    case P.TypeApp(P.Var(Symbol.Global(List("stackalloc")), _), List(pointee), loc) =>
+      unifyType(Typed(ast.Stackalloc(lookupType(pointee, ctxt), loc), Ptr(lookupType(pointee, ctxt))), expected)
 
-    case P.App(P.TypeApp(P.Var(Symbol.Global(List("arr"))), membertn :: typeTail), termParams) =>
+    case P.App(P.TypeApp(P.Var(Symbol.Global(List("arr")), _), membertn :: typeTail, _), termParams, loc) =>
       for {
         size <- typeTail.headOption traverse {
           case TypeName.IntLiteral(i) => Right(i.toInt)
@@ -59,16 +59,16 @@ object Typer {
         }
         memberType = lookupType(membertn, ctxt)
         typedParams <- termParams.traverse(solveType(_, ExpectedType.Specific(memberType), ctxt))
-      } yield Typed(ast.ArrLit(typedParams), Arr(memberType, size getOrElse typedParams.size))
+      } yield Typed(ast.ArrLit(typedParams, loc), Arr(memberType, size getOrElse typedParams.size))
 
-    case P.App(P.Var(sqrt @ Symbol.Global(List("sqrt"))), List(param)) =>
+    case P.App(P.Var(sqrt @ Symbol.Global(List("sqrt")), sqrtloc), List(param), loc) =>
       for {
         typedParam <- solveType(param, ExpectedType.Numeric(None), ctxt)
         pt = typedParam.typ
         _ <- Either.cond(pt.isInstanceOf[Type.F], (), TyperError.CantMatch(ExpectedType.Specific(Type.F64), pt))
-      } yield Typed(ast.App(Typed(ast.Var(sqrt), Type.Fun(List(pt), pt)), List(typedParam)), pt)
+      } yield Typed(ast.App(Typed(ast.Var(sqrt, sqrtloc), Type.Fun(List(pt), pt)), List(typedParam), loc), pt)
 
-    case P.StructLit(name, members) =>
+    case P.StructLit(name, members, loc) =>
       for {
         struct <- lookupType(TypeName.Named(name), ctxt) match {
           case s: Struct => Right(s)
@@ -82,27 +82,27 @@ object Typer {
             val expectedType = ExpectedType.Specific(typesMap(name))
             solveType(expr, expectedType, ctxt).map(name -> _)
         }
-      } yield Typed(ast.StructLit(name, typedMembers), struct)
+      } yield Typed(ast.StructLit(name, typedMembers, loc), struct)
 
-    case P.PrefixAp(PrefixOp.Inv, right) =>
+    case P.PrefixAp(PrefixOp.Inv, right, loc) =>
       for {
         rtyped <- solveType(right, ExpectedType.Numeric(None), ctxt)
-        t <- unifyType(Typed(ast.PrefixAp(PrefixOp.Inv, rtyped), rtyped.typ), expected)
+        t <- unifyType(Typed(ast.PrefixAp(PrefixOp.Inv, rtyped, loc), rtyped.typ), expected)
       } yield t
 
-    case P.PrefixAp(PrefixOp.Neg, right) =>
+    case P.PrefixAp(PrefixOp.Neg, right, loc) =>
       for {
         rtyped <- solveType(right, ExpectedType.Numeric(None), ctxt)
-        t <- unifyType(Typed(ast.PrefixAp(PrefixOp.Neg, rtyped), signed(rtyped.typ)), expected)
+        t <- unifyType(Typed(ast.PrefixAp(PrefixOp.Neg, rtyped, loc), signed(rtyped.typ)), expected)
       } yield t
 
-    case P.PrefixAp(PrefixOp.Not, right) =>
+    case P.PrefixAp(PrefixOp.Not, right, loc) =>
       for {
         rtyped <- solveType(right, ExpectedType.Specific(U1), ctxt)
-        t <- unifyType(Typed(ast.PrefixAp(PrefixOp.Not, rtyped), rtyped.typ), expected)
+        t <- unifyType(Typed(ast.PrefixAp(PrefixOp.Not, rtyped, loc), rtyped.typ), expected)
       } yield t
 
-    case P.InfixAp(op, left, right) =>
+    case P.InfixAp(op, left, right, loc) =>
       op match {
         case InfixOp.Add | InfixOp.Sub | InfixOp.Mul | InfixOp.Div |
              InfixOp.Mod | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Shl | InfixOp.Shr =>
@@ -115,7 +115,7 @@ object Typer {
             ltyped <- solveType(left, lexpected, ctxt)
             rtyped <- solveType(right, ExpectedType.Numeric(Some(ltyped.typ)), ctxt)
             lunified <- unifyType(ltyped, ExpectedType.Specific(rtyped.typ))
-            t <- unifyType(Typed(ast.InfixAp(op, lunified, rtyped), rtyped.typ), expected)
+            t <- unifyType(Typed(ast.InfixAp(op, lunified, rtyped, loc), rtyped.typ), expected)
           } yield t
 
         case InfixOp.Eq | InfixOp.Neq =>
@@ -126,7 +126,7 @@ object Typer {
               case t => ExpectedType.Specific(t)
             }
             rtyped <- solveType(right, rightExpected, ctxt)
-            t <- unifyType(Typed(ast.InfixAp(op, ltyped, rtyped): ast.Expression, U1), expected)
+            t <- unifyType(Typed(ast.InfixAp(op, ltyped, rtyped, loc): ast.Expression, U1), expected)
           } yield t
 
         case InfixOp.Geq | InfixOp.Gt | InfixOp.Lt | InfixOp.Leq =>
@@ -134,16 +134,16 @@ object Typer {
             ltyped <- solveType(left, ExpectedType.Numeric(None), ctxt)
             rtyped <- solveType(right, ExpectedType.Numeric(Some(ltyped.typ)), ctxt)
             widerType = wider(ltyped.typ, rtyped.typ)
-            lwidened = if (ltyped.typ == widerType) ltyped else Typed(ast.Widen(ltyped), widerType)
-            rwidened = if (rtyped.typ == widerType) rtyped else Typed(ast.Widen(rtyped), widerType)
-            t <- unifyType(Typed(ast.InfixAp(op, lwidened, rwidened): ast.Expression, U1), expected)
+            lwidened = if (ltyped.typ == widerType) ltyped else Typed(ast.Widen(ltyped, ltyped.expr.loc), widerType)
+            rwidened = if (rtyped.typ == widerType) rtyped else Typed(ast.Widen(rtyped, rtyped.expr.loc), widerType)
+            t <- unifyType(Typed(ast.InfixAp(op, lwidened, rwidened, loc): ast.Expression, U1), expected)
           } yield t
 
         case InfixOp.And | InfixOp.Or =>
           for {
             ltyped <- solveType(left, ExpectedType.Specific(U1), ctxt)
             rtyped <- solveType(right, ExpectedType.Specific(U1), ctxt)
-            t <- unifyType(Typed(ast.InfixAp(op, ltyped, rtyped), U1), expected)
+            t <- unifyType(Typed(ast.InfixAp(op, ltyped, rtyped, loc), U1), expected)
           } yield t
 
         case InfixOp.Xor =>
@@ -155,11 +155,11 @@ object Typer {
               case t => Left(TyperError.CantMatch(ExpectedType.Undefined, t))
             }
             rtyped <- solveType(right, rightExpected, ctxt)
-            t <- unifyType(Typed(ast.InfixAp(op, ltyped, rtyped): ast.Expression, U1), expected) // TODO support xor on integers
+            t <- unifyType(Typed(ast.InfixAp(op, ltyped, rtyped, loc): ast.Expression, U1), expected) // TODO support xor on integers
           } yield t
       }
 
-    case P.App(fn, pars) =>
+    case P.App(fn, pars, loc) =>
       for {
         fnTyped <- solveType(fn, ExpectedType.Appliable, ctxt)
         typedParams <- fnTyped.typ match {
@@ -183,16 +183,16 @@ object Typer {
           case Ptr(pointee) => Right(pointee)
           case Arr(member, _) => Right(member)
         }
-        t <- unifyType(Typed(ast.App(fnTyped, typedParams), valType), expected)
+        t <- unifyType(Typed(ast.App(fnTyped, typedParams, loc), valType), expected)
       } yield t
 
 
-    case P.Var(name) =>
+    case P.Var(name, loc) =>
       ctxt.terms.get(name)
         .toRight(TyperError.SymbolNotFound(name))
-        .flatMap(t => unifyType(Typed(ast.Var(name), t.typ), expected))
+        .flatMap(t => unifyType(Typed(ast.Var(name, loc), t.typ), expected))
 
-    case P.Select(expr, member) =>
+    case P.Select(expr, member, loc) =>
       for {
         exprTyped <- solveType(expr, ExpectedType.Undefined, ctxt)
         memberType <- exprTyped.typ match {
@@ -203,17 +203,17 @@ object Typer {
           case t =>
             Left(TyperError.MemberNotFound(member, t))
         }
-        t <- unifyType(Typed(ast.Select(exprTyped, member), memberType), expected)
+        t <- unifyType(Typed(ast.Select(exprTyped, member, loc), memberType), expected)
       } yield t
 
-    case P.If(cond, pos, None) =>
+    case P.If(cond, pos, None, loc) =>
       for {
         condTyped <- solveType(cond, ExpectedType.Specific(U1), ctxt)
         posTyped <- solveType(pos, ExpectedType.Undefined, ctxt)
-        t <- unifyType(Typed(ast.If(condTyped, posTyped, None), U0), expected)
+        t <- unifyType(Typed(ast.If(condTyped, posTyped, None, loc), U0), expected)
       } yield t
 
-    case P.If(cond, pos, Some(neg)) =>
+    case P.If(cond, pos, Some(neg), loc) =>
       for {
         condTyped <- solveType(cond, ExpectedType.Specific(U1), ctxt)
         posTyped <- solveType(pos, expected, ctxt)
@@ -228,20 +228,20 @@ object Typer {
           case (a, b) if a == b => a
           case (a, b) => wider(a, b) // TODO case this for numeric types only
         }
-        res <- unifyType(Typed(ast.If(condTyped, posTyped, Some(negTyped)), t), expected)
+        res <- unifyType(Typed(ast.If(condTyped, posTyped, Some(negTyped), loc), t), expected)
       } yield res
 
-    case P.While(cond, body) =>
+    case P.While(cond, body, loc) =>
       for {
         condTyped <- solveType(cond, ExpectedType.Specific(U1), ctxt)
         bodyTyped <- solveType(body, ExpectedType.Undefined, ctxt)
-        t <- unifyType(Typed(ast.While(condTyped, bodyTyped), U0), expected)
+        t <- unifyType(Typed(ast.While(condTyped, bodyTyped, loc), U0), expected)
       } yield t
 
-    case P.Block(Vector()) =>
-      unifyType(Typed(ast.Block(Vector.empty), U0), expected)
+    case P.Block(Vector(), loc) =>
+      unifyType(Typed(ast.Block(Vector.empty, loc), U0), expected)
 
-    case P.Block(stmnts) =>
+    case P.Block(stmnts, loc) =>
       type S[A] = StateT[TyperResult, Ctxt, A]
       def stmnt(s: P.BlockStatement, ex: ExpectedType): S[Typed[ast.BlockStatement]] = s match {
         case e: P.Expression =>
@@ -271,40 +271,40 @@ object Typer {
       (for {
         body <- stmnts.init.traverse(stmnt(_, ExpectedType.Undefined))
         last <- stmnt(stmnts.last, expected)
-        t <- StateT.lift(unifyType(Typed(ast.Block(body :+ last), last.typ), expected))
+        t <- StateT.lift(unifyType(Typed(ast.Block(body :+ last, loc), last.typ), expected))
       } yield t).runA(ctxt)
 
-    case P.Assign(l, Some(op), r) =>
-      solveType(P.Assign(l, None, P.InfixAp(op, l, r)), expected, ctxt)
+    case P.Assign(l, Some(op), r, loc) =>
+      solveType(P.Assign(l, None, P.InfixAp(op, l, r, loc), loc), expected, ctxt)
 
-    case P.Assign(lval, None, rval) =>
+    case P.Assign(lval, None, rval, loc) =>
       for {
         ltyped <- solveLVal(lval, ctxt)
         rtyped <- solveType(rval, ExpectedType.Specific(ltyped.typ), ctxt)
-        t <- unifyType(Typed(ast.Assign(ltyped, None, rtyped), U0), expected)
+        t <- unifyType(Typed(ast.Assign(ltyped, None, rtyped, loc), U0), expected)
       } yield t
   }
 
   private def solveLVal(e: P.Expression, ctxt: Ctxt): TyperResult[Typed[ast.Expression]] = e match {
-    case P.Var(s) => ctxt.terms(s) match {
-      case Ctxt.Mutable(t) => Right(Typed(ast.Var(s), t))
+    case P.Var(s, loc) => ctxt.terms(s) match {
+      case Ctxt.Mutable(t) => Right(Typed(ast.Var(s, loc), t))
       case Ctxt.Immutable(_) => Left(TyperError.ImmutableAssign(s))
     }
-    case P.Select(s, member) =>
+    case P.Select(s, member, loc) =>
       solveLVal(s, ctxt).flatMap {
         case src @ Typed(_, struct @ Struct(_, members)) =>
           members.find(_.name == member) map {
-            case StructMember(_, typ) => Typed(ast.Select(src, member), typ)
+            case StructMember(_, typ) => Typed(ast.Select(src, member, loc), typ)
           } toRight TyperError.MemberNotFound(member, struct)
       }
     case e => solveType(e, ExpectedType.Undefined, ctxt).flatMap {
-      case lTyped @ Typed(ast.App(Typed(ptr, _: Ptr), _), _) => Right(lTyped)
-      case lTyped @ Typed(ast.App(Typed(_, _: Arr), _), _) => Right(lTyped) // TODO arr ref too has to be an lval
+      case lTyped @ Typed(ast.App(Typed(ptr, _: Ptr), _, _), _) => Right(lTyped)
+      case lTyped @ Typed(ast.App(Typed(_, _: Arr), _, _), _) => Right(lTyped) // TODO arr ref too has to be an lval
       case e => Left(TyperError.NotAnLVal(e))
     }
   }
 
-  private def cast(target: TypeName, src: Typed[ast.Expression], ctxt: Ctxt): Typed[ast.Expression] =
+  private def cast(target: TypeName, src: Typed[ast.Expression], loc: Span, ctxt: Ctxt): Typed[ast.Expression] =
     (lookupType(target, ctxt), src.typ) match {
       case (a, b) if a == b => src
       case (t: Integral, s: Integral) =>
@@ -312,10 +312,10 @@ object Typer {
         if(w == t) widen(src, t)
         else trim(src, t)
       case (t: Integral, s: Type.F) =>
-        Typed(ast.Convert(src), t)
+        Typed(ast.Convert(src, loc), t)
       case (t: Type.F, s: Integral) =>
-        Typed(ast.Convert(src), t)
-      case (t @ Ptr(_), Ptr(_) | U64) => Typed(ast.Reinterpret(src), t)
+        Typed(ast.Convert(src, loc), t)
+      case (t @ Ptr(_), Ptr(_) | U64) => Typed(ast.Reinterpret(src, loc), t)
     }
 
   def lookupType(t: TypeName, ctxt: Ctxt): Type = t match {
@@ -368,7 +368,7 @@ object Typer {
     case (_, ExpectedType.Appliable) => Left(TyperError.CantMatch(expected, t.typ))
 
     case (typ, ExpectedType.Specific(U0))
-      if typ != U0 => Right(Typed(ast.Ignore(t), U0))
+      if typ != U0 => Right(Typed(ast.Ignore(t, t.expr.loc), U0))
 
     case (typ, ExpectedType.Specific(u)) =>
       if(typ == u) Right(t) else Left(TyperError.CantMatch(expected, typ))
@@ -396,15 +396,15 @@ object Typer {
   private def widen(expr: Typed[ast.Expression], t: Type): Typed[ast.Expression] = expr match {
     case Typed(l: ast.IntLit, _) => Typed(l, t)
     case Typed(l: ast.FloatLit, _) => Typed(l, t)
-    case Typed(ast.CharLit(c), _) => Typed(ast.IntLit(c.toLong), t)
-    case Typed(ast.Widen(e), _) => widen(e, t)
-    case _ => Typed(ast.Widen(expr), t)
+    case Typed(ast.CharLit(c, loc), _) => Typed(ast.IntLit(c.toLong, loc), t)
+    case Typed(ast.Widen(e, _), _) => widen(e, t)
+    case _ => Typed(ast.Widen(expr, expr.expr.loc), t)
   }
 
   private def trim(expr: Typed[ast.Expression], t: Type): Typed[ast.Expression] = expr match {
     case Typed(l: ast.IntLit, _) => Typed(l, t)
-    case Typed(ast.Trim(e), _) => trim(e, t)
-    case _ => Typed(ast.Trim(expr), t)
+    case Typed(ast.Trim(e, _), _) => trim(e, t)
+    case _ => Typed(ast.Trim(expr, expr.expr.loc), t)
   }
 
   private def bitwidth(t: Type): Int = t match {

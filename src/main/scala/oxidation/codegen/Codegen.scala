@@ -30,20 +30,20 @@ object Codegen {
   def register(index: Int, typ: ir.Type): ir.Register = ir.Register(CodegenReg, index, typ)
 
   def compileExpr(expr: Typed[ast.Expression]): Res[Val] = expr match {
-    case Typed(ast.IntLit(i), typ) => Res.pure(Val.I(i, translateType(typ)))
-    case Typed(ast.FloatLit(bd), analyze.Type.F32) =>
+    case Typed(ast.IntLit(i, _), typ) => Res.pure(Val.I(i, translateType(typ)))
+    case Typed(ast.FloatLit(bd, _), analyze.Type.F32) =>
       Res.pure(Val.F32(bd.toFloat))
-    case Typed(ast.FloatLit(bd), analyze.Type.F64) =>
+    case Typed(ast.FloatLit(bd, _), analyze.Type.F64) =>
       Res.pure(Val.F64(bd.toDouble))
 
-    case Typed(ast.BoolLit(b), typ) =>
+    case Typed(ast.BoolLit(b, _), typ) =>
       val i = b match {
         case true => 1
         case false => 0
       }
       Res.pure(Val.I(i, translateType(typ)))
-    case Typed(ast.CharLit(c), typ) => Res.pure(Val.I(c.toInt, translateType(typ)))
-    case Typed(ast.StructLit(_, members), analyze.Type.Struct(_, memberTypes)) =>
+    case Typed(ast.CharLit(c, _), typ) => Res.pure(Val.I(c.toInt, translateType(typ)))
+    case Typed(ast.StructLit(_, members, _), analyze.Type.Struct(_, memberTypes)) =>
       for {
         memberVals <- members.toVector.traverse {
           case (name, value) => for {
@@ -53,14 +53,14 @@ object Codegen {
         orderedMemberVals = memberVals.sortBy(_._1).map(_._2)
       } yield Val.Struct(orderedMemberVals)
 
-    case Typed(ast.StringLit(v), BuiltinSymbols.StrType) =>
+    case Typed(ast.StringLit(v, _), BuiltinSymbols.StrType) =>
       val cpe = ConstantPoolEntry.Str(v)
       constants(cpe).as(Val.Struct(Vector(Val.Const(cpe, Type.Ptr), Val.I(v.length, Type.U32))))
 
-    case Typed(ast.UnitLit(), analyze.Type.U0) => Res.pure(Val.I(0, Type.U0))
+    case Typed(ast.UnitLit(_), analyze.Type.U0) => Res.pure(Val.I(0, Type.U0))
 
-    case Typed(ast.Var(n: Symbol.Local), _) => WriterT.lift(State.inspect(s => Val.R(s.registerBindings(n))))
-    case Typed(ast.Var(Symbol.Global(path)), t) =>
+    case Typed(ast.Var(n: Symbol.Local, _), _) => WriterT.lift(State.inspect(s => Val.R(s.registerBindings(n))))
+    case Typed(ast.Var(Symbol.Global(path), _), t) =>
       for {
         r <- genReg(translateType(t))
         _ <- instructions(
@@ -68,13 +68,13 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.InfixAp(InfixOp.And, left, right), analyze.Type.U1) =>
-      compileExpr(Typed(ast.If(left, right, Some(Typed(ast.BoolLit(false), analyze.Type.U1))), analyze.Type.U1))
+    case Typed(ast.InfixAp(InfixOp.And, left, right, loc), analyze.Type.U1) =>
+      compileExpr(Typed(ast.If(left, right, Some(Typed(ast.BoolLit(false, loc), analyze.Type.U1)), loc), analyze.Type.U1))
 
-    case Typed(ast.InfixAp(InfixOp.Or, left, right), analyze.Type.U1) =>
-      compileExpr(Typed(ast.If(left, Typed(ast.BoolLit(true), analyze.Type.U1), Some(right)), analyze.Type.U1))
+    case Typed(ast.InfixAp(InfixOp.Or, left, right, loc), analyze.Type.U1) =>
+      compileExpr(Typed(ast.If(left, Typed(ast.BoolLit(true, loc), analyze.Type.U1), Some(right), loc), analyze.Type.U1))
 
-    case Typed(ast.InfixAp(op, left, right), valType) =>
+    case Typed(ast.InfixAp(op, left, right, _), valType) =>
       for {
         lval <- compileExpr(left)
         rval <- compileExpr(right)
@@ -84,7 +84,7 @@ object Codegen {
         )
       } yield Val.R(res)
 
-    case Typed(ast.PrefixAp(op, expr), valType) =>
+    case Typed(ast.PrefixAp(op, expr, _), valType) =>
       for {
         v <- compileExpr(expr)
         r <- genReg(translateType(valType))
@@ -93,7 +93,7 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.Widen(expr), valType) =>
+    case Typed(ast.Widen(expr, _), valType) =>
       for {
         v <- compileExpr(expr)
         r <- genReg(translateType(valType))
@@ -102,7 +102,7 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.Trim(expr), valType) =>
+    case Typed(ast.Trim(expr, _), valType) =>
       for {
         v <- compileExpr(expr)
         r <- genReg(translateType(valType))
@@ -111,7 +111,7 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.Reinterpret(expr), valType) =>
+    case Typed(ast.Reinterpret(expr, _), valType) =>
       for {
         v <- compileExpr(expr)
         r <- genReg(translateType(valType))
@@ -120,7 +120,7 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.Convert(src), valType) =>
+    case Typed(ast.Convert(src, _), valType) =>
       for {
         v <- compileExpr(src)
         r <- genReg(translateType(valType))
@@ -129,12 +129,12 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.Ignore(expr), analyze.Type.U0) =>
+    case Typed(ast.Ignore(expr, _), analyze.Type.U0) =>
       for {
         _ <- compileExpr(expr)
       } yield Val.I(0, Type.U0)
 
-    case Typed(ast.Block(stmnts), typ) =>
+    case Typed(ast.Block(stmnts, _), typ) =>
       for {
         bindings <- storeBindings
         vals <- stmnts.traverse {
@@ -162,7 +162,7 @@ object Codegen {
         _ <- restoreBindings(bindings)
       } yield vals.lastOption getOrElse Val.I(0, ir.Type.U0)
 
-    case Typed(ast.If(cond, pos, neg), typ) =>
+    case Typed(ast.If(cond, pos, neg, _), typ) =>
       for {
         condVal <- compileExpr(cond)
         lbli <- genLocalIndex
@@ -204,7 +204,7 @@ object Codegen {
         )
       } yield Val.R(res)
 
-    case Typed(ast.While(cond, body), _) =>
+    case Typed(ast.While(cond, body, _), _) =>
       for {
         lbli <- genLocalIndex
         condLbl = Name.Local("whilecond", lbli)
@@ -225,7 +225,7 @@ object Codegen {
         )
       } yield Val.I(0, ir.Type.U0)
 
-    case Typed(ast.App(Typed(ast.Var(Symbol.Global(List("sqrt"))), _), List(param)), tpe) =>
+    case Typed(ast.App(Typed(ast.Var(Symbol.Global(List("sqrt")), _), _), List(param), _), tpe) =>
       for {
         p <- compileExpr(param)
         r <- genReg(translateType(tpe))
@@ -234,10 +234,10 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.App(Typed(fn, fnType: analyze.Type.Fun), params), t) =>
+    case Typed(ast.App(Typed(fn, fnType: analyze.Type.Fun), params, _), t) =>
       for {
         fnVal <- fn match {
-          case ast.Var(Symbol.Global(path)) => Res.pure(Val.G(Name.Global(path), translateType(fnType)))
+          case ast.Var(Symbol.Global(path), _) => Res.pure(Val.G(Name.Global(path), translateType(fnType)))
           case _ => compileExpr(Typed(fn, fnType))
         }
         paramVals <- params.traverse(compileExpr)
@@ -257,7 +257,7 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.App(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), Nil), analyze.Type.Arr(member, _)), List(index)), t) =>
+    case Typed(ast.App(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), Nil, _), analyze.Type.Arr(member, _)), List(index), _), t) =>
       assert(member == t)
       for {
         ptrVal <- compileExpr(ptr)
@@ -275,7 +275,7 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), params), t) =>
+    case Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), params, _), t) =>
       for {
         ptrv <- compileExpr(ptr)
         offv <- params.headOption.traverse { off =>
@@ -293,7 +293,7 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.App(Typed(ast.Var(Symbol.Global(arrPath)), analyze.Type.Arr(elemType, _)), index :: Nil), t) =>
+    case Typed(ast.App(Typed(ast.Var(Symbol.Global(arrPath), _), analyze.Type.Arr(elemType, _)), index :: Nil, _), t) =>
       for {
         indexVal <- compileExpr(index)
         multipliedOffset <- genReg(Type.I64)
@@ -304,7 +304,7 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.App(arr @ Typed(_, _: analyze.Type.Arr), index :: Nil), t) =>
+    case Typed(ast.App(arr @ Typed(_, _: analyze.Type.Arr), index :: Nil, _), t) =>
       for {
         r <- genReg(translateType(t))
         a <- compileExpr(arr)
@@ -314,8 +314,8 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.Assign(Typed(ast.App(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), Nil), analyze.Type.Arr(member, _)), List(index)), _),
-                          None, rval), _) =>
+    case Typed(ast.Assign(Typed(ast.App(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(_)), Nil, _), analyze.Type.Arr(member, _)), List(index), _), _),
+                          None, rval, _), _) =>
       for {
         right <- compileExpr(rval)
         ptrVal <- compileExpr(ptr)
@@ -333,7 +333,7 @@ object Codegen {
         )
       } yield Val.I(0, Type.U0)
 
-    case Typed(ast.Assign(Typed(ast.Var(n), _), None, rval), _) =>
+    case Typed(ast.Assign(Typed(ast.Var(n, _), _), None, rval, _), _) =>
       for {
         right <- compileExpr(rval)
         dest <- WriterT.lift(CodegenState.inspect(_.registerBindings(n))): Res[Register]
@@ -342,7 +342,7 @@ object Codegen {
         )
       } yield Val.I(0, ir.Type.U0)
 
-    case Typed(ast.Assign(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(pointee)), params), _), None, rval), _) =>
+    case Typed(ast.Assign(Typed(ast.App(ptr @ Typed(_, analyze.Type.Ptr(pointee)), params, _), _), None, rval, _), _) =>
       // TODO pointee should be extracted from the pointer type, but Type.Ptr(_) contains an unresolved typename, some consideration is needed here
       for {
         right <- compileExpr(rval)
@@ -361,7 +361,7 @@ object Codegen {
         )
       } yield Val.I(0, ir.Type.U0)
 
-    case Typed(ast.Assign(Typed(ast.Select(struct @ Typed(_, analyze.Type.Struct(_, members)), member), _), None, rval), _) =>
+    case Typed(ast.Assign(Typed(ast.Select(struct @ Typed(_, analyze.Type.Struct(_, members)), member, _), _), None, rval, _), _) =>
       for {
         right <- compileExpr(rval) // TODO handle changing struct behind a pointer `val p: ptr[str] = ???; p().length = 10`
         structVal <- compileExpr(struct)
@@ -373,7 +373,7 @@ object Codegen {
         }
       } yield Val.I(0, ir.Type.U0)
 
-    case Typed(ast.Select(src @ Typed(_, analyze.Type.Ptr(structType: analyze.Type.Struct)), member), typ) =>
+    case Typed(ast.Select(src @ Typed(_, analyze.Type.Ptr(structType: analyze.Type.Struct)), member, _), typ) =>
       for {
         srcv <- compileExpr(src)
         struct = translateType(structType).asInstanceOf[Type.Struct]
@@ -383,7 +383,7 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.Select(src @ Typed(_, structType: analyze.Type.Struct), member), typ) =>
+    case Typed(ast.Select(src @ Typed(_, structType: analyze.Type.Struct), member, _), typ) =>
       for {
         srcv <- compileExpr(src)
         r <- genReg(translateType(typ))
@@ -392,7 +392,7 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.Stackalloc(pointee), _) =>
+    case Typed(ast.Stackalloc(pointee, _), _) =>
       for {
         r <- genReg(Type.Ptr)
         _ <- instructions(
@@ -400,12 +400,12 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.ArrLit(elems), arrType @ analyze.Type.Arr(_, size))
+    case Typed(ast.ArrLit(elems, _), arrType @ analyze.Type.Arr(_, size))
       if elems.size == size => elems.traverse(compileExpr).map(Val.Array)
   }
 
   def compileDef(d: ast.Def): Def = d match {
-    case ast.DefDef(Symbol.Global(name), params, _, Typed(ast.Extern(), ret)) =>
+    case ast.DefDef(Symbol.Global(name), params, _, Typed(ast.Extern(_), ret)) =>
       val plist = params.getOrElse(Nil)
       Def.ExternFun(Name.Global(name), plist.map(p => translateType(p.typ)), translateType(ret))
 

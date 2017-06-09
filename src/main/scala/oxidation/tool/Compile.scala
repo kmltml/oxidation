@@ -53,9 +53,9 @@ object Compile {
   final case class Stats(spillCount: Int)
 
   def compile(implicit options: Options): Either[CompileError, (File, Stats)] = {
-    val parser = new Parser
     for {
       parsed <- options.infiles.toVector.traverse { f =>
+        val parser = new Parser(Some(f.getName))
         val res = parser.compilationUnit.parse(Source.fromFile(f).mkString)
         res.fold(
           (_, _, _) => Left(ParseError(res.toString)),
