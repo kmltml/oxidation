@@ -89,6 +89,7 @@ trait AstPrettyprint {
   def prettyprintTypeName(t: TypeName): String = t match {
     case TypeName.Named(n) => prettyprintSymbol(n)
     case TypeName.App(t, p) => prettyprintTypeName(t) + "[" + p.map(prettyprintTypeName).mkString(", ") + "]"
+    case TypeName.IntLiteral(v) => v.toString
   }
 
   def prettyprintSymbol(s: Symbol): String = s match {
@@ -180,6 +181,9 @@ trait AstPrettyprint {
 
     case ast.Stackalloc(pointee, loc) =>
       s"Stackalloc{$loc}$typeInfo(".p + prettyprintTypeInfo(pointee) + ")"
+
+    case ast.ArrLit(elems, loc) =>
+      s"ArrLit{$loc}$typeInfo(".nl + elems.map(prettyprintTypedExp).sep(",".nl).indent + ")"
   }
 
   def stringify(p: P): String = {
