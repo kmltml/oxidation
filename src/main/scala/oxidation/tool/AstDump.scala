@@ -1,8 +1,7 @@
 package oxidation
 package tool
 
-import parse.Parser
-import parse.ast
+import parse.{IndexTranslator, Parser, Sourcefile, ast}
 import java.io.File
 
 import oxidation.analyze._
@@ -43,6 +42,9 @@ object AstDump extends App {
       val parsed = parser.compilationUnit.parse(Source.fromFile(f).mkString)
       (f, parsed.get.value)
     }
+    val sources = options.infiles.map { f => f.getName -> Sourcefile(Source.fromFile(f)) }
+    implicit val indexTranslator = new IndexTranslator(sources.toMap, None)
+
     options.stage match {
       case Parse =>
         show(ParseAstPrettyprint)(res)
@@ -90,7 +92,7 @@ object AstDump extends App {
     files
   }
 
-  def show(pp: AstPrettyprint)(tlds: Seq[(File, Seq[pp.ast.TLD])]): Unit = {
+  def show(pp: AstPrettyprint)(tlds: Seq[(File, Seq[pp.ast.TLD])])(implicit translator: IndexTranslator): Unit = {
     for((f, defs) <- tlds) {
       println(s"${f.getName}:")
       defs.foreach(d => println(pp.stringify(pp.prettyprintTLD(d))))
