@@ -102,9 +102,10 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
               Right(ast.InfixAp(InfixOp.And, ast.Var(l('x), loc) :: U1, ast.Var(l('y), loc) :: U1, loc) :: U1)
           }
           "invalid" - {
-            solveType(P.InfixAp(InfixOp.Or, P.Var(l('x), loc), P.Var(l('y), loc), loc), ExpectedType.Undefined,
+            val yloc = Span(None, 10, 11)
+            solveType(P.InfixAp(InfixOp.Or, P.Var(l('x), loc), P.Var(l('y), yloc), loc), ExpectedType.Undefined,
               Ctxt.default.withTerms(Map(l('x) -> imm(U1), l('y) -> imm(U16)))) ==>
-              Left(TyperError.CantMatch(ExpectedType.Specific(U1), U16))
+              Left(TyperError.CantMatch(ExpectedType.Specific(U1), U16, yloc))
           }
         }
       }
@@ -220,9 +221,10 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
               Right(ast.Assign(ast.Var(l('x), loc) :: I64, None, ast.IntLit(20, loc) :: I64, loc) :: U0)
           }
           "immutable" - {
-            solveType(P.Assign(P.Var(l('x), loc), None, P.IntLit(20, loc), loc), ExpectedType.Undefined,
+            val xloc = Span(None, 10, 20)
+            solveType(P.Assign(P.Var(l('x), xloc), None, P.IntLit(20, loc), loc), ExpectedType.Undefined,
               Ctxt.default.withTerms(Map(l('x) -> imm(I64)))) ==>
-              Left(TyperError.ImmutableAssign(l('x)))
+              Left(TyperError.ImmutableAssign(l('x), xloc)) // TODO maybe range on whole assign would be better?
           }
         }
         "Ptr" - {
@@ -242,9 +244,10 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
               Right(ast.Assign(ast.Select(ast.Var(l('x), loc) :: struct, "x", loc) :: I32, None, ast.IntLit(10, loc) :: I32, loc) :: U0)
           }
           "immutable" - {
-            solveType(P.Assign(P.Select(P.Var(l('x), loc), "x", loc), None, P.IntLit(10, loc), loc),
+            val xloc = Span(None, 10, 30)
+            solveType(P.Assign(P.Select(P.Var(l('x), xloc), "x", loc), None, P.IntLit(10, loc), loc),
               ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(struct)))) ==>
-              Left(TyperError.ImmutableAssign(l('x)))
+              Left(TyperError.ImmutableAssign(l('x), xloc))
           }
         }
         "Arr app" - {
@@ -258,8 +261,9 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
             Right(ast.Assign(ast.Var(l('x), loc) :: I64, None, ast.InfixAp(InfixOp.Add, ast.Var(l('x), loc) :: I64, ast.IntLit(20, loc) :: I64, loc) :: I64, loc) :: U0)
         }
         "An rval" - {
-          solveType(P.Assign(P.IntLit(2, loc), Some(InfixOp.Add), P.IntLit(1, loc), loc), ExpectedType.Undefined, Ctxt.default) ==>
-            Left(TyperError.NotAnLVal(ast.IntLit(2, loc) :: I32))
+          val loc2 = Span(None, 30, 31)
+          solveType(P.Assign(P.IntLit(2, loc2), Some(InfixOp.Add), P.IntLit(1, loc), loc), ExpectedType.Undefined, Ctxt.default) ==>
+            Left(TyperError.NotAnLVal(ast.IntLit(2, loc2) :: I32, loc2))
         }
       }
       "Extern" - {
@@ -268,8 +272,9 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
             Right(ast.Extern(loc) :: I32)
         }
         "type-inferred" - {
-          solveType(P.Extern(loc), ExpectedType.Undefined, Ctxt.default) ==>
-            Left(TyperError.ExternNoExplicitType())
+          val externLoc = Span(None, 10, 15)
+          solveType(P.Extern(externLoc), ExpectedType.Undefined, Ctxt.default) ==>
+            Left(TyperError.ExternNoExplicitType(externLoc))
         }
       }
       "Cast" - {
