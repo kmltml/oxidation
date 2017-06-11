@@ -21,7 +21,8 @@ object SymbolSearchTests extends TestSuite with SymbolSyntax {
           EnumDef(u('foobar), None, Nil)
         )) ==> Right(Symbols(
           terms = Map("main" -> Set(g('main)), "foo" -> Set(g('foo)), "bar" -> Set(g('bar))),
-          types = Map("baz" -> Set(g('baz)), "foobar" -> Set(g('foobar)))
+          types = Map("baz" -> Set(g('baz)), "foobar" -> Set(g('foobar))),
+          importedModules = Map.empty
         ))
       }
       "error on duplicate symbols" - {

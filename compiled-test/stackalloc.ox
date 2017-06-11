@@ -1,6 +1,6 @@
-module stackAlloc
+module stackalloc
 
-def stackAllocTests(): u0 = {
+def tests(): u0 = {
     assert({
         val p = stackalloc[i64]
         val q = stackalloc[i64]

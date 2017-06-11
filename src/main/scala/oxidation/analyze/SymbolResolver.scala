@@ -32,7 +32,7 @@ object SymbolResolver {
       explicitImports <- compilationUnit.collect {
         case parse.ast.Import(path, ImportSpecifier.All) => Right(global.findPrefixed(path))
         case parse.ast.Import(path, ImportSpecifier.Members(members)) =>
-          members.toVector.traverse { n =>
+          members.traverse { n =>
             val syms = global.findExact(path :+ n)
             if(syms.isEmpty) Left(SymbolNotFoundInImport(path :+ n)) else Right(syms)
           }.map(_.reduce(_ |+| _))
@@ -41,18 +41,18 @@ object SymbolResolver {
       values <- compilationUnit.map {
         case m: parse.ast.Module => m.asRight
         case i: parse.ast.Import => i.asRight
-        case d: parse.ast.Def => solveDef(d, imports, TopLevel(modulePath))
+        case d: parse.ast.Def => solveDef(d, imports, global, TopLevel(modulePath))
       }.sequence
     } yield values
   }
 
-  private def solveDef(d: parse.ast.Def, scope: Scope, ctxt: DefContext): Res[parse.ast.Def] = d match {
+  private def solveDef(d: parse.ast.Def, scope: Scope, global: Symbols, ctxt: DefContext): Res[parse.ast.Def] = d match {
     case parse.ast.ValDef(name, tpe, value) =>
-      (tpe.traverse(solveType(_, scope)), solveExpr(value, scope))
+      (tpe.traverse(solveType(_, scope)), solveExpr(value, scope, global))
         .map2(parse.ast.ValDef(solveDefName(name, ctxt), _, _))
 
     case parse.ast.VarDef(name, tpe, value) =>
-      (tpe.traverse(solveType(_, scope)), solveExpr(value, scope))
+      (tpe.traverse(solveType(_, scope)), solveExpr(value, scope, global))
         .map2(parse.ast.VarDef(solveDefName(name, ctxt), _, _))
 
     case parse.ast.DefDef(name, params, tpe, value) =>
@@ -62,7 +62,7 @@ object SymbolResolver {
         .foldLeft(scope)((s, p) => s.shadowTerm(Symbol.Local(p.name)))
       (params.traverse(_.traverse {
         case parse.ast.Param(name, tpe) => solveType(tpe, scope).map(parse.ast.Param(name, _))
-      }), tpe.traverse(solveType(_, scope)), solveExpr(value, newScope))
+      }), tpe.traverse(solveType(_, scope)), solveExpr(value, newScope, global))
         .map3(parse.ast.DefDef(solveDefName(name, ctxt), _, _, _))
 
     case parse.ast.StructDef(name, params, members) =>
@@ -82,44 +82,50 @@ object SymbolResolver {
     case (s, _) => s
   }
 
-  private def solveExpr(e: parse.ast.Expression, scope: Scope): Res[parse.ast.Expression] = e match {
+  private def solveExpr(e: parse.ast.Expression, scope: Scope, global: Symbols): Res[parse.ast.Expression] = e match {
     case parse.ast.Var(Symbol.Unresolved(n), loc) =>
       getOnlyOneSymbol(n, scope.terms).map(parse.ast.Var(_, loc))
 
     case parse.ast.StructLit(Symbol.Unresolved(name), members, loc) =>
       (getOnlyOneSymbol(name, scope.types), members.traverse {
-        case (n, e) => solveExpr(e, scope).map(n -> _)
+        case (n, e) => solveExpr(e, scope, global).map(n -> _)
       }).map2(parse.ast.StructLit(_, _, loc))
 
     case parse.ast.InfixAp(op, left, right, loc) =>
-      (solveExpr(left, scope), solveExpr(right, scope))
+      (solveExpr(left, scope, global), solveExpr(right, scope, global))
         .map2(parse.ast.InfixAp(op, _, _, loc))
 
     case parse.ast.PrefixAp(op, exp, loc) =>
-      SymbolResolver.solveExpr(exp, scope)
+      SymbolResolver.solveExpr(exp, scope, global)
         .map(parse.ast.PrefixAp.apply(op, _, loc))
 
     case parse.ast.App(expr, params, loc) =>
-      (solveExpr(expr, scope), params.traverse(solveExpr(_, scope)))
+      (solveExpr(expr, scope, global), params.traverse(solveExpr(_, scope, global)))
         .map2(parse.ast.App(_, _, loc))
 
     case parse.ast.TypeApp(expr, params, loc) =>
-      (solveExpr(expr, scope), params.traverse(solveType(_, scope)))
+      (solveExpr(expr, scope, global), params.traverse(solveType(_, scope)))
         .map2(parse.ast.TypeApp(_, _, loc))
 
     case parse.ast.Select(expr, member, loc) =>
-      solveExpr(expr, scope).map(parse.ast.Select(_, member, loc))
+      val res = for {
+        mod <- solveModule(expr, scope, global)
+        s <- Some(Symbol.Global(mod :+ member)).filter(global.terms.values.flatten.toSeq.contains)
+      } yield parse.ast.Var(s, loc)
+      res.map(Right(_)).getOrElse {
+        solveExpr(expr, scope, global).map(parse.ast.Select(_, member, loc))
+      }
 
     case parse.ast.If(cond, pos, neg, loc) =>
-      (solveExpr(cond, scope), solveExpr(pos, scope), neg.traverse(solveExpr(_, scope)))
+      (solveExpr(cond, scope, global), solveExpr(pos, scope, global), neg.traverse(solveExpr(_, scope, global)))
         .map3(parse.ast.If(_, _, _, loc))
 
     case parse.ast.While(cond, body, loc) =>
-      (solveExpr(cond, scope), solveExpr(body, scope))
+      (solveExpr(cond, scope, global), solveExpr(body, scope, global))
         .map2(parse.ast.While(_, _, loc))
 
     case parse.ast.Assign(left, op, right, loc) =>
-      (solveExpr(left, scope), solveExpr(right, scope))
+      (solveExpr(left, scope, global), solveExpr(right, scope, global))
         .map2(parse.ast.Assign(_, op, _, loc))
 
     case parse.ast.Block(stmnts, loc) =>
@@ -129,9 +135,9 @@ object SymbolResolver {
         case parse.ast.VarDef(Symbol.Unresolved(name), _, _) => name
       }
       val interiorScope = locals.foldLeft(scope)((s, l) => s.shadowTerm(Symbol.Local(l)))
-      stmnts.toVector.traverse {
-        case d: parse.ast.Def => solveDef(d, interiorScope, Local)
-        case e: parse.ast.Expression => solveExpr(e, interiorScope)
+      stmnts.traverse {
+        case d: parse.ast.Def => solveDef(d, interiorScope, global, Local)
+        case e: parse.ast.Expression => solveExpr(e, interiorScope, global)
       }.map(parse.ast.Block(_, loc))
 
     case _: parse.ast.IntLit | _: parse.ast.BoolLit | _: parse.ast.StringLit | _: parse.ast.CharLit |
@@ -150,6 +156,17 @@ object SymbolResolver {
 
     case l: TypeName.IntLiteral => Right(l)
 
+  }
+
+  private def solveModule(p: parse.ast.Expression, scope: Scope, global: Symbols): Option[List[String]] = p match {
+    case parse.ast.Var(Symbol.Unresolved(v), _) =>
+      scope.importedModules.get(v).filter(_.size == 1).map(_.head)
+    case parse.ast.Select(p, m, _) =>
+      for {
+        prefix <- solveModule(p, scope, global)
+        x <- Some(prefix :+ m).filter(global.modules.contains)
+      } yield x
+    case _ => None
   }
 
   private def getOnlyOneSymbol(s: String, scope: Multimap[String, Symbol]): Res[Symbol] =

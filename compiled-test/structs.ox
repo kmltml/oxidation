@@ -49,7 +49,7 @@ def threefoos(x: foo, y: foo, z: foo): threefoos =
 
 def getF(ref: ptr[bigfoo]): i32 = ref.f()
 
-def structTests(): u0 = {
+def tests(): u0 = {
     assert({
         val x = foo(10, 20)
         x.int + x.long == 30

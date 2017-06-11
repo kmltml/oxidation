@@ -26,6 +26,31 @@ object SymbolResolverTests extends TestSuite with SymbolSyntax {
             Var(l('bar), loc))
         ))
       }
+      "find a fully-qualified name" - {
+        resolveSymbols(Vector(
+          ValDef(u('foo), None, Select(Var(u('module), loc), "member", loc))
+        ), BuiltinSymbols.symbols.withTerms(g('module, 'member))) ==> Right(Vector(
+          ValDef(g('foo), None, Var(g('module, 'member), loc))
+        ))
+      }
+      "solve partially imported modules" - {
+        resolveSymbols(Vector(
+          Import(List("a"), ImportSpecifier.Members(List("b"))),
+          ValDef(u('foo), None, Select(Var(u('b), loc), "x", loc))
+        ), BuiltinSymbols.symbols.withTerms(g('a, 'b, 'x))) ==> Right(Vector(
+          Import(List("a"), ImportSpecifier.Members(List("b"))),
+          ValDef(g('foo), None, Var(g('a, 'b, 'x), loc))
+        ))
+      }
+      "solve modules imported partially by wildcard" - {
+        resolveSymbols(Vector(
+          Import(List("a"), ImportSpecifier.All),
+          ValDef(u('foo), None, Select(Var(u('b), loc), "x", loc))
+        ), BuiltinSymbols.symbols.withTerms(g('a, 'b, 'x))) ==> Right(Vector(
+          Import(List("a"), ImportSpecifier.All),
+          ValDef(g('foo), None, Var(g('a, 'b, 'x), loc))
+        ))
+      }
       "solve nested expressions" - {
         val foo = g('a, 'b, 'foo)
         val bar = g('a, 'b, 'bar)

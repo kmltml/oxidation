@@ -37,7 +37,8 @@ object SymbolSearch {
       case Nil =>
         Symbols(
           types = types.map(s => s.name -> Set(s)).toMap,
-          terms = terms.map(s => s.name -> Set(s)).toMap).asRight
+          terms = terms.map(s => s.name -> Set(s)).toMap,
+          importedModules = Map.empty).asRight
       case parse.ast.Module(_) :: rest => rec(rest, types, terms)
       case parse.ast.Import(_, _) :: rest => rec(rest, types, terms)
       case (d @ TypeDef(name)) :: rest =>

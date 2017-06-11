@@ -18,7 +18,7 @@ struct Vec5d = {
     v: f64
 }
 
-def floatTests(): u0 = {
+def tests(): u0 = {
     assert(0.5 + 0.25 == 0.75, "Float addition")
     assert(sumFloats(1.0, 0.5, 0.5, 2.5, 3.5, 0.5) == 8.5, "Float params and returns")
     assert(mul(0.5, 3) == 1.5, "Mixed float-int params")

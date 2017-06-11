@@ -1,6 +1,6 @@
 module spills
 
-def spillTests(): u0 = {
+def tests(): u0 = {
     val pa = malloc(1)
     val oa = 0
     val va: i8 = 10

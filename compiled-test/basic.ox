@@ -1,3 +1,5 @@
+module basic
+
 val GlobalInt: i32 = 42
 
 val NonTrivialInt: i32 = {
@@ -10,7 +12,7 @@ val NonTrivialInt: i32 = {
     s
 }
 
-def basicTests() = {
+def tests() = {
     val two = 2
     val five = 5
     val eight = 8

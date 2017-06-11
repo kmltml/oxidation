@@ -5,21 +5,21 @@ import cats._
 import cats.data._
 import cats.implicits._
 
-case class Symbols(types: Multimap[String, Symbol], terms: Multimap[String, Symbol]) {
+case class Symbols(types: Multimap[String, Symbol], terms: Multimap[String, Symbol], importedModules: Multimap[String, List[String]]) {
 
   def withTypes(t: Symbol*): Symbols =
-    Symbols(types = types |+| t.map(s => s.name -> Set(s)).toMap, terms = terms)
+    copy(types = types |+| t.map(s => s.name -> Set(s)).toMap)
 
   def withTerms(t: Symbol*): Symbols =
-    Symbols(terms = terms |+| t.map(s => s.name -> Set(s)).toMap, types = types)
+    copy(terms = terms |+| t.map(s => s.name -> Set(s)).toMap)
 
   def |+|(b: Symbols): Symbols =
-    Symbols(terms = terms |+| b.terms, types = types |+| b.types)
+    Symbols(terms = terms |+| b.terms, types = types |+| b.types, importedModules = importedModules |+| b.importedModules)
 
   def shadowTerm(t: Symbol): Symbols = copy(terms = terms.updated(t.name, Set(t)))
   def shadowType(t: Symbol): Symbols = copy(types = types.updated(t.name, Set(t)))
 
-  def isEmpty: Boolean = types.isEmpty && terms.isEmpty
+  def isEmpty: Boolean = types.isEmpty && terms.isEmpty && importedModules.isEmpty
 
   def findPrefixed(path: List[String]): Symbols = {
     val newTerms = terms.values.flatten.collect {
@@ -28,24 +28,37 @@ case class Symbols(types: Multimap[String, Symbol], terms: Multimap[String, Symb
     val newTypes = types.values.flatten.collect {
       case s @ Symbol.Global(`path` :+ _) => s.name -> Set(s: Symbol)
     }.toMap
-    Symbols(types = newTypes, terms = newTerms)
+    val newModules = modules.collect {
+      case mod @ (`path` :+ n) => n -> Set(mod)
+    }.toMap
+    copy(types = newTypes, terms = newTerms, importedModules = newModules)
   }
 
-  def findExact(path: Seq[String]): Symbols = {
+  def findExact(path: List[String]): Symbols = {
     val newTerms = terms.values.flatten.collect {
       case s @ Symbol.Global(`path`) => s.name -> Set(s: Symbol)
     }.toMap
     val newTypes = types.values.flatten.collect {
       case s @ Symbol.Global(`path`) => s.name -> Set(s: Symbol)
     }.toMap
-    Symbols(types = newTypes, terms = newTerms)
+    val newModules = if(modules.contains(path)) Map(path.last -> Set(path)) else Map.empty[String, Set[List[String]]]
+    copy(types = newTypes, terms = newTerms, importedModules = newModules)
+  }
+
+  lazy val modules: Set[List[String]] = {
+    val symbols = (types.values ++ terms.values).flatten.toSet
+    symbols.flatMap {
+      case Symbol.Global(path) => path.init.inits
+      case Symbol.Unresolved(_) => Seq.empty
+      case Symbol.Local(_) => Seq.empty
+    }
   }
 
 }
 
 object Symbols {
 
-  val empty = new Symbols(Map.empty, Map.empty)
+  val empty = new Symbols(Map.empty, Map.empty, Map.empty)
 
   def types(t: Symbol*): Symbols = empty.withTypes(t: _*)
   def terms(t: Symbol*): Symbols = empty.withTerms(t: _*)

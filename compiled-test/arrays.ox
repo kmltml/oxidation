@@ -12,7 +12,7 @@ val StructArray = arr[foo](
     foo { x = 30, y = 40 }
 )
 
-def arrayTests(): u0 = {
+def tests(): u0 = {
     assert({
         val a: ptr[arr[i32, 10]] = stackalloc[arr[i32, 10]]
         var i = 0
