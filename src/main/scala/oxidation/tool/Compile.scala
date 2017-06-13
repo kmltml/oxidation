@@ -44,6 +44,7 @@ object Compile {
   final case class ValidatorError(err: ValidationError, after: String) extends CompileError
   final case class AssemblerError(message: String) extends CompileError
   final case class LinkerError(message: String) extends CompileError
+  final case class AnalysisErrors(errors: NonEmptyList[AnalysisError]) extends CompileError
 
   def get[L, R](e: Either[L, R]): R = e.fold(l => {
     Console.err.println(l)
@@ -73,7 +74,7 @@ object Compile {
         case d: parse.ast.TermDef => d
       }
       deps = DependencyGraph.build(termDefs).prune
-      typed <- TypeTraverse.solveTree(deps, termDefs, ctxt)
+      typed <- TypeTraverse.solveTree(deps, termDefs, ctxt).leftMap(AnalysisErrors)
       irDefs = typed.map {
         case d: analyze.ast.TermDef => Codegen.compileDef(d)
       }

@@ -12,10 +12,10 @@ object TypeTraverse {
 
   case class SolutionContext(types: Ctxt, solved: Map[Symbol, ast.TermDef])
 
-  private type S[A] = StateT[Either[AnalysisError, ?], SolutionContext, A]
+  private type S[A] = StateT[Either[NonEmptyList[AnalysisError], ?], SolutionContext, A]
   private val S = MonadState[S, SolutionContext]
 
-  def solveTree(deps: DependencyGraph, defs: Vector[untyped.Def], ctxt: Ctxt): Either[AnalysisError, Set[ast.Def]] = {
+  def solveTree(deps: DependencyGraph, defs: Vector[untyped.Def], ctxt: Ctxt): Either[NonEmptyList[AnalysisError], Set[ast.Def]] = {
     val defsByName = defs.collect {
       case d: untyped.TermDef => d.name -> d
     }.toMap
@@ -42,12 +42,12 @@ object TypeTraverse {
                            defs: Map[Symbol, untyped.TermDef], d: untyped.TermDef): S[Unit] = {
     for {
       ctxt <- S.get
-      _ <- StateT.lift(Either.cond(!currentlySolved(d.name), (), CyclicReferenceError(currentlySolved): AnalysisError))
+      _ <- StateT.lift(Either.cond(!currentlySolved(d.name), (), NonEmptyList.of(CyclicReferenceError(currentlySolved): AnalysisError)))
       _ <- if(ctxt.solved.contains(d.name)) S.pure(()) else for {
         _ <- deps.dependencies(d.name).dependencies.toVector
           .traverse(s => solveTermDef(deps, currentlySolved + d.name, defs, defs(s)))
         ctxt <- S.get
-        typed <- StateT.lift(Typer.solveTermDef(d, ctxt.types).leftWiden[AnalysisError])
+        typed <- StateT.lift(Typer.solveTermDef(d, ctxt.types).leftMap(_.widen[AnalysisError]).toEither)
         _ <- solved(typed)
       } yield ()
     } yield ()
