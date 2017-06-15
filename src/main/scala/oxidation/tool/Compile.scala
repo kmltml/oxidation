@@ -74,7 +74,7 @@ object Compile {
         case d: parse.ast.TermDef => d
       }
       deps = DependencyGraph.build(termDefs).prune
-      typed <- TypeTraverse.solveTree(deps, termDefs, ctxt).leftMap(AnalysisErrors)
+      typed <- TypeTraverse.solveTree(deps, termDefs, ctxt).leftMap(AnalysisErrors).toEither
       irDefs = typed.map {
         case d: analyze.ast.TermDef => Codegen.compileDef(d)
       }

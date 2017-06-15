@@ -110,7 +110,7 @@ object IrDump extends App {
       DependencyGraph.build(termDefs).prune
     }
     val typed = phase("type") {
-      get(TypeTraverse.solveTree(deps, termDefs, ctxt))
+      get(TypeTraverse.solveTree(deps, termDefs, ctxt).toEither)
     }
 
     val irDefs = phase("codegen") {
