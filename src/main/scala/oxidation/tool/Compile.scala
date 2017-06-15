@@ -65,7 +65,7 @@ object Compile {
       }
       symbols <- parsed.traverse(SymbolSearch.findSymbols).map(_.combineAll)
       scope = BuiltinSymbols.symbols |+| symbols
-      resolvedSymbols <- parsed.traverse(SymbolResolver.resolveSymbols(_, scope)).map(_.flatten)
+      resolvedSymbols <- parsed.traverse(SymbolResolver.resolveSymbols(_, scope).toValidated).toEither.map(_.flatten).leftMap(AnalysisErrors)
       typeDefs = resolvedSymbols.collect {
         case d: parse.ast.TypeDef => d
       }

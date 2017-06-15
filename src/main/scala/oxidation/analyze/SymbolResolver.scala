@@ -4,12 +4,13 @@ package analyze
 import cats._
 import cats.data._
 import cats.implicits._
+import Validated.{invalidNel, valid}
 
 object SymbolResolver {
 
   type Scope = Symbols
 
-  type Res[A] = Either[Error, A]
+  type Res[A] = ValidatedNel[Error, A]
 
   sealed trait Error extends AnalysisError
   final case class SymbolNotFound(name: String) extends Error
@@ -20,7 +21,7 @@ object SymbolResolver {
   final case class TopLevel(module: List[String]) extends DefContext
   case object Local extends DefContext
 
-  def resolveSymbols(compilationUnit: Vector[parse.ast.TLD], global: Symbols): Res[Vector[parse.ast.TLD]] = {
+  def resolveSymbols(compilationUnit: Vector[parse.ast.TLD], global: Symbols): Either[NonEmptyList[Error], Vector[parse.ast.TLD]] = {
     val modulePaths = compilationUnit.collect {
       case parse.ast.Module(path) => path
     }
@@ -34,15 +35,15 @@ object SymbolResolver {
         case parse.ast.Import(path, ImportSpecifier.Members(members)) =>
           members.traverse { n =>
             val syms = global.findExact(path :+ n)
-            if(syms.isEmpty) Left(SymbolNotFoundInImport(path :+ n)) else Right(syms)
+            if(syms.isEmpty) Left(NonEmptyList.of(SymbolNotFoundInImport(path :+ n))) else Right(syms)
           }.map(_.reduce(_ |+| _))
       }.sequence
       imports = explicitImports.foldLeft(moduleImports)(_ |+| _)
       values <- compilationUnit.map {
-        case m: parse.ast.Module => m.asRight
-        case i: parse.ast.Import => i.asRight
+        case m: parse.ast.Module => valid(m)
+        case i: parse.ast.Import => valid(i)
         case d: parse.ast.Def => solveDef(d, imports, global, TopLevel(modulePath))
-      }.sequence
+      }.sequence.toEither
     } yield values
   }
 
@@ -112,7 +113,7 @@ object SymbolResolver {
         mod <- solveModule(expr, scope, global)
         s <- Some(Symbol.Global(mod :+ member)).filter(global.terms.values.flatten.toSeq.contains)
       } yield parse.ast.Var(s, loc)
-      res.map(Right(_)).getOrElse {
+      res.map(valid).getOrElse {
         solveExpr(expr, scope, global).map(parse.ast.Select(_, member, loc))
       }
 
@@ -141,7 +142,7 @@ object SymbolResolver {
       }.map(parse.ast.Block(_, loc))
 
     case _: parse.ast.IntLit | _: parse.ast.BoolLit | _: parse.ast.StringLit | _: parse.ast.CharLit |
-         _: parse.ast.Extern | _: parse.ast.UnitLit | _: parse.ast.FloatLit => Right(e)
+         _: parse.ast.Extern | _: parse.ast.UnitLit | _: parse.ast.FloatLit => valid(e)
 
     case parse.ast.Widen(_, _) | parse.ast.Ignore(_, _) => ??? // theese should only be present after the typer
   }
@@ -154,7 +155,7 @@ object SymbolResolver {
       (solveType(const, scope), params.traverse(solveType(_, scope)))
         .map2(TypeName.App)
 
-    case l: TypeName.IntLiteral => Right(l)
+    case l: TypeName.IntLiteral => valid(l)
 
   }
 
@@ -171,9 +172,9 @@ object SymbolResolver {
 
   private def getOnlyOneSymbol(s: String, scope: Multimap[String, Symbol]): Res[Symbol] =
     scope.get(s)
-      .toRight(SymbolNotFound(s))
-      .flatMap {
-        case ss if ss.size == 1 => Right(ss.head)
-        case ss => Left(AmbiguousSymbolReference(s, ss))
+      .toValidNel(SymbolNotFound(s))
+      .andThen {
+        case ss if ss.size == 1 => valid(ss.head)
+        case ss => invalidNel(AmbiguousSymbolReference(s, ss))
       }
 }
