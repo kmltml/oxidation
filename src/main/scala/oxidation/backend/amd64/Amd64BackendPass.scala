@@ -114,6 +114,16 @@ object Amd64BackendPass extends Pass {
         Inst.Move(dest, Op.Copy(ir.Val.R(destTemp)))
       )
 
+    case Inst.Move(dest, Op.Binary(op @ (InfixOp.Shr | InfixOp.Shl), left, right: ir.Val.R)) =>
+      for {
+        r <- nextReg(right.typ)
+        _ <- tellIntColour(Set(r -> RegLoc.C))
+      } yield Vector(
+        Inst.Move(r, Op.Copy(right)),
+        Inst.Move(dest, Op.Binary(op, left, ir.Val.R(r))),
+        Inst.Do(Op.Copy(ir.Val.R(r)))
+      )
+
     case Inst.Eval(dest, call @ Op.Call(_, params)) =>
       val paramColours = params.zipWithIndex.collect {
         case t @ (Register(_, _, _: Type.Integral | Type.U1 | Type.Ptr), _) => t

@@ -394,7 +394,7 @@ class Amd64Target { this: Output =>
 
       case ir.Op.Binary(op, left, right) => left.typ match {
         case _: ir.Type.Integral | ir.Type.U1 | ir.Type.Ptr => op match {
-          case InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor | InfixOp.Shl | InfixOp.Shr =>
+          case InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor =>
             F.tell(Vector(
               move(toVal(dest), left),
               op match {
@@ -403,13 +403,20 @@ class Amd64Target { this: Output =>
                 case InfixOp.BitAnd => and(toVal(dest), toVal(right))
                 case InfixOp.BitOr => or(toVal(dest), toVal(right))
                 case InfixOp.Xor => xor(toVal(dest), toVal(right))
-                case InfixOp.Shl => shl(toVal(dest), toVal(right))
+              }
+            ).combineAll)
+          case InfixOp.Shl | InfixOp.Shr =>
+            F.tell(Vector(
+              move(toVal(dest), left),
+              op match {
+                case InfixOp.Shl => shl(toVal(dest), toVal(right).withSize(RegSize.Byte))
                 case InfixOp.Shr => signedness(dest.typ) match {
-                  case Signed   => sar(toVal(dest), toVal(right))
-                  case Unsigned => shr(toVal(dest), toVal(right))
+                  case Signed   => sar(toVal(dest), toVal(right).withSize(RegSize.Byte))
+                  case Unsigned => shr(toVal(dest), toVal(right).withSize(RegSize.Byte))
                 }
               }
             ).combineAll)
+
           case InfixOp.Div => F.tell(div(toVal(right)))
           case InfixOp.Mod => F.tell(div(toVal(right)))
           case InfixOp.Mul => F.tell(mul(toVal(right)))

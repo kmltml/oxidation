@@ -25,6 +25,7 @@ def tests() = {
     assert(five << 1 == 10, "Shift left")
     assert(!false && (!true == false), "Not")
     assert(factorial(10) == 3628800, "Factorial")
+    assert(two << five == 64, "Shift precolour")
     assert(-two == -2, "Negation")
     assert(GlobalInt == 42, "Top level val")
 

@@ -4,7 +4,7 @@ import oxidation.codegen.Name
 
 sealed trait Val extends Product with Serializable {
 
-  def withSize(s: RegSize): Val = ???
+  def withSize(s: RegSize): Val = this
 
 }
 
