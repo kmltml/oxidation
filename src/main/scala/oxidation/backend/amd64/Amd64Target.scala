@@ -368,7 +368,7 @@ class Amd64Target { this: Output =>
         toVal(src) match {
           case Val.R(Reg(loc, _)) =>
             F.tell(mov(toVal(dest), Val.R(Reg(loc, regSize(dest.typ)))))
-          case v => F.tell(mov(toVal(dest), v))
+          case v => F.tell(mov(toVal(dest), v.withSize(regSize(dest.typ))))
         }
 
       case ir.Op.Elem(arr, index) =>
