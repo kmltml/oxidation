@@ -46,6 +46,11 @@ object ExprWeaken extends IdPass {
       if JLong.bitCount(i) == 1 =>
       Vector(Inst.Move(dest, Op.Binary(InfixOp.Shr, v, Val.I(JLong.numberOfTrailingZeros(i), dest.typ))))
 
+    // x % (2|4|8|...) = x & (1|3|7|...)
+    case Inst.Move(dest, Op.Binary(InfixOp.Mod, v, Val.I(i, _)))
+      if JLong.bitCount(i) == 1 =>
+      Vector(Inst.Move(dest, Op.Binary(InfixOp.BitAnd, v, Val.I(i - 1, dest.typ))))
+
   }
 
 }
