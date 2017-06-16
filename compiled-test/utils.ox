@@ -1,13 +1,13 @@
 def putchar(c: u8): u32 = extern
 
-def exit(result: i32): u0 = extern
+def _exit(result: i32): u0 = extern
 
 def malloc(size: i32): ptr[i8] = extern
 
 def assert(v: u1, msg: str): u0 = {
     if(!v) {
         println(msg)
-        exit(1)
+        _exit(1)
     }
 }
 
