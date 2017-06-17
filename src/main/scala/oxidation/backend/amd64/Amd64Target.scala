@@ -83,7 +83,7 @@ class Amd64Target { this: Output =>
 
   private def allocateIntRegs(stackParams: List[ir.Register], precolours: Map[ir.Register, RegLoc]): State[(FunCtxt, ir.Def.Fun), Unit] = {
     val allocator: RegisterAllocator[RegLoc] =
-      new RegisterAllocator[RegLoc](RegLoc.calleeSaved, RegLoc.callerSaved) {
+      new RegisterAllocator[RegLoc](RegLoc.calleeSaved, RegLoc.callerSaved, IntSpillPass.SpillFillReg) {
 
         override def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun =
           IntSpillPass.txDef(fun).runEmptyA.run(spilled).head.asInstanceOf[ir.Def.Fun]
@@ -126,7 +126,7 @@ class Amd64Target { this: Output =>
 
   private def allocateFloatRegs(stackParams: List[ir.Register], precolours: Map[ir.Register, Xmm]): State[(FunCtxt, ir.Def.Fun), Unit] = {
     val allocator: RegisterAllocator[Xmm] =
-      new RegisterAllocator[Xmm](Xmm.calleeSaved, Xmm.callerSaved) {
+      new RegisterAllocator[Xmm](Xmm.calleeSaved, Xmm.callerSaved, FloatSpillPass.SpillFillReg) {
 
         override def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun =
           FloatSpillPass.txDef(fun).runEmptyA.run(spilled).head.asInstanceOf[ir.Def.Fun]

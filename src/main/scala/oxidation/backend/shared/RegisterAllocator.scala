@@ -8,7 +8,7 @@ import cats.implicits._
 
 import oxidation.ir.RegisterNamespace
 
-abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs: List[Reg]) {
+abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val callerSavedRegs: List[Reg], val spillNamespace: RegisterNamespace) {
 
   def rebuildAfterSpill(fun: ir.Def.Fun, spilled: Set[ir.Register]): ir.Def.Fun
 
@@ -212,7 +212,9 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
     }
 
     def spill(spilled: Set[ir.Register], graph: Graph, candidates: Set[Set[ir.Register]]): Eval[(Map[ir.Register, Alloc], ir.Def.Fun)] = {
-      val spillable = candidates.filter(!graph.colours.contains(_)).toVector.sortBy { r =>
+      val spillable = candidates.filter(!graph.colours.contains(_))
+        .filterNot(_.exists(_.ns == spillNamespace))
+        .toVector.sortBy { r =>
         - graph.neighbors(r).size // Sort by most neighbours
       }
       val regToSpill = spillable.head.head
