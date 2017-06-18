@@ -12,9 +12,9 @@ import cats.data._
 import cats.implicits._
 import ir.serialization.Serialize
 import codegen.pass.Pass
-import codegen.{Codegen, pass}
+import codegen.{Codegen, Name, pass}
 import oxidation.backend.amd64.Amd64BackendPass
-import oxidation.backend.shared.{FlowGraph, RegisterLifetime}
+import oxidation.backend.shared.{BlockLinearizationPass, FlowGraph, RegisterLifetime}
 import oxidation.ir.{Block, ConstantPoolEntry, Register}
 
 object IrDump extends App {
@@ -41,7 +41,8 @@ object IrDump extends App {
     "array-dealiasing" -> pass.ArrayDealiasing,
     "constant-removal" -> pass.ConstantRemoval,
     "expr-weaken" -> pass.ExprWeaken,
-    "amd64-backend"   -> Amd64BackendPass
+    "amd64-backend"   -> Amd64BackendPass,
+    "block-linearization" -> BlockLinearizationPass
   )
 
   implicit val passRead: scopt.Read[Pass] =

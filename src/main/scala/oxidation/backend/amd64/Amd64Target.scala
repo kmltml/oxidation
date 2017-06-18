@@ -8,7 +8,7 @@ import cats.data._
 import cats.implicits._
 import monocle.Lens
 import monocle.function.{Field1, Field2}
-import oxidation.backend.shared.RegisterAllocator
+import oxidation.backend.shared.{BlockLinearizationPass, RegisterAllocator}
 import oxidation.codegen.Name
 import oxidation.ir.ConstantPoolEntry
 
@@ -197,6 +197,7 @@ class Amd64Target { this: Output =>
           case (r, i) => r -> Val.m(Some(regSize(r.typ)), RBP, 0x30 + i * 8)
         }
         _ <- AllocationState.bindingsState(b => (b ++ stackParamBindings, ()))
+        _ <- AllocationState.funState(f => (BlockLinearizationPass.txDef(f).head.asInstanceOf[ir.Def.Fun], ()))
       } yield ()
       val (ctxt, allocatedFun) = allocS.runS((FunCtxt(constants = constants), unallocatedFun)).value
 
@@ -212,12 +213,7 @@ class Amd64Target { this: Output =>
       implicit val _ctxt = ctxt.copy(floats = floatNames)
 
       val res: F[Unit] = allocatedFun.body.traverse_ {
-        case ir.Block(name, instructions, flow) =>
-          for {
-            _ <- F.tell(label(name))
-            _ <- instructions.traverse(outputInstruction(_))
-            _ <- outputFlow(flow)
-          } yield ()
+        case ir.Block(_, instructions, _) => instructions.traverse_(outputInstruction(_))
       }
       val m = res.written
       val floatM = floatNames.map {
@@ -296,6 +292,8 @@ class Amd64Target { this: Output =>
 
   def outputInstruction(i: ir.Inst)(implicit ctxt: FunCtxt): F[Unit] = i match {
     case ir.Inst.Label(n) => F.tell(label(n))
+
+    case ir.Inst.Flow(f) => outputFlow(f)
 
     case ir.Inst.Do(ir.Op.Copy(_)) => F.pure(())
 
