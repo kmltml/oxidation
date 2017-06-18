@@ -60,6 +60,7 @@ object Op {
     case Store(addr, offset, value) => show"store [$addr + $offset] = $value"
     case Widen(v) => show"widen $v"
     case Trim(v) => show"trim $v"
+    case Convert(v, t) => show"convert[$t] $v"
     case Member(s, i) => show"member $s.$i"
     case Stackalloc(s) => show"stackalloc $s"
     case StructCopy(src, substs) => show"structcopy $src { ${substs.map{ case (k, v) => show".$k -> $v" } mkString ", " } }"

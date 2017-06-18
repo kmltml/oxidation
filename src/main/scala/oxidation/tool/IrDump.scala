@@ -15,6 +15,7 @@ import codegen.pass.Pass
 import codegen.{Codegen, pass}
 import oxidation.backend.amd64.Amd64BackendPass
 import oxidation.backend.shared.{FlowGraph, RegisterLifetime}
+import oxidation.ir.{Block, ConstantPoolEntry, Register}
 
 object IrDump extends App {
 
@@ -158,35 +159,12 @@ object IrDump extends App {
       val writer = new PrintWriter(out, true)
       defs.foreach {
         case fun @ ir.Def.Fun(name, params, ret, body, constants) =>
-          lazy val flowGraph = FlowGraph.apply(body)
-          lazy val inputs = body.map(b => b.name -> RegisterLifetime.inputs(b)).toMap
-          lazy val outputs = body.map(b => b.name -> RegisterLifetime.outputs(flowGraph, b.name, inputs)).toMap
-          lazy val ghosts = body.map(b => b.name -> RegisterLifetime.ghosts(flowGraph, b.name, inputs, outputs)).toMap
           writer.println(show"def $name(${params.map(_.show).mkString(", ")}): $ret {")
-          if(constants.nonEmpty) {
-            writer.println("  constants {")
-            constants.foreach { e =>
-              writer.println(show"    $e")
-            }
-            writer.println("  }")
-          }
-          body.foreach { block =>
-            writer.println(show"  ${block.name} {")
-            if(opts.showLifetimes) {
-              writer.println(show"    #live in: ${inputs(block.name).map(_.show) mkString ", "}")
-              writer.println(show"    #ghost in: ${ghosts(block.name).map(_.show) mkString ", "}")
-            }
-            block.instructions.foreach { instr =>
-              writer.println(show"    $instr")
-            }
-            writer.println(show"    ${block.flow}")
-            if(opts.showLifetimes) {
-              writer.println(show"    #live out: ${outputs(block.name).map(_.show) mkString ", "}")
-              writer.println(show"    #ghost out: ${ghosts(block.name).map(_.show) mkString ", "}")
-            }
-            writer.println("  }")
-          }
-          writer.println("}")
+          dumpFunLike(body, constants, writer, opts)
+
+        case ir.Def.ComputedVal(name, body, typ, constants) =>
+          writer.println(show"val $name: $typ {")
+          dumpFunLike(body, constants, writer, opts)
 
         case ir.Def.ExternFun(name, params, ret) =>
           writer.println(show"def $name(${params.map(_.show).mkString(", ")}): $ret = extern")
@@ -198,6 +176,37 @@ object IrDump extends App {
     case Binary =>
       val s = new Serialize(new DataOutputStream(out))
       s.writeDefs(defs.toSeq)
+  }
+
+  def dumpFunLike(body: Vector[Block], constants: Set[ConstantPoolEntry], writer: PrintWriter, opts: Options): Unit = {
+    lazy val flowGraph = FlowGraph(body)
+    lazy val inputs = body.map(b => b.name -> RegisterLifetime.inputs(b)).toMap
+    lazy val outputs = body.map(b => b.name -> RegisterLifetime.outputs(flowGraph, b.name, inputs)).toMap
+    lazy val ghosts = body.map(b => b.name -> RegisterLifetime.ghosts(flowGraph, b.name, inputs, outputs)).toMap
+    if(constants.nonEmpty) {
+      writer.println("  constants {")
+      constants.foreach { e =>
+        writer.println(show"    $e")
+      }
+      writer.println("  }")
+    }
+    body.foreach { block =>
+      writer.println(show"  ${block.name} {")
+      if(opts.showLifetimes) {
+        writer.println(show"    #live in: ${inputs(block.name).map(_.show) mkString ", "}")
+        writer.println(show"    #ghost in: ${ghosts(block.name).map(_.show) mkString ", "}")
+      }
+      block.instructions.foreach { instr =>
+        writer.println(show"    $instr")
+      }
+      writer.println(show"    ${block.flow}")
+      if(opts.showLifetimes) {
+        writer.println(show"    #live out: ${outputs(block.name).map(_.show) mkString ", "}")
+        writer.println(show"    #ghost out: ${ghosts(block.name).map(_.show) mkString ", "}")
+      }
+      writer.println("  }")
+    }
+    writer.println("}")
   }
 
 }
