@@ -101,5 +101,6 @@ trait Output {
   def ret: M
 
   def jnz(dest: Name): M
+  def jz(dest: Name): M
 
 }

@@ -217,4 +217,5 @@ trait Amd64NasmOutput extends Output {
   override def ret: M = ln("ret")
 
   override def jnz(dest: Name) = ln(show"jnz $dest")
+  override def jz(dest: Name)  = ln(show"jz $dest")
 }

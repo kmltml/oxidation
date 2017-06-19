@@ -43,11 +43,11 @@ def printInt(i: i32, stream: ptr[file]): u0 = {
 
 def main(): i32 = {
     // val buff: ptr[u8] = malloc(8192)
-    val size = 32000
+    val size = 16000
     val fac = 2.0 / cast[f64](size)
     val shift = if(size % 8 == 0) 0 else 8 - size % 8
     val f = fopen("image.pbm\0".data, "wb\0".data)
-    
+
     println("P4", f)
     printInt(size, f)
     printString(" ", f)

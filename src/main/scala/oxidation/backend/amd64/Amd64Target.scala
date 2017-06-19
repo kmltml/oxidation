@@ -12,6 +12,8 @@ import oxidation.backend.shared.{BlockLinearizationPass, RegisterAllocator}
 import oxidation.codegen.Name
 import oxidation.ir.ConstantPoolEntry
 
+import scala.annotation.tailrec
+
 class Amd64Target { this: Output =>
 
   private var _spillCount: Int = 0
@@ -212,10 +214,18 @@ class Amd64Target { this: Output =>
 
       implicit val _ctxt = ctxt.copy(floats = floatNames)
 
-      val res: F[Unit] = allocatedFun.body.traverse_ {
-        case ir.Block(_, instructions, _) => instructions.traverse_(outputInstruction(_))
+      val res: M = allocatedFun.body.foldMap {
+        case ir.Block(_, instructions, _) =>
+          @tailrec
+          def go(acc: M, is: Vector[ir.Inst]): M =
+            if(is.isEmpty) {
+              acc
+            } else {
+              val (m, rest) = outputInstructions(is)
+              go(acc |+| m, rest)
+            }
+          go(M.empty, instructions)
       }
-      val m = res.written
       val floatM = floatNames.map {
         case (ir.Val.F32(f), n) => dd(n, java.lang.Float.floatToRawIntBits(f))
         case (ir.Val.F64(d), n) => dq(n, java.lang.Double.doubleToRawLongBits(d))
@@ -230,7 +240,7 @@ class Amd64Target { this: Output =>
         global(name),
         label(name),
         prologue,
-        m,
+        res,
         floatM
       ).combineAll
   }
@@ -290,19 +300,42 @@ class Amd64Target { this: Output =>
       case (d: Val.R, ir.Type.F64) => movq(d, src)
     }
 
-  def outputInstruction(i: ir.Inst)(implicit ctxt: FunCtxt): F[Unit] = i match {
-    case ir.Inst.Label(n) => F.tell(label(n))
+  def outputInstructions(is: Vector[ir.Inst])(implicit ctxt: FunCtxt): (M, Vector[ir.Inst]) = is match {
+
+    case ir.Inst.Flow(ir.FlowControl.Branch(cond, ifTrue, ifFalse)) +:
+         ir.Inst.Label(lbl) +: rest
+      if ifTrue == lbl =>
+
+      val m = cmp(toVal(cond), 0) |+|
+              jz(ifFalse) |+|
+              label(lbl)
+      (m, rest)
+
+    case ir.Inst.Flow(ir.FlowControl.Branch(cond, ifTrue, ifFalse)) +:
+      ir.Inst.Label(lbl) +: rest
+      if ifFalse == lbl =>
+
+      val m = cmp(toVal(cond), 0) |+|
+        jnz(ifTrue) |+|
+        label(lbl)
+      (m, rest)
+
+    case i +: rest => (outputInstruction(i), rest)
+  }
+
+  def outputInstruction(i: ir.Inst)(implicit ctxt: FunCtxt): M = i match {
+    case ir.Inst.Label(n) => label(n)
 
     case ir.Inst.Flow(f) => outputFlow(f)
 
-    case ir.Inst.Do(ir.Op.Copy(_)) => F.pure(())
+    case ir.Inst.Do(ir.Op.Copy(_)) => M.empty
 
-    case ir.Inst.Move(_, ir.Op.Copy(ir.Val.UArr(_))) => F.pure(())
+    case ir.Inst.Move(_, ir.Op.Copy(ir.Val.UArr(_))) => M.empty
 
     case ir.Inst.Do(ir.Op.Store(addr, offset, value)) =>
       assert(regSize(addr.typ) == RegSize.QWord)
       assert(regSize(offset.typ) == RegSize.QWord)
-      F.tell(move(Val.m(Some(regSize(value.typ)), toVal(addr), toVal(offset)), value))
+      move(Val.m(Some(regSize(value.typ)), toVal(addr), toVal(offset)), value)
 
     case ir.Inst.Do(ir.Op.ArrStore(arr, index, value)) =>
       val arrM = toVal(arr).asInstanceOf[Val.M]
@@ -311,13 +344,13 @@ class Amd64Target { this: Output =>
         case Val.I(i) => arrM + Val.m(Some(regSize(value.typ)), i * elemSize)
         case Val.R(r) => arrM + Val.m(Some(regSize(value.typ)), r * elemSize)
       }
-      F.tell(mov(dest, toVal(value)))
+      mov(dest, toVal(value))
 
 
     case ir.Inst.Eval(_, ir.Op.Call(ir.Val.G(fun, _), params)) =>
       val stackParams = params.drop(4)
 
-      F.tell(Vector(
+      Vector(
         if(stackParams.nonEmpty) sub(RSP, stackParams.size * 8) else M.empty,
         stackParams.zipWithIndex.foldMap {
           case (r, i) =>
@@ -330,43 +363,43 @@ class Amd64Target { this: Output =>
         },
         call(fun),
         if(stackParams.nonEmpty) add(RSP, stackParams.size * 8) else M.empty
-      ).combineAll)
+      ).combineAll
 
     case ir.Inst.Move(dest, op) => op match {
       case ir.Op.Widen(src) => (signedness(src.typ), regSize(dest.typ), regSize(src.typ)) match {
-        case (_, a, b) if a == b => F.tell(mov(toVal(dest), toVal(src)))
+        case (_, a, b) if a == b => mov(toVal(dest), toVal(src))
 
         case (Unsigned, RegSize.QWord, RegSize.DWord) =>
           val Val.R(Reg(destLoc, _)) = toVal(dest)
-          F.tell(move(Reg(destLoc, RegSize.DWord), src))
+          move(Reg(destLoc, RegSize.DWord), src)
 
         case (Signed, RegSize.QWord, RegSize.DWord) =>
-          F.tell(movsxd(toVal(dest), toVal(src)))
+          movsxd(toVal(dest), toVal(src))
 
-        case (Unsigned, _, _) => F.tell(movzx(toVal(dest), toVal(src)))
-        case (Signed, _, _) => F.tell(movsx(toVal(dest), toVal(src)))
+        case (Unsigned, _, _) => movzx(toVal(dest), toVal(src))
+        case (Signed, _, _) => movsx(toVal(dest), toVal(src))
       }
 
       case ir.Op.Convert(v, _: ir.Type.I) => v.typ match {
-        case ir.Type.F32 => F.tell(cvttss2si(toVal(dest), toVal(v)))
-        case ir.Type.F64 => F.tell(cvttsd2si(toVal(dest), toVal(v)))
+        case ir.Type.F32 => cvttss2si(toVal(dest), toVal(v))
+        case ir.Type.F64 => cvttsd2si(toVal(dest), toVal(v))
       }
       case ir.Op.Convert(v, t: ir.Type.F) => t match {
-        case ir.Type.F32 => F.tell(cvtsi2ss(toVal(dest), toVal(v)))
-        case ir.Type.F64 => F.tell(cvtsi2sd(toVal(dest), toVal(v)))
+        case ir.Type.F32 => cvtsi2ss(toVal(dest), toVal(v))
+        case ir.Type.F64 => cvtsi2sd(toVal(dest), toVal(v))
       }
 
       case ir.Op.Sqrt(src) =>
         src.typ match {
-          case ir.Type.F32 => F.tell(sqrtss(toVal(dest), toVal(src)))
-          case ir.Type.F64 => F.tell(sqrtsd(toVal(dest), toVal(src)))
+          case ir.Type.F32 => sqrtss(toVal(dest), toVal(src))
+          case ir.Type.F64 => sqrtsd(toVal(dest), toVal(src))
         }
 
       case ir.Op.Trim(src) =>
         toVal(src) match {
           case Val.R(Reg(loc, _)) =>
-            F.tell(mov(toVal(dest), Val.R(Reg(loc, regSize(dest.typ)))))
-          case v => F.tell(mov(toVal(dest), v.withSize(regSize(dest.typ))))
+            mov(toVal(dest), Val.R(Reg(loc, regSize(dest.typ))))
+          case v => mov(toVal(dest), v.withSize(regSize(dest.typ)))
         }
 
       case ir.Op.Elem(arr, index) =>
@@ -376,164 +409,135 @@ class Amd64Target { this: Output =>
           case Val.I(i) => arrM + Val.m(Some(regSize(dest.typ)), i * elemSize)
           case Val.R(r) => arrM + Val.m(Some(regSize(dest.typ)), r * elemSize)
         }
-        F.tell(mov(toVal(dest), src))
+        mov(toVal(dest), src)
 
       case ir.Op.Unary(PrefixOp.Not, src) =>
-        F.tell(Vector(
-          move(toVal(dest), src),
-          xor(toVal(dest), 1)
-        ).combineAll)
+        move(toVal(dest), src) |+|
+        xor(toVal(dest), 1)
 
       case ir.Op.Unary(PrefixOp.Neg, src) =>
-        F.tell(Vector(
-          move(toVal(dest), src),
-          neg(toVal(dest))
-        ).combineAll)
+        move(toVal(dest), src) |+|
+        neg(toVal(dest))
 
       case ir.Op.Binary(op, left, right) => left.typ match {
         case _: ir.Type.Integral | ir.Type.U1 | ir.Type.Ptr => op match {
           case InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor =>
-            F.tell(Vector(
-              move(toVal(dest), left),
-              op match {
-                case InfixOp.Add => add(toVal(dest), toVal(right))
-                case InfixOp.Sub => sub(toVal(dest), toVal(right))
-                case InfixOp.BitAnd => and(toVal(dest), toVal(right))
-                case InfixOp.BitOr => or(toVal(dest), toVal(right))
-                case InfixOp.Xor => xor(toVal(dest), toVal(right))
-              }
-            ).combineAll)
+            move(toVal(dest), left) |+|
+            (op match {
+              case InfixOp.Add => add(toVal(dest), toVal(right))
+              case InfixOp.Sub => sub(toVal(dest), toVal(right))
+              case InfixOp.BitAnd => and(toVal(dest), toVal(right))
+              case InfixOp.BitOr => or(toVal(dest), toVal(right))
+              case InfixOp.Xor => xor(toVal(dest), toVal(right))
+            })
           case InfixOp.Shl | InfixOp.Shr =>
-            F.tell(Vector(
-              move(toVal(dest), left),
-              op match {
-                case InfixOp.Shl => shl(toVal(dest), toVal(right).withSize(RegSize.Byte))
-                case InfixOp.Shr => signedness(dest.typ) match {
-                  case Signed   => sar(toVal(dest), toVal(right).withSize(RegSize.Byte))
-                  case Unsigned => shr(toVal(dest), toVal(right).withSize(RegSize.Byte))
-                }
+            move(toVal(dest), left) |+|
+            (op match {
+              case InfixOp.Shl => shl(toVal(dest), toVal(right).withSize(RegSize.Byte))
+              case InfixOp.Shr => signedness(dest.typ) match {
+                case Signed   => sar(toVal(dest), toVal(right).withSize(RegSize.Byte))
+                case Unsigned => shr(toVal(dest), toVal(right).withSize(RegSize.Byte))
               }
-            ).combineAll)
+            })
 
-          case InfixOp.Div => F.tell(div(toVal(right)))
-          case InfixOp.Mod => F.tell(div(toVal(right)))
-          case InfixOp.Mul => F.tell(mul(toVal(right)))
+          case InfixOp.Div => div(toVal(right))
+          case InfixOp.Mod => div(toVal(right))
+          case InfixOp.Mul => mul(toVal(right))
           case (InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq | InfixOp.Eq | InfixOp.Neq) =>
-            F.tell(Vector(
-              cmp(toVal(left), toVal(right)),
-              op match {
-                case InfixOp.Lt => setl(toVal(dest))
-                case InfixOp.Gt => setg(toVal(dest))
-                case InfixOp.Geq => setge(toVal(dest))
-                case InfixOp.Leq => setle(toVal(dest))
-                case InfixOp.Eq => sete(toVal(dest))
-                case InfixOp.Neq => setne(toVal(dest))
-              }
-            ).combineAll)
+            cmp(toVal(left), toVal(right)) |+|
+            (op match {
+              case InfixOp.Lt => setl(toVal(dest))
+              case InfixOp.Gt => setg(toVal(dest))
+              case InfixOp.Geq => setge(toVal(dest))
+              case InfixOp.Leq => setle(toVal(dest))
+              case InfixOp.Eq => sete(toVal(dest))
+              case InfixOp.Neq => setne(toVal(dest))
+            })
         }
         case ir.Type.F32 => op match {
           case InfixOp.Add | InfixOp.Sub | InfixOp.Div | InfixOp.Mul =>
-            F.tell(Vector(
-              move(toVal(dest), left),
-              op match {
-                case InfixOp.Add => addss(toVal(dest), toVal(right))
-                case InfixOp.Sub => subss(toVal(dest), toVal(right))
-                case InfixOp.Div => divss(toVal(dest), toVal(right))
-                case InfixOp.Mul => mulss(toVal(dest), toVal(right))
-              }
-            ).combineAll)
+            move(toVal(dest), left) |+|
+            (op match {
+              case InfixOp.Add => addss(toVal(dest), toVal(right))
+              case InfixOp.Sub => subss(toVal(dest), toVal(right))
+              case InfixOp.Div => divss(toVal(dest), toVal(right))
+              case InfixOp.Mul => mulss(toVal(dest), toVal(right))
+            })
 
           case InfixOp.Eq | InfixOp.Neq =>
-            F.tell(Vector(
-              op match {
-                case InfixOp.Eq => cmpeqss(toVal(left), toVal(right))
-                case InfixOp.Neq => cmpneqss(toVal(left), toVal(right))
-              },
-              move(toVal(dest).withSize(RegSize.DWord), left),
-              neg(toVal(dest).withSize(RegSize.DWord))
-            ).combineAll)
+            (op match {
+              case InfixOp.Eq => cmpeqss(toVal(left), toVal(right))
+              case InfixOp.Neq => cmpneqss(toVal(left), toVal(right))
+            }) |+|
+            move(toVal(dest).withSize(RegSize.DWord), left) |+|
+            neg(toVal(dest).withSize(RegSize.DWord))
 
           case InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq =>
-            F.tell(Vector(
-              ucomiss(toVal(left), toVal(right)),
-              op match {
-                case InfixOp.Lt => setb(toVal(dest))
-                case InfixOp.Leq => setbe(toVal(dest))
-                case InfixOp.Gt => seta(toVal(dest))
-                case InfixOp.Geq => setae(toVal(dest))
-              }
-            ).combineAll)
+            ucomiss(toVal(left), toVal(right)) |+|
+            (op match {
+              case InfixOp.Lt => setb(toVal(dest))
+              case InfixOp.Leq => setbe(toVal(dest))
+              case InfixOp.Gt => seta(toVal(dest))
+              case InfixOp.Geq => setae(toVal(dest))
+            })
         }
         case ir.Type.F64 => op match {
           case InfixOp.Add | InfixOp.Sub | InfixOp.Div | InfixOp.Mul =>
-            F.tell(Vector(
-              move(toVal(dest), left),
-              op match {
-                case InfixOp.Add => addsd(toVal(dest), toVal(right))
-                case InfixOp.Sub => subsd(toVal(dest), toVal(right))
-                case InfixOp.Div => divsd(toVal(dest), toVal(right))
-                case InfixOp.Mul => mulsd(toVal(dest), toVal(right))
-              }
-            ).combineAll)
+            move(toVal(dest), left) |+|
+            (op match {
+              case InfixOp.Add => addsd(toVal(dest), toVal(right))
+              case InfixOp.Sub => subsd(toVal(dest), toVal(right))
+              case InfixOp.Div => divsd(toVal(dest), toVal(right))
+              case InfixOp.Mul => mulsd(toVal(dest), toVal(right))
+            })
           case InfixOp.Eq | InfixOp.Neq =>
-            F.tell(Vector(
-              op match {
-                case InfixOp.Eq => cmpeqsd(toVal(left), toVal(right))
-                case InfixOp.Neq => cmpneqsd(toVal(left), toVal(right))
-              },
-              move(toVal(dest).withSize(RegSize.QWord), left),
-              neg(toVal(dest).withSize(RegSize.QWord))
-            ).combineAll)
+            (op match {
+              case InfixOp.Eq => cmpeqsd(toVal(left), toVal(right))
+              case InfixOp.Neq => cmpneqsd(toVal(left), toVal(right))
+            }) |+|
+            move(toVal(dest).withSize(RegSize.QWord), left) |+|
+            neg(toVal(dest).withSize(RegSize.QWord))
 
           case InfixOp.Lt | InfixOp.Gt | InfixOp.Geq | InfixOp.Leq =>
-            F.tell(Vector(
-              ucomisd(toVal(left), toVal(right)),
-              op match {
-                case InfixOp.Lt => setb(toVal(dest))
-                case InfixOp.Leq => setbe(toVal(dest))
-                case InfixOp.Gt => seta(toVal(dest))
-                case InfixOp.Geq => setae(toVal(dest))
-              }
-            ).combineAll)
+            ucomisd(toVal(left), toVal(right)) |+|
+            (op match {
+              case InfixOp.Lt => setb(toVal(dest))
+              case InfixOp.Leq => setbe(toVal(dest))
+              case InfixOp.Gt => seta(toVal(dest))
+              case InfixOp.Geq => setae(toVal(dest))
+            })
         }
 
       }
 
-      case ir.Op.Copy(src) => F.tell(move(toVal(dest), src))
+      case ir.Op.Copy(src) => move(toVal(dest), src)
 
-      case ir.Op.Garbled => F.pure(())
+      case ir.Op.Garbled => M.empty
 
       case ir.Op.Load(addr, off) =>
         assert(regSize(addr.typ) == RegSize.QWord)
         assert(regSize(off.typ) == RegSize.QWord)
-        F.tell(
-          move(dest, Val.m(Some(regSize(dest.typ)), toVal(addr), toVal(off)))
-        )
+        move(dest, Val.m(Some(regSize(dest.typ)), toVal(addr), toVal(off)))
 
       case ir.Op.Stackalloc(size) =>
         val allocSize = (size + 7) & ~7 // align to 8 bytes
         assert(allocSize >= size && allocSize % 8 == 0)
-        F.tell(Vector(
-          sub(RSP, allocSize),
-          lea(toVal(dest), Val.m(None, RSP, 32))
-        ).combineAll)
+
+        sub(RSP, allocSize) |+|
+        lea(toVal(dest), Val.m(None, RSP, 32))
 
     }
   }
 
-  def outputFlow(f: ir.FlowControl)(implicit ctxt: FunCtxt): F[Unit] = f match {
+  def outputFlow(f: ir.FlowControl)(implicit ctxt: FunCtxt): M = f match {
     case ir.FlowControl.Return(r) =>
-      F.tell(Vector(
-        epilogue,
-        ret
-      ).combineAll)
-    case ir.FlowControl.Goto(n) => F.tell(jmp(n))
+      epilogue |+| ret
+
+    case ir.FlowControl.Goto(n) => jmp(n)
     case ir.FlowControl.Branch(cond, ifTrue, ifFalse) =>
-      F.tell(Vector(
-        cmp(toVal(cond), 0),
-        jnz(ifTrue),
+        cmp(toVal(cond), 0) |+|
+        jnz(ifTrue) |+|
         jmp(ifFalse)
-      ).combineAll)
   }
 
   def prologue(implicit ctxt: FunCtxt): M = {
