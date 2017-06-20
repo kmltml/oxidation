@@ -20,6 +20,10 @@ struct Vec5d = {
 
 def tests(): u0 = {
     assert(0.5 + 0.25 == 0.75, "Float addition")
+    assert({
+        val twenty = 20.0
+        twenty > 0.5
+    }, "Float comparison")
     assert(sumFloats(1.0, 0.5, 0.5, 2.5, 3.5, 0.5) == 8.5, "Float params and returns")
     assert(mul(0.5, 3) == 1.5, "Mixed float-int params")
     assert(lengthSq(Vec2d { x = 3.0, y = 4.0 }) == 25.0, "Passing structures with float members")

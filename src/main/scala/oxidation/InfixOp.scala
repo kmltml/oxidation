@@ -27,6 +27,13 @@ object InfixOp {
   case object Leq extends InfixOp
   case object Neq extends InfixOp
 
+  object Comp {
+    def unapply(op: InfixOp): Option[InfixOp] = op match {
+      case Eq | Neq | Lt | Gt | Geq | Leq => Some(op)
+      case _ => None
+    }
+  }
+
   implicit val show: Show[InfixOp] = {
     case Add => "+"
     case Sub => "-"

@@ -300,24 +300,44 @@ class Amd64Target { this: Output =>
       case (d: Val.R, ir.Type.F64) => movq(d, src)
     }
 
+  def branch(cc: ConditionCode, ifTrue: Name, ifFalse: Name, nextLabel: Name): M =
+    if(nextLabel == ifTrue)
+      jcc(!cc, ifFalse)
+    else if(nextLabel == ifFalse)
+      jcc(cc, ifTrue)
+    else
+      jcc(cc, ifTrue) |+| jmp(ifFalse)
+
   def outputInstructions(is: Vector[ir.Inst])(implicit ctxt: FunCtxt): (M, Vector[ir.Inst]) = is match {
 
     case ir.Inst.Flow(ir.FlowControl.Branch(cond, ifTrue, ifFalse)) +:
-         ir.Inst.Label(lbl) +: rest
-      if ifTrue == lbl =>
+         ir.Inst.Label(lbl) +: rest =>
 
       val m = cmp(toVal(cond), 0) |+|
-              jz(ifFalse) |+|
+              branch(ConditionCode.NotEqual, ifTrue, ifFalse, lbl) |+|
               label(lbl)
       (m, rest)
 
-    case ir.Inst.Flow(ir.FlowControl.Branch(cond, ifTrue, ifFalse)) +:
-      ir.Inst.Label(lbl) +: rest
-      if ifFalse == lbl =>
+    case ir.Inst.Move(flag, ir.Op.Binary(InfixOp.Comp(op), ir.Val(l, _: ir.Type.Integral | ir.Type.Ptr), r)) +:
+         ir.Inst.Flow(ir.FlowControl.Branch(ir.Val.R(cond), ifTrue, ifFalse)) +:
+         ir.Inst.Label(lbl) +: rest
+         if flag == cond =>
 
-      val m = cmp(toVal(cond), 0) |+|
-        jnz(ifTrue) |+|
-        label(lbl)
+      val cc = op match {
+        case InfixOp.Eq => ConditionCode.Equal
+        case InfixOp.Neq => ConditionCode.NotEqual
+        case InfixOp.Lt => ConditionCode.Less
+        case InfixOp.Leq => ConditionCode.LessOrEqual
+        case InfixOp.Gt => ConditionCode.Greater
+        case InfixOp.Geq => ConditionCode.GreaterOrEqual
+      }
+
+      val jumps = branch(cc, ifTrue, ifFalse, lbl)
+
+      val m = cmp(toVal(l), toVal(r)) |+|
+              setcc(cc, toVal(flag)) |+|
+              jumps |+|
+              label(lbl)
       (m, rest)
 
     case i +: rest => (outputInstruction(i), rest)

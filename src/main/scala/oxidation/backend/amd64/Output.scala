@@ -5,8 +5,8 @@ package amd64
 import cats._
 import cats.data._
 import cats.implicits._
-
-import oxidation.codegen.Name
+import ConditionCode._
+import codegen.Name
 
 trait Output {
 
@@ -82,16 +82,17 @@ trait Output {
   def cmpeqsd(dest: Val, src: Val): M
   def cmpneqsd(dest: Val, src: Val): M
 
-  def setl(dest: Val): M
-  def setle(dest: Val): M
-  def setg(dest: Val): M
-  def setge(dest: Val): M
-  def sete(dest: Val): M
-  def setne(dest: Val): M
-  def seta(dest: Val): M
-  def setae(dest: Val): M
-  def setb(dest: Val): M
-  def setbe(dest: Val): M
+  def setcc(cond: ConditionCode, dest: Val): M
+  def setl(dest: Val): M = setcc(Less, dest)
+  def setle(dest: Val): M = setcc(LessOrEqual, dest)
+  def setg(dest: Val): M = setcc(Greater, dest)
+  def setge(dest: Val): M = setcc(GreaterOrEqual, dest)
+  def sete(dest: Val): M = setcc(Equal, dest)
+  def setne(dest: Val): M = setcc(NotEqual, dest)
+  def seta(dest: Val): M = setcc(Above, dest)
+  def setae(dest: Val): M = setcc(AboveOrEqual, dest)
+  def setb(dest: Val): M = setcc(BelowOrEqual, dest)
+  def setbe(dest: Val): M = setcc(BelowOrEqual, dest)
 
   def push(src: Val): M
   def pop(dest: Val): M
@@ -100,7 +101,8 @@ trait Output {
   def jmp(dest: Name): M
   def ret: M
 
-  def jnz(dest: Name): M
-  def jz(dest: Name): M
+  def jcc(cond: ConditionCode, dest: Name): M
+  def jnz(dest: Name): M = jcc(NotZero, dest)
+  def jz(dest: Name): M = jcc(Zero, dest)
 
 }

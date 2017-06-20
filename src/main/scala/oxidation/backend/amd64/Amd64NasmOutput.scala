@@ -38,6 +38,8 @@ trait Amd64NasmOutput extends Output {
     case Name.Local(p, i) => show".$p.$i"
   }
 
+  private implicit val showCC: Show[ConditionCode] = _.repr
+
   type M = Vector[String]
 
   override def M: Monoid[M] = Monoid[Vector[String]]
@@ -191,16 +193,7 @@ trait Amd64NasmOutput extends Output {
   def cmpneqsd(dest: Val, src: Val): M =
     ln(show"cmpneqsd $dest, $src")
 
-  def setl(dest: Val): M = ln(show"setl $dest")
-  def setle(dest: Val): M = ln(show"setle $dest")
-  def setg(dest: Val): M = ln(show"setg $dest")
-  def setge(dest: Val): M = ln(show"setge $dest")
-  def sete(dest: Val): M = ln(show"sete $dest")
-  def setne(dest: Val): M = ln(show"setne $dest")
-  def seta(dest: Val): M = ln(show"seta $dest")
-  def setae(dest: Val): M = ln(show"setae $dest")
-  def setb(dest: Val): M = ln(show"setb $dest")
-  def setbe(dest: Val): M = ln(show"setbe $dest")
+  def setcc(cond: ConditionCode, dest: Val): M = ln(show"set$cond $dest")
 
   override def push(src: Val): M =
     ln(show"push $src")
@@ -216,6 +209,6 @@ trait Amd64NasmOutput extends Output {
 
   override def ret: M = ln("ret")
 
-  override def jnz(dest: Name) = ln(show"jnz $dest")
-  override def jz(dest: Name)  = ln(show"jz $dest")
+  def jcc(cond: ConditionCode, dest: Name): M = ln(show"j$cond $dest")
+
 }
