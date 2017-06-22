@@ -35,6 +35,11 @@ case class StackLayout(shadowSpace: Vector[StackAlloc], mainSpace: Vector[StackA
     else
       (copy(mainSpace = mainSpace :+ a), StackAlloc.Main(mainSpace.size))
 
+  def align(to: Int): StackLayout = {
+    val disalign = mainOffset.last % to
+    if(disalign == 0) this
+    else copy(mainSpace = mainSpace :+ StackAlloc.Padding(to - disalign))
+  }
 
 }
 
@@ -51,6 +56,7 @@ object StackAlloc {
   final case class SavedIntReg(reg: RegLoc) extends StackAlloc(1)
   final case class SavedXmmReg(reg: Xmm) extends StackAlloc(2)
   final case class Array(typ: Type.Arr) extends StackAlloc((typ.member.size * typ.elems + 7) / 8) // Round up to next 8 bytes
+  final case class Padding(override val slots: Int) extends StackAlloc(slots)
   final case object Spill extends StackAlloc(1)
 
   sealed trait Addr

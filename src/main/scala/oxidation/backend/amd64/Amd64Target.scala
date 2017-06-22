@@ -212,7 +212,7 @@ class Amd64Target { this: Output =>
         case (v, i) => v -> Name.Local("$FL", i)
       }.toMap
 
-      implicit val _ctxt = ctxt.copy(floats = floatNames)
+      implicit val _ctxt = ctxt.copy(floats = floatNames, stack = ctxt.stack.align(2))
 
       val res: M = allocatedFun.body.foldMap {
         case ir.Block(_, instructions, _) =>
@@ -369,9 +369,9 @@ class Amd64Target { this: Output =>
 
     case ir.Inst.Eval(_, ir.Op.Call(ir.Val.G(fun, _), params)) =>
       val stackParams = params.drop(4)
-
+      val alignedStackParamsSize = (stackParams.size * 8 + 15) & ~15
       Vector(
-        if(stackParams.nonEmpty) sub(RSP, stackParams.size * 8) else M.empty,
+        if(stackParams.nonEmpty) sub(RSP, alignedStackParamsSize) else M.empty,
         stackParams.zipWithIndex.foldMap {
           case (r, i) =>
             val dest = Val.m(Some(regSize(r.typ)), RSP, 8 * (4 + i))
@@ -382,7 +382,7 @@ class Amd64Target { this: Output =>
             }
         },
         call(fun),
-        if(stackParams.nonEmpty) add(RSP, stackParams.size * 8) else M.empty
+        if(stackParams.nonEmpty) add(RSP, alignedStackParamsSize) else M.empty
       ).combineAll
 
     case ir.Inst.Move(dest, op) => op match {
@@ -540,7 +540,7 @@ class Amd64Target { this: Output =>
         move(dest, Val.m(Some(regSize(dest.typ)), toVal(addr), toVal(off)))
 
       case ir.Op.Stackalloc(size) =>
-        val allocSize = (size + 7) & ~7 // align to 8 bytes
+        val allocSize = (size + 15) & ~15 // align to 16 bytes
         assert(allocSize >= size && allocSize % 8 == 0)
 
         sub(RSP, allocSize) |+|
