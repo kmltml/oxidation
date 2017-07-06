@@ -212,6 +212,16 @@ object ParserTests extends TestSuite {
       "a while loop" - {
         expr.parse("while(foo) bar()").get.value ==> While(Var("foo", 6 +> 3), App(Var("bar", 11 +> 3), Nil, 11 +> 5), 0 +> 16)
       }
+      "a match expression" - {
+        expr.parse(
+          """match(foo) {
+            |  case 10 => 20
+            |  case x => x + 2
+            |}""".stripMargin.normalize).get.value ==> Match(Var("foo", 6 +> 3), List(
+              Pattern.IntLit(10, 20 +> 2) -> IntLit(20, 26 +> 2),
+              Pattern.Var("x", 36 +> 1) -> InfixAp(InfixOp.Add, Var("x", 41 +> 1), IntLit(2, 45 +> 1), 41 +> 5)
+            ), 0 +> 48)
+      }
       "a variable assignment" - {
         expr.parse("foo = 42").get.value ==> Assign(Var("foo", 0 +> 3), None, IntLit(42, 6 +> 2), 0 +> 8)
         expr.parse("foo.bar(32).baz += 6").get.value ==>
@@ -229,6 +239,19 @@ object ParserTests extends TestSuite {
         expr.parse("foo &= bar").get.value ==> Assign(Var("foo", 0 +> 3), Some(InfixOp.BitAnd), Var("bar", 7 +> 3), 0 +> 10)
         expr.parse("foo |= bar").get.value ==> Assign(Var("foo", 0 +> 3), Some(InfixOp.BitOr), Var("bar", 7 +> 3), 0 +> 10)
       }
+    }
+
+    "Pattern" - {
+      val pat = p.whole(p.pattern)
+      "Var" - (pat.parse("xyz").get.value ==> Pattern.Var("xyz", 0 +> 3))
+      "Ignore" - (pat.parse("_").get.value ==> Pattern.Ignore(0 +> 1))
+      "IntLit" - (pat.parse("10").get.value ==> Pattern.IntLit(10, 0 +> 2))
+      "FloatLit" - (pat.parse("10.0").get.value ==> Pattern.FloatLit(10.0, 0 +> 4))
+      "BoolLit" - {
+        "true" - (pat.parse("true").get.value ==> Pattern.BoolLit(true, 0 +> 4))
+        "false" - (pat.parse("false").get.value ==> Pattern.BoolLit(false, 0 +> 5))
+      }
+      "CharLit" - (pat.parse("'a'").get.value ==> Pattern.CharLit('a', 0 +> 3))
     }
 
     "definition should parse" - {

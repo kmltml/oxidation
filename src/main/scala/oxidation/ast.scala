@@ -47,22 +47,33 @@ trait Ast {
 
   }
 
-  final case class IntLit(value: Long, loc: Span) extends Expression
-  final case class FloatLit(value: BigDecimal, loc: Span) extends Expression
-  final case class BoolLit(value: Boolean, loc: Span) extends Expression
-  final case class CharLit(value: Char, loc: Span) extends Expression
+  final case class IntLit(value: Long, loc: Span) extends Expression {
+    def pattern = Pattern.IntLit(value, loc)
+  }
+  final case class FloatLit(value: BigDecimal, loc: Span) extends Expression {
+    def pattern = Pattern.FloatLit(value, loc)
+  }
+  final case class BoolLit(value: Boolean, loc: Span) extends Expression {
+    def pattern = Pattern.BoolLit(value, loc)
+  }
+  final case class CharLit(value: Char, loc: Span) extends Expression {
+    def pattern = Pattern.CharLit(value, loc)
+  }
   final case class StringLit(value: String, loc: Span) extends Expression
   final case class StructLit(name: Symbol, members: List[(String, Typed[Expression])], loc: Span) extends Expression
   final case class UnitLit(loc: Span) extends Expression
   final case class InfixAp(operator: InfixOp, left: Typed[Expression], right: Typed[Expression], loc: Span) extends Expression
   final case class PrefixAp(operator: PrefixOp, expr: Typed[Expression], loc: Span) extends Expression
-  final case class Var(name: Symbol, loc: Span) extends Expression
+  final case class Var(name: Symbol, loc: Span) extends Expression {
+    def pattern = Pattern.Var(name, loc)
+  }
   final case class Block(body: Vector[Typed[BlockStatement]], loc: Span) extends Expression
   final case class App(expr: Typed[Expression], params: List[Typed[Expression]], loc: Span) extends Expression
   final case class TypeApp(expr: Typed[Expression], params: List[TypeName], loc: Span) extends Expression
   final case class Select(expr: Typed[Expression], member: String, loc: Span) extends Expression
   final case class If(cond: Typed[Expression], positive: Typed[Expression], negative: Option[Typed[Expression]], loc: Span) extends Expression
   final case class While(cond: Typed[Expression], body: Typed[Expression], loc: Span) extends Expression
+  final case class Match(matchee: Typed[Expression], cases: List[(Pattern, Typed[Expression])], loc: Span) extends Expression
   final case class Assign(lval: Typed[Expression], op: Option[InfixOp], rval: Typed[Expression], loc: Span) extends Expression
 
   final case class Extern(loc: Span) extends Expression
@@ -76,6 +87,18 @@ trait Ast {
   final case class Stackalloc(pointee: TypeInfo, loc: Span) extends Expression
   final case class ArrLit(elems: List[Typed[Expression]], loc: Span) extends Expression
 
+  sealed trait Pattern
+
+  object Pattern {
+
+    final case class Var(name: Symbol, loc: Span) extends Pattern
+    final case class Ignore(loc: Span) extends Pattern
+    final case class IntLit(value: Long, loc: Span) extends Pattern
+    final case class FloatLit(value: BigDecimal, loc: Span) extends Pattern
+    final case class BoolLit(value: Boolean, loc: Span) extends Pattern
+    final case class CharLit(value: Char, loc: Span) extends Pattern
+
+  }
 
   sealed trait TLD
 

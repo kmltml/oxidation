@@ -48,7 +48,8 @@ class Parser(file: Option[String]) {
     P((WS ~~ tld).repX(sep = semi).map(_.toVector) ~~ End)
 
   private val expression0: P[Expression] = P(
-    stringLiteral | floatLiteral | intLiteral | structLit | charLiteral | unitLiteral | varacc | parexp | blockexpr | ifexp | whileexp | boolLiteral
+    stringLiteral | floatLiteral | intLiteral | structLit | charLiteral | unitLiteral |
+    varacc | parexp | blockexpr | ifexp | whileexp | matchexp | boolLiteral
   )
   private val expression1: P[Expression] = P(
     expression0 ~~ postfix.repX
@@ -78,6 +79,14 @@ class Parser(file: Option[String]) {
     }
 
   val expression: P[Expression] = P(expression13)
+
+  val pattern: P[Pattern] =
+    P( located(K("_")).map(Pattern.Ignore)
+     | varacc.map(_.pattern)
+     | floatLiteral.map(_.pattern)
+     | boolLiteral.map(_.pattern)
+     | charLiteral.map(_.pattern)
+     | intLiteral.map(_.pattern))
 
   val definition: P[Def] = P(
     defdef | valdef | vardef | structdef | enumdef | typedef
@@ -127,7 +136,7 @@ class Parser(file: Option[String]) {
 
   val keyword: P0 =
     P(K(StringIn("if", "else", "def", "while", "struct", "enum", "extern",
-      "val", "var", "true", "false", "module", "import", "type")))
+      "val", "var", "true", "false", "module", "import", "type", "match", "case")))
 
   private val idSpecialChars = "$_"
   private val idStart = P(CharPred(c => c.isLetter || idSpecialChars.contains(c)))
@@ -261,6 +270,12 @@ class Parser(file: Option[String]) {
 
   private val whileexp: P[While] =
     P(located(K("while") ~/ "(" ~ expression ~ ")" ~/ expression)).map(While.tupled)
+
+  private val matchexp: P[Match] = {
+    val cas = K("case") ~/ pattern ~ O("=>") ~ expression
+    P(located(K("match") ~/ "(" ~ expression ~ ")" ~/ "{" ~ cas.rep ~ "}"))
+      .map { case (m, cs, l) => Match(m, cs.toList, l) }
+  }
 
   private val prefixOp: P[PrefixOp] = P(
     O("-").as(PrefixOp.Neg)
