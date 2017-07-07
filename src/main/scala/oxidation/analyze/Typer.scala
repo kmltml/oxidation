@@ -247,9 +247,14 @@ object Typer {
             case (pattern, body) =>
               solveMatchCase(typedMatchee.typ, expected, ctxt)(pattern, body)
           }.andThen { typedCases =>
+            val unhandled = typedCases.foldLeft(MatchSet.Any(typedMatchee.typ) : MatchSet) {
+              case (set, (Typed(pattern, _), _)) => set - pattern
+            }
             val resultType = typedCases.map(_._2.typ).reduceLeft(commonType)
             val unifiedCases = typedCases.traverse(_.traverse(unifyType(_, ExpectedType.Specific(resultType))))
-            unifiedCases.andThen(cs => unifyType(Typed(ast.Match(typedMatchee, cs, loc), resultType), expected))
+            unifiedCases
+              .andThen(cs => unifyType(Typed(ast.Match(typedMatchee, cs, loc), resultType), expected)) <*
+              (if(unhandled.isEmpty) valid(()) else invalidNel(TyperError.NonexhaustivePatternMatch(unhandled, loc)))
           }
         }
 
