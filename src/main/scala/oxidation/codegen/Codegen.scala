@@ -225,6 +225,37 @@ object Codegen {
         )
       } yield Val.I(0, ir.Type.U0)
 
+    case Typed(ast.Match(matchee, cases, _), t) =>
+      for {
+        afterlbl <- genLocalName("matchafter")
+        matcheeVal <- compileExpr(matchee)
+        r <- genReg(translateType(t))
+        _ <- cases.traverse_ {
+          case (pattern, body) =>
+            for {
+              binds <- storeBindings
+              lbli <- genLocalIndex
+              caselbl = Name.Local("case", lbli)
+              nextlbl = Name.Local("casenext", lbli)
+              patres <- compilePattern(pattern, matcheeVal, nextlbl)
+              _ <- instructions(
+                Inst.Flow(FlowControl.Branch(patres, caselbl, nextlbl)),
+                Inst.Label(caselbl)
+              )
+              bodyres <- compileExpr(body)
+              _ <- instructions(
+                Inst.Move(r, Op.Copy(bodyres)),
+                Inst.Flow(FlowControl.Goto(afterlbl)),
+                Inst.Label(nextlbl)
+              )
+              _ <- restoreBindings(binds)
+            } yield ()
+        }
+        _ <- instructions(
+          Inst.Label(afterlbl)
+        )
+      } yield Val.R(r)
+
     case Typed(ast.App(Typed(ast.Var(Symbol.Global(List("sqrt")), _), _), List(param), _), tpe) =>
       for {
         p <- compileExpr(param)
@@ -438,6 +469,33 @@ object Codegen {
         Def.TrivialVal(Name.Global(name), valueVal)
       } else Def.ComputedVal(Name.Global(name), Vector(Block(Name.Local("body", 0), log.insts, FlowControl.Return(valueVal))),
                              translateType(value.typ), log.consts.toSet)
+  }
+
+  def compilePattern(pattern: Typed[ast.Pattern], matchee: Val, nextlbl: Name): Res[Val] = pattern match {
+    case Typed(ast.Pattern.Ignore(_), _) =>
+      Res.pure(Val.I(1, Type.U1))
+    case Typed(ast.Pattern.Var(n, _), t) =>
+      for {
+        r <- genReg(translateType(t))
+        _ <- instructions(
+          Inst.Move(r, Op.Copy(matchee))
+        )
+        _ <- withBindings(n -> r)
+      } yield Val.I(1, Type.U1)
+    case Typed(_: ast.Pattern.IntLit | _: ast.Pattern.FloatLit | _: ast.Pattern.BoolLit | _: ast.Pattern.CharLit, _) =>
+      val rval = pattern match {
+        case Typed(ast.Pattern.IntLit(v, _), t) => Val.I(v, translateType(t))
+        case Typed(ast.Pattern.FloatLit(v, _), analyze.Type.F32) => Val.F32(v.toFloat)
+        case Typed(ast.Pattern.FloatLit(v, _), analyze.Type.F64) => Val.F64(v.toDouble)
+        case Typed(ast.Pattern.BoolLit(v, _), _) => Val.I(if(v) 1 else 0, Type.U1)
+        case Typed(ast.Pattern.CharLit(v, _), t) => Val.I(v.toLong, translateType(t))
+      }
+      for {
+        r <- genReg(Type.U1)
+        _ <- instructions(
+          Inst.Move(r, Op.Binary(InfixOp.Eq, matchee, rval))
+        )
+      } yield Val.R(r)
   }
 
   private def translateType(t: analyze.Type): ir.Type = t match {

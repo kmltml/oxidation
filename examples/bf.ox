@@ -67,39 +67,46 @@ def main(argc: u64, args: ptr[ptr[u16]]): i32 = {
     while(ip < bufferSize && buffer(ip) != 0) {
         val instr = buffer(ip)
         head = head % memorySize
-        if(instr == '+') {
-            memory(head) += 1
-            ip += 1
-        } else if(instr == '-') {
-            memory(head) -= 1
-            ip += 1
-        }  else if(instr == '>') {
-            head += 1
-            ip += 1
-        } else if(instr == '<') {
-            head -= 1
-            ip += 1
-        } else if(instr == '.') {
-            putchar(memory(head))
-            ip += 1
-        } else if(instr == ',') {
-            memory(head) = getchar()
-            ip += 1
-        } else if(instr == '[') {
-            if(memory(head) == 0) {
-                ip = findClosingBrace(ip, buffer) + 1
-            } else {
+        match(instr) {
+            case '+' => {
+                memory(head) += 1
                 ip += 1
             }
-        } else if(instr == ']') {
-            if(memory(head) != 0) {
-                ip = findOpeningBrace(ip, buffer) + 1
-            } else {
+            case '-' => {
+                memory(head) -= 1
                 ip += 1
             }
-        } else {
-            // comment - skip
-            ip += 1
+            case '>' => {
+                head += 1
+                ip += 1
+            }
+            case '<' => {
+                head -= 1
+                ip += 1
+            }
+            case '.' => {
+                putchar(memory(head))
+                ip += 1
+            }
+            case ',' => {
+                memory(head) = getchar()
+                ip += 1
+            }
+            case '[' =>
+                if(memory(head) == 0) {
+                    ip = findClosingBrace(ip, buffer) + 1
+                } else {
+                    ip += 1
+                }
+            case ']' =>
+                if(memory(head) != 0) {
+                    ip = findOpeningBrace(ip, buffer) + 1
+                } else {
+                    ip += 1
+                }
+            case _ =>
+                // comment - skip
+                ip += 1
         }
     }
     0

@@ -7,5 +7,6 @@ def main(): i32 = {
     spills.tests()
     arrays.tests()
     floats.tests()
+    patmat.tests()
     0
 }
