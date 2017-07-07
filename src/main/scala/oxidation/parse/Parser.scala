@@ -273,7 +273,7 @@ class Parser(file: Option[String]) {
 
   private val matchexp: P[Match] = {
     val cas = K("case") ~/ pattern ~ O("=>") ~ expression
-    P(located(K("match") ~/ "(" ~ expression ~ ")" ~/ "{" ~ cas.rep ~ "}"))
+    P(located(K("match") ~/ "(" ~ expression ~ ")" ~/ "{" ~ cas.rep(min = 1) ~ "}"))
       .map { case (m, cs, l) => Match(m, cs.toList, l) }
   }
 

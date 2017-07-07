@@ -73,7 +73,7 @@ trait Ast {
   final case class Select(expr: Typed[Expression], member: String, loc: Span) extends Expression
   final case class If(cond: Typed[Expression], positive: Typed[Expression], negative: Option[Typed[Expression]], loc: Span) extends Expression
   final case class While(cond: Typed[Expression], body: Typed[Expression], loc: Span) extends Expression
-  final case class Match(matchee: Typed[Expression], cases: List[(Pattern, Typed[Expression])], loc: Span) extends Expression
+  final case class Match(matchee: Typed[Expression], cases: List[(Typed[Pattern], Typed[Expression])], loc: Span) extends Expression
   final case class Assign(lval: Typed[Expression], op: Option[InfixOp], rval: Typed[Expression], loc: Span) extends Expression
 
   final case class Extern(loc: Span) extends Expression
@@ -142,6 +142,7 @@ trait Ast {
       case If(c, p, n, _) =>
         traverse(c)(f) ++ traverse(p)(f) ++ n.map(traverse(_)(f)).orEmpty
       case While(c, b, _) => traverse(c)(f) ++ traverse(b)(f)
+      case Match(m, c, _) => traverse(m)(f) ++ c.foldMap { case (_, e) => traverse(m)(f) }
       case Assign(l, _, r, _) => traverse(l)(f) ++ traverse(r)(f)
       case StructLit(_, members, _) => members.map(_._2).foldMap(traverse(_)(f))
 

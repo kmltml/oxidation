@@ -240,6 +240,19 @@ object Typer {
         .map2((_, _))
         .andThen { case (c, b) => unifyType(Typed(ast.While(c, b, loc), U0), expected) }
 
+    case P.Match(matchee, cases, loc) =>
+      solveType(matchee, ExpectedType.Undefined, ctxt)
+        .andThen { typedMatchee =>
+          cases.traverse {
+            case (pattern, body) =>
+              solveMatchCase(typedMatchee.typ, expected, ctxt)(pattern, body)
+          }.andThen { typedCases =>
+            val resultType = typedCases.map(_._2.typ).reduceLeft(commonType)
+            val unifiedCases = typedCases.traverse(_.traverse(unifyType(_, ExpectedType.Specific(resultType))))
+            unifiedCases.andThen(cs => unifyType(Typed(ast.Match(typedMatchee, cs, loc), resultType), expected))
+          }
+        }
+
     case P.Block(Vector(), loc) =>
       unifyType(Typed(ast.Block(Vector.empty, loc), U0), expected)
 
@@ -290,6 +303,38 @@ object Typer {
         rtyped <- solveType(rval, ExpectedType.Specific(ltyped.typ), ctxt).toEither
         t <- unifyType(Typed(ast.Assign(ltyped, None, rtyped, loc), U0), expected).toEither
       } yield t)
+  }
+
+  private def solveMatchCase(matcheeType: Type, expectedType: ExpectedType, ctxt: Ctxt)
+                            (pattern: P.Pattern, body: P.Expression): TyperResult[(Typed[ast.Pattern], Typed[ast.Expression])] = {
+    val bodyCtxt = pattern match {
+      case P.Pattern.Var(n, _) => ctxt.withTerms(Map(n -> Ctxt.Immutable(matcheeType)))
+      case P.Pattern.Ignore(_) | P.Pattern.IntLit(_, _) | P.Pattern.FloatLit(_, _) | P.Pattern.BoolLit(_, _)
+           | P.Pattern.CharLit(_, _) => ctxt
+    }
+    (solvePattern(pattern, matcheeType, ctxt), solveType(body, expectedType, bodyCtxt))
+      .map2((_, _))
+  }
+
+  private def solvePattern(pattern: P.Pattern, matcheeType: Type, ctxt: Ctxt): TyperResult[Typed[ast.Pattern]] = pattern match {
+    case P.Pattern.Ignore(loc) => valid(Typed(ast.Pattern.Ignore(loc), matcheeType))
+    case P.Pattern.Var(name, loc) => valid(Typed(ast.Pattern.Var(name, loc), matcheeType))
+    case P.Pattern.IntLit(value, loc) => matcheeType match {
+      case t: Integral => valid(Typed(ast.Pattern.IntLit(value, loc), t))
+      case t => invalidNel(TyperError.CantMatch(ExpectedType.Numeric(Some(I32)), t, loc))
+    }
+    case P.Pattern.CharLit(value, loc) => matcheeType match {
+      case t: Integral => valid(Typed(ast.Pattern.IntLit(value, loc), t))
+      case t => invalidNel(TyperError.CantMatch(ExpectedType.Numeric(Some(U8)), t, loc))
+    }
+    case P.Pattern.FloatLit(value, loc) => matcheeType match {
+      case t: F => valid(Typed(ast.Pattern.FloatLit(value, loc), t))
+      case t => invalidNel(TyperError.CantMatch(ExpectedType.Numeric(Some(F64)), t, loc))
+    }
+    case P.Pattern.BoolLit(value, loc) => matcheeType match {
+      case U1 => valid(Typed(ast.Pattern.BoolLit(value, loc), U1))
+      case t => invalidNel(TyperError.CantMatch(ExpectedType.Specific(U1), t, loc))
+    }
   }
 
   private def solveLVal(e: P.Expression, ctxt: Ctxt): TyperResult[Typed[ast.Expression]] = e match {
@@ -380,6 +425,12 @@ object Typer {
     case (typ, ExpectedType.Specific(u)) =>
       if(typ == u) valid(t) else invalidNel(TyperError.CantMatch(expected, typ, t.expr.loc))
     case (_, ExpectedType.Undefined) => valid(t)
+  }
+
+  private[analyze] def commonType(a: Type, b: Type): Type = (a, b) match {
+    case (a, b) if a == b => a
+    case (a: Num, b: Num) => wider(a, b)
+    case _ => U0
   }
 
   private def wider(a: Type, b: Type): Type = (a, b) match {

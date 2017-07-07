@@ -202,6 +202,20 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
               ast.InfixAp(InfixOp.Add, ast.Var(l('x), loc) :: I32, ast.IntLit(1, loc) :: I32, loc) :: I32, loc) :: U0, loc
           ) :: U0)
       }
+      "Match" - {
+        solveType(P.Match(
+          P.Var(l('x), loc), List(
+            P.Pattern.IntLit(0, loc) -> P.IntLit(0, loc),
+            P.Pattern.Var(l('x), loc) -> P.InfixAp(InfixOp.Sub, P.Var(l('x), loc), P.IntLit(1, loc), loc)
+          ), loc
+        ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(I32)))) ==>
+          valid(ast.Match(
+            ast.Var(l('x), loc) :: I32, List(
+              (ast.Pattern.IntLit(0, loc) :: I32) -> (ast.IntLit(0, loc) :: I32),
+              (ast.Pattern.Var(l('x), loc) :: I32) -> (ast.InfixAp(InfixOp.Sub, ast.Var(l('x), loc) :: I32, ast.IntLit(1, loc) :: I32, loc) :: I32)
+            ), loc
+          ) :: I32)
+      }
       "Select" - {
         val s = Struct(g('s), StructMember("x", I32), StructMember("y", I64))
         "struct" - {

@@ -125,6 +125,25 @@ object SymbolResolver {
       (solveExpr(cond, scope, global), solveExpr(body, scope, global))
         .map2(parse.ast.While(_, _, loc))
 
+    case parse.ast.Match(matchee, cases, loc) =>
+      def solveCase(pattern: parse.ast.Pattern, body: parse.ast.Expression): Res[(parse.ast.Pattern, parse.ast.Expression)] = {
+        import parse.ast.Pattern
+        val bindings = pattern match {
+          case Pattern.Var(Symbol.Unresolved(n), _) => List(Symbol.Local(n))
+          case Pattern.Ignore(_) | Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.BoolLit(_, _)
+             | Pattern.CharLit(_, _) => Nil
+        }
+        val newPattern = pattern match {
+          case Pattern.Var(Symbol.Unresolved(n), loc) => Pattern.Var(Symbol.Local(n), loc)
+          case Pattern.Ignore(_) | Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.BoolLit(_, _)
+               | Pattern.CharLit(_, _) => pattern
+        }
+        solveExpr(body, bindings.foldLeft(scope)(_.shadowTerm(_)), global).map(newPattern -> _)
+      }
+
+      (solveExpr(matchee, scope, global), cases.traverse((solveCase _).tupled))
+        .map2(parse.ast.Match(_, _, loc))
+
     case parse.ast.Assign(left, op, right, loc) =>
       (solveExpr(left, scope, global), solveExpr(right, scope, global))
         .map2(parse.ast.Assign(_, op, _, loc))
