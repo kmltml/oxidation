@@ -252,6 +252,35 @@ object ParserTests extends TestSuite {
         "false" - (pat.parse("false").get.value ==> Pattern.BoolLit(false, 0 +> 5))
       }
       "CharLit" - (pat.parse("'a'").get.value ==> Pattern.CharLit('a', 0 +> 3))
+      "Struct" - {
+        "basic explicit" - {
+          pat.parse("point { x = 10, y = _ }").get.value ==>
+            Pattern.Struct(Some("point"), List(
+              "x" -> Pattern.IntLit(10, 12 +> 2),
+              "y" -> Pattern.Ignore(20 +> 1)
+            ), ignoreExtra = false, 0 +> 23)
+        }
+        "basic implicit" - {
+          pat.parse("{ x = 10, y = _ }").get.value ==>
+            Pattern.Struct(None, List(
+              "x" -> Pattern.IntLit(10, 6 +> 2),
+              "y" -> Pattern.Ignore(14 +> 1)
+            ), ignoreExtra = false, 0 +> 17)
+        }
+        "automatic name bind" - {
+          pat.parse("{ x, y }").get.value ==>
+            Pattern.Struct(None, List(
+              "x" -> Pattern.Var("x", 2 +> 1),
+              "y" -> Pattern.Var("y", 5 +> 1)
+            ), ignoreExtra = false, 0 +> 8)
+        }
+        "unmentioned members ignore" - {
+          pat.parse("{ x, _ }").get.value ==>
+            Pattern.Struct(None, List(
+              "x" -> Pattern.Var("x", 2 +> 1)
+            ), ignoreExtra = true, 0 +> 8)
+        }
+      }
     }
 
     "definition should parse" - {

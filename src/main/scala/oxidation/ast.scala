@@ -34,6 +34,7 @@ trait Ast {
       case x: Select => x.copy(loc = loc)
       case x: If => x.copy(loc = loc)
       case x: While => x.copy(loc = loc)
+      case x: Match => x.copy(loc = loc)
       case x: Assign => x.copy(loc = loc)
       case x: Extern => x.copy(loc = loc)
       case x: Widen => x.copy(loc = loc)
@@ -97,6 +98,7 @@ trait Ast {
     final case class FloatLit(value: BigDecimal, loc: Span) extends Pattern
     final case class BoolLit(value: Boolean, loc: Span) extends Pattern
     final case class CharLit(value: Char, loc: Span) extends Pattern
+    final case class Struct(typeName: Option[Symbol], members: List[(String, Typed[Pattern])], ignoreExtra: Boolean, loc: Span) extends Pattern
 
   }
 

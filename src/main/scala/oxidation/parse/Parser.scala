@@ -82,11 +82,19 @@ class Parser(file: Option[String]) {
 
   val pattern: P[Pattern] =
     P( located(K("_")).map(Pattern.Ignore)
+     | structPattern
      | varacc.map(_.pattern)
      | floatLiteral.map(_.pattern)
      | boolLiteral.map(_.pattern)
      | charLiteral.map(_.pattern)
      | intLiteral.map(_.pattern))
+
+  val structPattern: P[Pattern.Struct] = {
+    val member = P(located(!K("_") ~ id.!) ~ ("=" ~/ pattern).?)
+      .map { case (n, loc, p) => n -> p.getOrElse(Pattern.Var(Symbol.Unresolved(n), loc)) }
+    P(located(id.!.? ~ "{" ~/ member.repX(min = 1, sep = semiOrComa) ~ (semiOrComa ~ "_").!.? ~ "}"))
+      .map { case (typ, ms, e, loc) => Pattern.Struct(typ.map(Symbol.Unresolved), ms.toList, e.nonEmpty, loc) }
+  }
 
   val definition: P[Def] = P(
     defdef | valdef | vardef | structdef | enumdef | typedef
