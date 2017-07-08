@@ -231,6 +231,35 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
               ), loc
             ) :: I32)
         }
+        "struct" - {
+          val struct = Type.Struct(g('foo), StructMember("x", U1), StructMember("y", U1))
+          solveType(P.Match(
+            P.Var(l('x), loc), List(
+              P.Pattern.Struct(Some(g('foo)), List(
+                "x" -> P.Pattern.BoolLit(true, loc)
+              ), ignoreExtra = true, loc) -> P.BoolLit(true, loc),
+              P.Pattern.Struct(None, List(
+                "x" -> P.Pattern.BoolLit(false, loc), "y" -> P.Pattern.BoolLit(false, loc)
+              ), ignoreExtra = false, loc) -> P.BoolLit(false, loc),
+              P.Pattern.Struct(None, List(
+                "x" -> P.Pattern.BoolLit(false, loc), "y" -> P.Pattern.BoolLit(true, loc)
+              ), ignoreExtra = false, loc) -> P.BoolLit(true, loc)
+            ), loc
+          ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(struct))).withTypes(Map(g('foo) -> struct))) ==>
+            valid(ast.Match(
+              ast.Var(l('x), loc) :: struct, List(
+                (ast.Pattern.Struct(Some(g('foo)), List(
+                  "x" -> (ast.Pattern.BoolLit(true, loc) :: U1)
+                ), ignoreExtra = true, loc) :: struct) -> (ast.BoolLit(true, loc) :: U1),
+                (ast.Pattern.Struct(None, List(
+                  "x" -> (ast.Pattern.BoolLit(false, loc) :: U1), "y" -> (ast.Pattern.BoolLit(false, loc) :: U1)
+                ), ignoreExtra = false, loc) :: struct) -> (ast.BoolLit(false, loc) :: U1),
+                (ast.Pattern.Struct(None, List(
+                  "x" -> (ast.Pattern.BoolLit(false, loc) :: U1), "y" -> (ast.Pattern.BoolLit(true, loc) :: U1)
+                ), ignoreExtra = false, loc) :: struct) -> (ast.BoolLit(true, loc) :: U1)
+              ), loc
+            ) :: U1)
+        }
         "nonexhaustive" - {
           val matchLoc = Span(None, 0, 10)
           "i32" - {
@@ -242,13 +271,40 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
             ), ExpectedType.Specific(I32), Ctxt.default.withTerms(Map(l('x) -> imm(I32)))) ==>
               invalidNel(TyperError.NonexhaustivePatternMatch(MatchSet.Any(I32), matchLoc))
           }
-          "i1" - {
+          "u1" - {
             solveType(P.Match(
               P.Var(l('x), loc), List(
                 P.Pattern.BoolLit(true, loc) -> P.IntLit(1, loc)
               ), matchLoc
             ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(U1)))) ==>
               invalidNel(TyperError.NonexhaustivePatternMatch(MatchSet.Bool(false), matchLoc))
+          }
+          "{u1, u1}" - {
+            val struct = Type.Struct(g('foo), StructMember("x", U1), StructMember("y", U1))
+            "{true, true} case handled" - {
+              solveType(P.Match(
+                P.Var(l('x), loc), List(
+                  P.Pattern.Struct(None, List(
+                    "x" -> P.Pattern.BoolLit(true, loc), "y" -> P.Pattern.BoolLit(true, loc)
+                  ), ignoreExtra = false, loc) -> P.IntLit(3, loc)
+                ), matchLoc
+              ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(struct)))) ==>
+                invalidNel(TyperError.NonexhaustivePatternMatch(MatchSet.Sum(Set(
+                  MatchSet.Struct(List("x" -> MatchSet.Bool(false), "y" -> MatchSet.Any(U1))),
+                  MatchSet.Struct(List("x" -> MatchSet.Bool(true), "y" -> MatchSet.Bool(false)))
+                )), matchLoc))
+            }
+            "{true, _} case handled" - {
+              solveType(P.Match(
+                P.Var(l('x), loc), List(
+                  P.Pattern.Struct(None, List(
+                    "x" -> P.Pattern.BoolLit(true, loc), "y" -> P.Pattern.Ignore(loc)
+                  ), ignoreExtra = false, loc) -> P.IntLit(3, loc)
+                ), matchLoc
+              ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(struct)))) ==>
+                invalidNel(TyperError.NonexhaustivePatternMatch(
+                  MatchSet.Struct(List("x" -> MatchSet.Bool(false), "y" -> MatchSet.Any(U1))), matchLoc))
+            }
           }
         }
       }

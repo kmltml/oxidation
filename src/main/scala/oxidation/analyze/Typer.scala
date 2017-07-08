@@ -312,13 +312,16 @@ object Typer {
 
   private def solveMatchCase(matcheeType: Type, expectedType: ExpectedType, ctxt: Ctxt)
                             (pattern: P.Pattern, body: P.Expression): TyperResult[(Typed[ast.Pattern], Typed[ast.Expression])] = {
-    val bodyCtxt = pattern match {
-      case P.Pattern.Var(n, _) => ctxt.withTerms(Map(n -> Ctxt.Immutable(matcheeType)))
-      case P.Pattern.Ignore(_) | P.Pattern.IntLit(_, _) | P.Pattern.FloatLit(_, _) | P.Pattern.BoolLit(_, _)
-           | P.Pattern.CharLit(_, _) => ctxt
+    def findBindings(pattern: Typed[ast.Pattern]): List[(Symbol, Ctxt.Term)] = pattern match {
+      case Typed(ast.Pattern.Var(n, _), t) => List(n -> Ctxt.Immutable(t))
+      case Typed(ast.Pattern.Struct(_, ms, _, _), _) => ms.flatMap(m => findBindings(m._2))
+      case Typed(ast.Pattern.Ignore(_) | ast.Pattern.IntLit(_, _) | ast.Pattern.FloatLit(_, _) | ast.Pattern.BoolLit(_, _)
+           | ast.Pattern.CharLit(_, _), _) => Nil
     }
-    (solvePattern(pattern, matcheeType, ctxt), solveType(body, expectedType, bodyCtxt))
-      .map2((_, _))
+    solvePattern(pattern, matcheeType, ctxt).andThen { typedPattern =>
+      val bodyCtxt = ctxt.withTerms(findBindings(typedPattern).toMap)
+      solveType(body, expectedType, bodyCtxt).map(typedPattern -> _)
+    }
   }
 
   private def solvePattern(pattern: P.Pattern, matcheeType: Type, ctxt: Ctxt): TyperResult[Typed[ast.Pattern]] = pattern match {
@@ -339,6 +342,28 @@ object Typer {
     case P.Pattern.BoolLit(value, loc) => matcheeType match {
       case U1 => valid(Typed(ast.Pattern.BoolLit(value, loc), U1))
       case t => invalidNel(TyperError.CantMatch(ExpectedType.Specific(U1), t, loc))
+    }
+    case P.Pattern.Struct(typ, memberPatterns, ignoreExtra, loc) => matcheeType match {
+      case Type.Struct(name, matcheeMembers) =>
+        val typedMembers = memberPatterns.traverse {
+          case (name, pattern) =>
+            matcheeMembers.find(_.name == name).toValidNel(TyperError.MemberNotFound(name, matcheeType, pattern.loc))
+              .andThen(member => solvePattern(pattern, member.typ, ctxt).map(name -> _))
+        }
+        lazy val matcheeMemberNames = matcheeMembers.map(_.name).toSet
+        lazy val patternMemberNames = memberPatterns.map(_._1).toSet
+        val allMembersHandled =
+          if(ignoreExtra || matcheeMemberNames == patternMemberNames)
+            valid(())
+          else invalidNel(TyperError.WrongStructMembers(matcheeMemberNames, patternMemberNames, loc))
+        val correctExplicitType = typ.flatMap { explicitName =>
+          val explicitType = lookupType(TypeName.Named(explicitName), ctxt)
+          if(explicitType == matcheeType) None
+          else Some(TyperError.CantMatch(ExpectedType.Specific(matcheeType), explicitType, loc))
+        }.toInvalidNel(())
+
+        typedMembers.map(ms => Typed(ast.Pattern.Struct(typ, ms, ignoreExtra, loc), matcheeType)) <*
+          allMembersHandled <* correctExplicitType
     }
   }
 

@@ -11,6 +11,8 @@ trait Ast {
   type Typed[+_]
   type TypeInfo
 
+  protected def extractTyped[A](t: Typed[A]): A
+
   sealed trait BlockStatement
 
   sealed trait Expression extends BlockStatement with Product with Serializable {
@@ -88,7 +90,22 @@ trait Ast {
   final case class Stackalloc(pointee: TypeInfo, loc: Span) extends Expression
   final case class ArrLit(elems: List[Typed[Expression]], loc: Span) extends Expression
 
-  sealed trait Pattern
+  sealed trait Pattern {
+
+    def loc: Span
+
+    /**
+      * True if the pattern matches a single element of a set not checked for exhaustivity.
+      * If a patern is infinitesimal, that means, that no attempt will be made to check if all cases are covered,
+      * there has to be a catch-all case to pass the exhaustivity checker.
+      */
+    def isInfinitesimal: Boolean = this match {
+      case Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.CharLit(_, _) => true
+      case Pattern.Struct(_, members, _, _) => members.exists(t => extractTyped(t._2).isInfinitesimal)
+      case _ => false
+    }
+
+  }
 
   object Pattern {
 

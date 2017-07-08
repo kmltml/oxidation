@@ -7,4 +7,6 @@ object ast extends Ast {
 
   override type TypeInfo = Type
 
+  protected def extractTyped[A](t: Typed[A]): A = t.expr
+
 }
