@@ -217,6 +217,7 @@ abstract class RegisterAllocator[Reg](val calleeSavedRegs: List[Reg], val caller
         .toVector.sortBy { r =>
         - graph.neighbors(r).size // Sort by most neighbours
       }
+      assert(spillable.nonEmpty, s"candidates: $candidates, colours: ${graph.colours}")
       val regToSpill = spillable.head.head
       val newSpilled = spilled + regToSpill
       val spillfill = rebuildAfterSpill(originalFun, newSpilled)

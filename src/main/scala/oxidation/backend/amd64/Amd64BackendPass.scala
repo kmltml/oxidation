@@ -147,10 +147,7 @@ object Amd64BackendPass extends Pass {
           case Some(r @ Register(_, _, Type.Struct(_))) => saveReturnedStruct(r).as(Vector.empty)
           case Some(r @ Register(_, _, _: Type.F)) => tellFloatColour(Set(r -> Xmm0)).as(Vector())
           case Some(r) => tellIntColour(Set(r -> RegLoc.A)).as(Vector())
-          case None => for {
-            r <- nextReg(Type.U0)
-            _ <- tellIntColour(Set(r -> RegLoc.A))
-          } yield Vector(Inst.Move(r, Op.Garbled))
+          case None => F.pure(Vector.empty)
         }
         newDest = dest match {
           case Some(Register(_, _, Type.Struct(_))) => None
