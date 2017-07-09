@@ -128,17 +128,17 @@ object SymbolResolver {
     case parse.ast.Match(matchee, cases, loc) =>
       def solveCase(pattern: parse.ast.Pattern, body: parse.ast.Expression): Res[(parse.ast.Pattern, parse.ast.Expression)] = {
         import parse.ast.Pattern
-        val bindings = pattern match {
-          case Pattern.Var(Symbol.Unresolved(n), _) => List(Symbol.Local(n))
-          case Pattern.Ignore(_) | Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.BoolLit(_, _)
-             | Pattern.CharLit(_, _) => Nil
-        }
-        val newPattern = pattern match {
-          case Pattern.Var(Symbol.Unresolved(n), loc) => Pattern.Var(Symbol.Local(n), loc)
-          case Pattern.Ignore(_) | Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.BoolLit(_, _)
-               | Pattern.CharLit(_, _) => pattern
-        }
-        solveExpr(body, bindings.foldLeft(scope)(_.shadowTerm(_)), global).map(newPattern -> _)
+        def findBindings(pattern: Pattern): List[Symbol] = pattern match {
+            case Pattern.Var(Symbol.Unresolved(n), _) => List(Symbol.Local(n))
+            case Pattern.Struct(_, members, _, _) => members.flatMap { case (_, p) => findBindings(p) }
+            case Pattern.Ignore(_) | Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.BoolLit(_, _)
+               | Pattern.CharLit(_, _) => Nil
+          }
+        val bindings = findBindings(pattern)
+
+        ( solvePattern(pattern, scope, global),
+          solveExpr(body, bindings.foldLeft(scope)(_.shadowTerm(_)), global))
+          .map2((_, _))
       }
 
       (solveExpr(matchee, scope, global), cases.traverse((solveCase _).tupled))
@@ -187,6 +187,21 @@ object SymbolResolver {
         x <- Some(prefix :+ m).filter(global.modules.contains)
       } yield x
     case _ => None
+  }
+
+  def solvePattern(pattern: parse.ast.Pattern, scope: Scope, global: Symbols): Res[parse.ast.Pattern] = pattern match {
+    case parse.ast.Pattern.Var(Symbol.Unresolved(n), loc) => valid(parse.ast.Pattern.Var(Symbol.Local(n), loc))
+    case parse.ast.Pattern.Struct(typeName, members, ignoreExtra, loc) =>
+      val solvedTypeName = typeName.traverse {
+        case Symbol.Unresolved(s) => getOnlyOneSymbol(s, scope.types)
+      }
+      val solvedMembers = members.traverse {
+        case (name, pat) => solvePattern(pat, scope, global).map(name -> _)
+      }
+      (solvedTypeName, solvedMembers)
+        .map2(parse.ast.Pattern.Struct(_, _, ignoreExtra, loc))
+    case parse.ast.Pattern.Ignore(_) | parse.ast.Pattern.IntLit(_, _) | parse.ast.Pattern.FloatLit(_, _)
+         | parse.ast.Pattern.BoolLit(_, _) | parse.ast.Pattern.CharLit(_, _) => valid(pattern)
   }
 
   private def getOnlyOneSymbol(s: String, scope: Multimap[String, Symbol]): Res[Symbol] =

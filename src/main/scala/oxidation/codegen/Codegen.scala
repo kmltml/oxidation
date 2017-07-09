@@ -482,6 +482,31 @@ object Codegen {
         )
         _ <- withBindings(n -> r)
       } yield Val.I(1, Type.U1)
+    case Typed(ast.Pattern.Struct(_, members, _, _), structType: analyze.Type.Struct) =>
+      for {
+        _ <- members.init.traverse_ {
+          case (memberName, pattern) =>
+            for {
+              memberReg <- genReg(translateType(pattern.typ))
+              _ <- instructions(
+                Inst.Move(memberReg, Op.Member(matchee, structType.indexOf(memberName)))
+              )
+              cond <- compilePattern(pattern, Val.R(memberReg), nextlbl)
+              structlbl <- genLocalName("struct")
+              _ <- instructions(
+                Inst.Flow(FlowControl.Branch(cond, structlbl, nextlbl)),
+                Inst.Label(structlbl)
+              )
+            } yield ()
+        }
+        lastPattern = members.last
+        lastMemberReg <- genReg(translateType(lastPattern._2.typ))
+        _ <- instructions(
+          Inst.Move(lastMemberReg, Op.Member(matchee, structType.indexOf(lastPattern._1)))
+        )
+        res <- compilePattern(lastPattern._2, Val.R(lastMemberReg), nextlbl)
+      } yield res
+
     case Typed(_: ast.Pattern.IntLit | _: ast.Pattern.FloatLit | _: ast.Pattern.BoolLit | _: ast.Pattern.CharLit, _) =>
       val rval = pattern match {
         case Typed(ast.Pattern.IntLit(v, _), t) => Val.I(v, translateType(t))
