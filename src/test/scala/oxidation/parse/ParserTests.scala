@@ -281,6 +281,18 @@ object ParserTests extends TestSuite {
             ), ignoreExtra = true, 0 +> 8)
         }
       }
+      "Alternative pattern" - {
+        pat.parse("1 | 2 | 3").get.value ==>
+          Pattern.Or(
+            Pattern.Or(
+              Pattern.IntLit(1, 0 +> 1),
+              Pattern.IntLit(2, 4 +> 1),
+              0 +> 5
+            ),
+            Pattern.IntLit(3, 8 +> 1),
+            0 +> 9
+          )
+      }
     }
 
     "definition should parse" - {

@@ -62,16 +62,16 @@ class Parser(file: Option[String]) {
     case (Some(op), expr, loc) => PrefixAp(op, expr, loc)
     case (None, expr, _) => expr
   }
-  private val expression3: P[Expression] = infixl(expression2, op3)
-  private val expression4: P[Expression] = infixl(expression3, op4)
-  private val expression5: P[Expression] = infixl(expression4, op5)
-  private val expression6: P[Expression] = infixl(expression5, op6)
-  private val expression7: P[Expression] = infixl(expression6, op7)
-  private val expression8: P[Expression] = infixl(expression7, op8)
-  private val expression9: P[Expression] = infixl(expression8, op9)
-  private val expression10: P[Expression] = infixl(expression9, op10)
-  private val expression11: P[Expression] = infixl(expression10, op11)
-  private val expression12: P[Expression] = infixl(expression11, op12)
+  private val expression3: P[Expression] = infixexprl(expression2, op3)
+  private val expression4: P[Expression] = infixexprl(expression3, op4)
+  private val expression5: P[Expression] = infixexprl(expression4, op5)
+  private val expression6: P[Expression] = infixexprl(expression5, op6)
+  private val expression7: P[Expression] = infixexprl(expression6, op7)
+  private val expression8: P[Expression] = infixexprl(expression7, op8)
+  private val expression9: P[Expression] = infixexprl(expression8, op9)
+  private val expression10: P[Expression] = infixexprl(expression9, op10)
+  private val expression11: P[Expression] = infixexprl(expression10, op11)
+  private val expression12: P[Expression] = infixexprl(expression11, op12)
   private val expression13: P[Expression] =
     P(located(expression12 ~ (assignOp ~ expression).?)).map {
       case (e, None, _) => e
@@ -80,7 +80,7 @@ class Parser(file: Option[String]) {
 
   val expression: P[Expression] = P(expression13)
 
-  val pattern: P[Pattern] =
+  val pattern0: P[Pattern] =
     P( located(K("_")).map(Pattern.Ignore)
      | structPattern
      | varacc.map(_.pattern)
@@ -88,6 +88,10 @@ class Parser(file: Option[String]) {
      | boolLiteral.map(_.pattern)
      | charLiteral.map(_.pattern)
      | intLiteral.map(_.pattern))
+
+  val pattern1: P[Pattern] = infixl(pattern0, O("|")){ (_, a, b) => Pattern.Or(a, b, Span(file, a.loc.start, b.loc.end)) }
+
+  val pattern: P[Pattern] = pattern1
 
   val structPattern: P[Pattern.Struct] = {
     val member = P(located(!K("_") ~ id.!) ~ ("=" ~/ pattern).?)
@@ -133,11 +137,14 @@ class Parser(file: Option[String]) {
   private val semiOrComa: P0 =
     P((";" | "," | NL) ~~ WS)
 
-  private def infixl(exp: => P[Expression], op: => P[InfixOp]): P[Expression] = P(
+  private def infixl[Term, Op](exp: => P[Term], op: => P[Op])(ap: (Op, Term, Term) => Term): P[Term] = P(
     exp ~ (op ~/ exp).rep
   ).map { case (head, bs) =>
-    bs.foldLeft(head) { case (a, (op, b)) => InfixAp(op, a, b, Span(file, a.loc.start, b.loc.end)) }
+    bs.foldLeft(head) { case (a, (op, b)) => ap(op, a, b) }
   }
+
+  private def infixexprl(exp: => P[Expression], op: => P[InfixOp]): P[Expression] =
+    infixl(exp, op){ (o, a, b) => InfixAp(o, a, b, Span(file, a.loc.start, b.loc.end)) }
 
   private def K(p: P0): P0 = p ~~ !CharPred(c => c.isLetterOrDigit || idSpecialChars.contains(c))
   private def O(p: String): P0 = p ~~ !CharIn("~!%^&*+=<>|/?")

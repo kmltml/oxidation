@@ -102,6 +102,7 @@ trait Ast {
     def isInfinitesimal: Boolean = this match {
       case Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.CharLit(_, _) => true
       case Pattern.Struct(_, members, _, _) => members.exists(t => extractTyped(t._2).isInfinitesimal)
+      case Pattern.Or(l, r, _) => extractTyped(l).isInfinitesimal && extractTyped(r).isInfinitesimal
       case _ => false
     }
 
@@ -116,6 +117,7 @@ trait Ast {
     final case class BoolLit(value: Boolean, loc: Span) extends Pattern
     final case class CharLit(value: Char, loc: Span) extends Pattern
     final case class Struct(typeName: Option[Symbol], members: List[(String, Typed[Pattern])], ignoreExtra: Boolean, loc: Span) extends Pattern
+    final case class Or(left: Typed[Pattern], right: Typed[Pattern], loc: Span) extends Pattern
 
   }
 
