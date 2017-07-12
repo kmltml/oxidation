@@ -312,15 +312,25 @@ object Typer {
 
   private def solveMatchCase(matcheeType: Type, expectedType: ExpectedType, ctxt: Ctxt)
                             (pattern: P.Pattern, body: P.Expression): TyperResult[(Typed[ast.Pattern], Typed[ast.Expression])] = {
-    def findBindings(pattern: Typed[ast.Pattern]): List[(Symbol, Ctxt.Term)] = pattern match {
-      case Typed(ast.Pattern.Var(n, _), t) => List(n -> Ctxt.Immutable(t))
-      case Typed(ast.Pattern.Struct(_, ms, _, _), _) => ms.flatMap(m => findBindings(m._2))
+    def findBindings(pattern: Typed[ast.Pattern]): TyperResult[List[(Symbol, Ctxt.Term)]] = pattern match {
+      case Typed(ast.Pattern.Var(n, _), t) => valid(List(n -> Ctxt.Immutable(t)))
+      case Typed(ast.Pattern.Struct(_, ms, _, _), _) => ms.traverse(m => findBindings(m._2)).map(_.flatten)
+      case Typed(ast.Pattern.Or(left, right, loc), _) =>
+        (findBindings(left), findBindings(right))
+          .map2((_, _))
+          .andThen { case (l, r) =>
+            if(l.toSet == r.toSet) valid(l)
+            else invalidNel(TyperError.AlternativePatternBindingsMismatch(l.toSet, r.toSet, loc))
+          }
+
       case Typed(ast.Pattern.Ignore(_) | ast.Pattern.IntLit(_, _) | ast.Pattern.FloatLit(_, _) | ast.Pattern.BoolLit(_, _)
-           | ast.Pattern.CharLit(_, _), _) => Nil
+           | ast.Pattern.CharLit(_, _), _) => valid(Nil)
     }
     solvePattern(pattern, matcheeType, ctxt).andThen { typedPattern =>
-      val bodyCtxt = ctxt.withTerms(findBindings(typedPattern).toMap)
-      solveType(body, expectedType, bodyCtxt).map(typedPattern -> _)
+      findBindings(typedPattern).andThen { bs =>
+        val bodyCtxt = bs.toMap
+        solveType(body, expectedType, ctxt.withTerms(bodyCtxt)).map(typedPattern -> _)
+      }
     }
   }
 
@@ -365,6 +375,9 @@ object Typer {
         typedMembers.map(ms => Typed(ast.Pattern.Struct(typ, ms, ignoreExtra, loc), matcheeType)) <*
           allMembersHandled <* correctExplicitType
     }
+    case P.Pattern.Or(left, right, loc) =>
+      (solvePattern(left, matcheeType, ctxt), solvePattern(right, matcheeType, ctxt))
+        .map2((a, b) => Typed(ast.Pattern.Or(a, b, loc), matcheeType))
   }
 
   private def solveLVal(e: P.Expression, ctxt: Ctxt): TyperResult[Typed[ast.Expression]] = e match {

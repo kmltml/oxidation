@@ -19,5 +19,6 @@ object TyperError {
   final case class ExternNoExplicitType(loc: Span) extends TyperError
   final case class NotASingletonType(found: TypeName) extends TyperError
   final case class NonexhaustivePatternMatch(unhandled: MatchSet, loc: Span) extends TyperError
+  final case class AlternativePatternBindingsMismatch(leftBindings: Set[(Symbol, Ctxt.Term)], rightBindings: Set[(Symbol, Ctxt.Term)], loc: Span) extends TyperError
 
 }

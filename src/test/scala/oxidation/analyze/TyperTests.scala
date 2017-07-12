@@ -260,6 +260,74 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
               ), loc
             ) :: U1)
         }
+        "Or" - {
+          "i32 constants" - {
+            solveType(P.Match(
+              P.Var(l('x), loc), List(
+                P.Pattern.Or(P.Pattern.IntLit(1, loc), P.Pattern.IntLit(2, loc), loc) ->
+                  P.IntLit(0, loc),
+                P.Pattern.Ignore(loc) -> P.IntLit(1, loc)
+              ), loc
+            ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(I32)))) ==>
+              valid(ast.Match(
+                ast.Var(l('x), loc) :: I32, List(
+                  (ast.Pattern.Or(ast.Pattern.IntLit(1, loc) :: I32, ast.Pattern.IntLit(2, loc) :: I32, loc) :: I32) ->
+                    (ast.IntLit(0, loc) :: I32),
+                  (ast.Pattern.Ignore(loc) :: I32) -> (ast.IntLit(1, loc) :: I32)
+                ), loc
+              ) :: I32)
+          }
+          "u1" - {
+            solveType(P.Match(
+              P.Var(l('x), loc), List(
+                P.Pattern.Or(P.Pattern.BoolLit(false, loc), P.Pattern.BoolLit(true, loc), loc) ->
+                  P.IntLit(10, loc)
+              ), loc
+            ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(U1)))) ==>
+              valid(ast.Match(
+                ast.Var(l('x), loc) :: U1, List(
+                  (ast.Pattern.Or(ast.Pattern.BoolLit(false, loc) :: U1, ast.Pattern.BoolLit(true, loc) :: U1, loc) :: U1) ->
+                    (ast.IntLit(10, loc) :: I32)
+                ), loc
+              ) :: I32)
+          }
+          "{u1, i32, i32} with bindings" - {
+            val struct = Struct(g('foo), StructMember("x", U1), StructMember("y", I32), StructMember("z", I32))
+            solveType(P.Match(
+              P.Var(l('x), loc), List(
+                P.Pattern.Or(
+                  P.Pattern.Struct(None, List("x" -> P.Pattern.BoolLit(true, loc), "y" -> P.Pattern.Var(l('a), loc)), ignoreExtra = true, loc),
+                  P.Pattern.Struct(None, List("x" -> P.Pattern.BoolLit(false, loc), "z" -> P.Pattern.Var(l('a), loc)), ignoreExtra = true, loc),
+                  loc
+                ) -> P.Var(l('a), loc)
+              ), loc
+            ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(struct)))) ==>
+              valid(ast.Match(
+                ast.Var(l('x), loc) :: struct, List(
+                  (ast.Pattern.Or(
+                    ast.Pattern.Struct(None, List(
+                      "x" -> (ast.Pattern.BoolLit(true, loc) :: U1),
+                      "y" -> (ast.Pattern.Var(l('a), loc) :: I32)), ignoreExtra = true, loc) :: struct,
+                    ast.Pattern.Struct(None, List(
+                      "x" -> (ast.Pattern.BoolLit(false, loc) :: U1),
+                      "z" -> (ast.Pattern.Var(l('a), loc) :: I32)), ignoreExtra = true, loc) :: struct,
+                    loc
+                  ) :: struct) -> (ast.Var(l('a), loc) :: I32)
+                ), loc
+              ) :: I32)
+          }
+          "mismatched bindings" - {
+            val orLoc = Span(None, 0, 10)
+            solveType(P.Match(
+              P.Var(l('x), loc), List(
+                P.Pattern.Or(
+                  P.Pattern.IntLit(1, loc), P.Pattern.Var(l('y), loc), orLoc
+                ) -> P.Var(l('y), loc)
+              ), loc
+            ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(I32)))) ==>
+              invalidNel(TyperError.AlternativePatternBindingsMismatch(Set.empty, Set(l('y) -> imm(I32)), orLoc))
+          }
+        }
         "nonexhaustive" - {
           val matchLoc = Span(None, 0, 10)
           "i32" - {
@@ -304,6 +372,26 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
               ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(struct)))) ==>
                 invalidNel(TyperError.NonexhaustivePatternMatch(
                   MatchSet.Struct(List("x" -> MatchSet.Bool(false), "y" -> MatchSet.Any(U1))), matchLoc))
+            }
+            "{true, false} | {false, true}" - {
+              solveType(P.Match(
+                P.Var(l('x), loc), List(
+                  P.Pattern.Or(
+                    P.Pattern.Struct(None, List(
+                      "x" -> P.Pattern.BoolLit(true, loc), "y" -> P.Pattern.BoolLit(false, loc)
+                    ), ignoreExtra = false, loc),
+                    P.Pattern.Struct(None, List(
+                      "x" -> P.Pattern.BoolLit(false, loc), "y" -> P.Pattern.BoolLit(true, loc)
+                    ), ignoreExtra = false, loc),
+                    loc
+                  ) -> P.BoolLit(true, loc)
+                ), matchLoc
+              ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(struct)))) ==>
+                invalidNel(TyperError.NonexhaustivePatternMatch(
+                  MatchSet.Struct(List("x" -> MatchSet.Bool(true), "y" -> MatchSet.Bool(true))) +
+                  MatchSet.Struct(List("x" -> MatchSet.Bool(false), "y" -> MatchSet.Bool(false))),
+                  matchLoc
+                ))
             }
           }
         }

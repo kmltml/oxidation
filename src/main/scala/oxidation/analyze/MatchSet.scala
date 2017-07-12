@@ -40,6 +40,8 @@ sealed trait MatchSet {
         case Empty => Nil
       }
       sets.foldLeft(Empty: MatchSet)(_ + _)
+    case ast.Pattern.Or(Typed(left, _), Typed(right, _), _) =>
+      this - left - right
   }
 
   def +(s: MatchSet): MatchSet = (this, s) match {
