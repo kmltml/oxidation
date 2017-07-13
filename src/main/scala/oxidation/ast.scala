@@ -106,6 +106,17 @@ trait Ast {
       case _ => false
     }
 
+    def withLoc(loc: Span): Pattern = this match {
+      case x: Pattern.Var => x.copy(loc = loc)
+      case x: Pattern.Ignore => x.copy(loc = loc)
+      case x: Pattern.IntLit => x.copy(loc = loc)
+      case x: Pattern.FloatLit => x.copy(loc = loc)
+      case x: Pattern.BoolLit => x.copy(loc = loc)
+      case x: Pattern.CharLit => x.copy(loc = loc)
+      case x: Pattern.Struct => x.copy(loc = loc)
+      case x: Pattern.Or => x.copy(loc = loc)
+    }
+
   }
 
   object Pattern {

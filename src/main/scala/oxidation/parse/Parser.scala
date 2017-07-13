@@ -82,6 +82,7 @@ class Parser(file: Option[String]) {
 
   val pattern0: P[Pattern] =
     P( located(K("_")).map(Pattern.Ignore)
+     | parenPattern
      | structPattern
      | varacc.map(_.pattern)
      | floatLiteral.map(_.pattern)
@@ -99,6 +100,10 @@ class Parser(file: Option[String]) {
     P(located(id.!.? ~ "{" ~/ member.repX(min = 1, sep = semiOrComa) ~ (semiOrComa ~ "_").!.? ~ "}"))
       .map { case (typ, ms, e, loc) => Pattern.Struct(typ.map(Symbol.Unresolved), ms.toList, e.nonEmpty, loc) }
   }
+
+  val parenPattern: P[Pattern] =
+    P(located("(" ~/ pattern ~ ")"))
+      .map { case (p, s) => p.withLoc(s) }
 
   val definition: P[Def] = P(
     defdef | valdef | vardef | structdef | enumdef | typedef

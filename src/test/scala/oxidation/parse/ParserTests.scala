@@ -293,6 +293,18 @@ object ParserTests extends TestSuite {
             0 +> 9
           )
       }
+      "Pattern in parens" - {
+        pat.parse("(1 | 2 | 3)").get.value ==>
+          Pattern.Or(
+            Pattern.Or(
+              Pattern.IntLit(1, 1 +> 1),
+              Pattern.IntLit(2, 5 +> 1),
+              1 +> 5
+            ),
+            Pattern.IntLit(3, 9 +> 1),
+            0 +> 11
+          )
+      }
     }
 
     "definition should parse" - {
