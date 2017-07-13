@@ -131,6 +131,7 @@ object SymbolResolver {
         def findBindings(pattern: Pattern): List[Symbol] = pattern match {
             case Pattern.Var(Symbol.Unresolved(n), _) => List(Symbol.Local(n))
             case Pattern.Struct(_, members, _, _) => members.flatMap { case (_, p) => findBindings(p) }
+            case Pattern.Or(left, right, _) => findBindings(left) ++ findBindings(right)
             case Pattern.Ignore(_) | Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.BoolLit(_, _)
                | Pattern.CharLit(_, _) => Nil
           }
@@ -200,6 +201,9 @@ object SymbolResolver {
       }
       (solvedTypeName, solvedMembers)
         .map2(parse.ast.Pattern.Struct(_, _, ignoreExtra, loc))
+    case parse.ast.Pattern.Or(left, right, loc) =>
+      (solvePattern(left, scope, global), solvePattern(right, scope, global))
+        .map2(parse.ast.Pattern.Or(_, _, loc))
     case parse.ast.Pattern.Ignore(_) | parse.ast.Pattern.IntLit(_, _) | parse.ast.Pattern.FloatLit(_, _)
          | parse.ast.Pattern.BoolLit(_, _) | parse.ast.Pattern.CharLit(_, _) => valid(pattern)
   }
