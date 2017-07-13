@@ -237,9 +237,8 @@ object Codegen {
               lbli <- genLocalIndex
               caselbl = Name.Local("case", lbli)
               nextlbl = Name.Local("casenext", lbli)
-              patres <- compilePattern(pattern, matcheeVal, nextlbl)
+              _ <- compilePattern(pattern, matcheeVal, caselbl, nextlbl, reuseBindings = false)
               _ <- instructions(
-                Inst.Flow(FlowControl.Branch(patres, caselbl, nextlbl)),
                 Inst.Label(caselbl)
               )
               bodyres <- compileExpr(body)
@@ -471,17 +470,24 @@ object Codegen {
                              translateType(value.typ), log.consts.toSet)
   }
 
-  def compilePattern(pattern: Typed[ast.Pattern], matchee: Val, nextlbl: Name): Res[Val] = pattern match {
+  def compilePattern(pattern: Typed[ast.Pattern], matchee: Val, passLbl: Name, failLbl: Name, reuseBindings: Boolean): Res[Unit] = pattern match {
     case Typed(ast.Pattern.Ignore(_), _) =>
-      Res.pure(Val.I(1, Type.U1))
+      instructions(
+        Inst.Flow(FlowControl.Goto(passLbl))
+      )
     case Typed(ast.Pattern.Var(n, _), t) =>
       for {
-        r <- genReg(translateType(t))
+        r <-
+          if(reuseBindings)
+            WriterT.lift[State[CodegenState, ?], Log, Register](State.inspect(_.registerBindings(n)))
+          else
+            genReg(translateType(t))
         _ <- instructions(
-          Inst.Move(r, Op.Copy(matchee))
+          Inst.Move(r, Op.Copy(matchee)),
+          Inst.Flow(FlowControl.Goto(passLbl))
         )
         _ <- withBindings(n -> r)
-      } yield Val.I(1, Type.U1)
+      } yield ()
     case Typed(ast.Pattern.Struct(_, members, _, _), structType: analyze.Type.Struct) =>
       for {
         _ <- members.init.traverse_ {
@@ -491,10 +497,9 @@ object Codegen {
               _ <- instructions(
                 Inst.Move(memberReg, Op.Member(matchee, structType.indexOf(memberName)))
               )
-              cond <- compilePattern(pattern, Val.R(memberReg), nextlbl)
               structlbl <- genLocalName("struct")
+              _ <- compilePattern(pattern, Val.R(memberReg), structlbl, failLbl, reuseBindings)
               _ <- instructions(
-                Inst.Flow(FlowControl.Branch(cond, structlbl, nextlbl)),
                 Inst.Label(structlbl)
               )
             } yield ()
@@ -504,8 +509,18 @@ object Codegen {
         _ <- instructions(
           Inst.Move(lastMemberReg, Op.Member(matchee, structType.indexOf(lastPattern._1)))
         )
-        res <- compilePattern(lastPattern._2, Val.R(lastMemberReg), nextlbl)
-      } yield res
+        _ <- compilePattern(lastPattern._2, Val.R(lastMemberReg), passLbl, failLbl, reuseBindings)
+      } yield ()
+
+    case Typed(ast.Pattern.Or(left, right, _), _) =>
+      for {
+        orlbl <- genLocalName("orpattern")
+        _ <- compilePattern(left, matchee, passLbl, orlbl, reuseBindings)
+        _ <- instructions(
+          Inst.Label(orlbl)
+        )
+        _ <- compilePattern(right, matchee, passLbl, failLbl, reuseBindings = true)
+      } yield ()
 
     case Typed(_: ast.Pattern.IntLit | _: ast.Pattern.FloatLit | _: ast.Pattern.BoolLit | _: ast.Pattern.CharLit, _) =>
       val rval = pattern match {
@@ -518,9 +533,10 @@ object Codegen {
       for {
         r <- genReg(Type.U1)
         _ <- instructions(
-          Inst.Move(r, Op.Binary(InfixOp.Eq, matchee, rval))
+          Inst.Move(r, Op.Binary(InfixOp.Eq, matchee, rval)),
+          Inst.Flow(FlowControl.Branch(Val.R(r), passLbl, failLbl))
         )
-      } yield Val.R(r)
+      } yield ()
   }
 
   private def translateType(t: analyze.Type): ir.Type = t match {

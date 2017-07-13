@@ -292,7 +292,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
 
               Inst.Label(Name.Local("casenext", 3)),
               Inst.Move(r(5, _.I32), Op.Copy(r(0, _.I32))),
-              Inst.Flow(FlowControl.Branch(u1(true), Name.Local("case", 4), Name.Local("casenext", 4))),
+              Inst.Flow(FlowControl.Goto(Name.Local("case", 4))),
 
               Inst.Label(Name.Local("case", 4)),
               Inst.Move(r(1, _.I32), Op.Copy(r(5, _.I32))),
@@ -327,7 +327,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Inst.Label(Name.Local("struct", 2)),
               Inst.Move(r(4, _.I32), Op.Member(r0, 1)),
               Inst.Move(r(5, _.I32), Op.Copy(r(4, _.I32))),
-              Inst.Flow(FlowControl.Branch(u1(true), Name.Local("case", 1), Name.Local("casenext", 1))),
+              Inst.Flow(FlowControl.Goto(Name.Local("case", 1))),
 
               Inst.Label(Name.Local("case", 1)),
               Inst.Move(r(1, _.I32), Op.Copy(r(5, _.I32))),
@@ -336,12 +336,12 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Inst.Label(Name.Local("casenext", 1)),
               Inst.Move(r(6, _.I32), Op.Member(r0, 0)),
               Inst.Move(r(7, _.I32), Op.Copy(r(6, _.I32))),
-              Inst.Flow(FlowControl.Branch(u1(true), Name.Local("struct", 4), Name.Local("casenext", 3))),
+              Inst.Flow(FlowControl.Goto(Name.Local("struct", 4))),
 
               Inst.Label(Name.Local("struct", 4)),
               Inst.Move(r(8, _.I32), Op.Member(r0, 1)),
               Inst.Move(r(9, _.I32), Op.Copy(r(8, _.I32))),
-              Inst.Flow(FlowControl.Branch(u1(true), Name.Local("case", 3), Name.Local("casenext", 3))),
+              Inst.Flow(FlowControl.Goto(Name.Local("case", 3))),
 
               Inst.Label(Name.Local("case", 3)),
               Inst.Move(r(10, _.I32), Op.Binary(InfixOp.Add, r(7, _.I32), r(9, _.I32))),
@@ -352,6 +352,92 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Inst.Label(Name.Local("matchafter", 0))
 
             ), Val.R(r(1, _.I32)))
+        }
+        "Or" - {
+          "i32" - {
+            compileExpr(ast.Match(
+              ast.Var(l('x), loc) :: I32, List(
+                (ast.Pattern.Or(
+                  ast.Pattern.IntLit(0, loc) :: I32,
+                  ast.Pattern.IntLit(1, loc) :: I32,
+                  loc
+                ) :: I32) -> (ast.IntLit(1, loc) :: I32),
+                (ast.Pattern.Var(l('x), loc) :: I32) -> (ast.Var(l('x), loc) :: I32)
+              ), loc
+            ) :: I32).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)), nextReg = 1)).value ==>
+              (insts(
+                Inst.Move(r(2, _.U1), Op.Binary(InfixOp.Eq, r(0, _.I32), i32(0))),
+                Inst.Flow(FlowControl.Branch(r(2, _.U1), Name.Local("case", 1), Name.Local("orpattern", 2))),
+
+                Inst.Label(Name.Local("orpattern", 2)),
+                Inst.Move(r(3, _.U1), Op.Binary(InfixOp.Eq, r(0, _.I32), i32(1))),
+                Inst.Flow(FlowControl.Branch(r(3, _.U1), Name.Local("case", 1), Name.Local("casenext", 1))),
+
+                Inst.Label(Name.Local("case", 1)),
+                Inst.Move(r(1, _.I32), Op.Copy(i32(1))),
+                Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
+
+                Inst.Label(Name.Local("casenext", 1)),
+                Inst.Move(r(4, _.I32), Op.Copy(r(0, _.I32))),
+                Inst.Flow(FlowControl.Goto(Name.Local("case", 3))),
+
+                Inst.Label(Name.Local("case", 3)),
+                Inst.Move(r(1, _.I32), Op.Copy(r(4, _.I32))),
+                Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
+
+                Inst.Label(Name.Local("casenext", 3)),
+                Inst.Label(Name.Local("matchafter", 0))
+
+              ), Val.R(r(1, _.I32)))
+          }
+          "{u1, i32, i32} with bindings" - {
+            val struct = Struct(g('foo), StructMember("b", U1), StructMember("x", I32), StructMember("y", I32))
+            val irstruct = ir.Type.Struct(Vector(ir.Type.U1, ir.Type.I32, ir.Type.I32))
+            val r0 = register(0, irstruct)
+            compileExpr(ast.Match(
+              ast.Var(l('x), loc) :: struct, List(
+                (ast.Pattern.Or(
+                  ast.Pattern.Struct(None, List(
+                    "b" -> (ast.Pattern.BoolLit(true, loc) :: U1),
+                    "x" -> (ast.Pattern.Var(l('x), loc) :: I32)
+                  ), ignoreExtra = true, loc) :: struct,
+                  ast.Pattern.Struct(None, List(
+                    "b" -> (ast.Pattern.BoolLit(false, loc) :: U1),
+                    "y" -> (ast.Pattern.Var(l('x), loc) :: I32)
+                  ), ignoreExtra = true, loc) :: struct,
+                  loc
+                ) :: struct) -> (ast.Var(l('x), loc) :: I32)
+              ), loc
+            ) :: I32).run.runA(CodegenState(registerBindings = Map(l('x) -> r0), nextReg = 1)).value ==>
+              (insts(
+                Inst.Move(r(2, _.U1), Op.Member(r0, 0)),
+                Inst.Move(r(3, _.U1), Op.Binary(InfixOp.Eq, r(2, _.U1), u1(true))),
+                Inst.Flow(FlowControl.Branch(r(3, _.U1), Name.Local("struct", 3), Name.Local("orpattern", 2))),
+
+                Inst.Label(Name.Local("struct", 3)),
+                Inst.Move(r(4, _.I32), Op.Member(r0, 1)),
+                Inst.Move(r(5, _.I32), Op.Copy(r(4, _.I32))),
+                Inst.Flow(FlowControl.Goto(Name.Local("case", 1))),
+
+                Inst.Label(Name.Local("orpattern", 2)),
+                Inst.Move(r(6, _.U1), Op.Member(r0, 0)),
+                Inst.Move(r(7, _.U1), Op.Binary(InfixOp.Eq, r(6, _.U1), u1(false))),
+                Inst.Flow(FlowControl.Branch(r(7, _.U1), Name.Local("struct", 4), Name.Local("casenext", 1))),
+
+                Inst.Label(Name.Local("struct", 4)),
+                Inst.Move(r(8, _.I32), Op.Member(r0, 2)),
+                Inst.Move(r(5, _.I32), Op.Copy(r(8, _.I32))),
+                Inst.Flow(FlowControl.Goto(Name.Local("case", 1))),
+
+                Inst.Label(Name.Local("case", 1)),
+                Inst.Move(r(1, _.I32), Op.Copy(r(5, _.I32))),
+                Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
+
+                Inst.Label(Name.Local("casenext", 1)),
+                Inst.Label(Name.Local("matchafter", 0))
+
+              ), Val.R(r(1, _.I32)))
+          }
         }
       }
       "Assign" - {
