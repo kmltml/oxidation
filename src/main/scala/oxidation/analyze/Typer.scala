@@ -314,6 +314,8 @@ object Typer {
                             (pattern: P.Pattern, body: P.Expression): TyperResult[(Typed[ast.Pattern], Typed[ast.Expression])] = {
     def findBindings(pattern: Typed[ast.Pattern]): TyperResult[List[(Symbol, Ctxt.Term)]] = pattern match {
       case Typed(ast.Pattern.Var(n, _), t) => valid(List(n -> Ctxt.Immutable(t)))
+      case Typed(ast.Pattern.Alias(n, p, _), t) =>
+        findBindings(p).map((n -> Ctxt.Immutable(t)) :: _)
       case Typed(ast.Pattern.Struct(_, ms, _, _), _) => ms.traverse(m => findBindings(m._2)).map(_.flatten)
       case Typed(ast.Pattern.Or(left, right, loc), _) =>
         (findBindings(left), findBindings(right))
@@ -337,6 +339,9 @@ object Typer {
   private def solvePattern(pattern: P.Pattern, matcheeType: Type, ctxt: Ctxt): TyperResult[Typed[ast.Pattern]] = pattern match {
     case P.Pattern.Ignore(loc) => valid(Typed(ast.Pattern.Ignore(loc), matcheeType))
     case P.Pattern.Var(name, loc) => valid(Typed(ast.Pattern.Var(name, loc), matcheeType))
+    case P.Pattern.Alias(name, pattern, loc) =>
+      solvePattern(pattern, matcheeType, ctxt)
+        .map(p => Typed(ast.Pattern.Alias(name, p, loc), matcheeType))
     case P.Pattern.IntLit(value, loc) => matcheeType match {
       case t: Integral => valid(Typed(ast.Pattern.IntLit(value, loc), t))
       case t => invalidNel(TyperError.CantMatch(ExpectedType.Numeric(Some(I32)), t, loc))

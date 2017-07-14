@@ -11,6 +11,7 @@ sealed trait MatchSet {
 
   def -(p: ast.Pattern): MatchSet = p match {
     case ast.Pattern.Ignore(_) | ast.Pattern.Var(_, _) => Empty
+    case ast.Pattern.Alias(_, Typed(pattern, _), _) => this - pattern
     case p if p.isInfinitesimal => this
     case ast.Pattern.BoolLit(patbool, _) => this match {
       case Any(Type.U1) => Bool(!patbool)

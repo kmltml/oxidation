@@ -328,6 +328,19 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
               invalidNel(TyperError.AlternativePatternBindingsMismatch(Set.empty, Set(l('y) -> imm(I32)), orLoc))
           }
         }
+        "Alias" - {
+          solveType(P.Match(
+            P.Var(l('x), loc), List(
+              P.Pattern.Alias(l('y), P.Pattern.Ignore(loc), loc) -> P.Var(l('y), loc)
+            ), loc
+          ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(I32)))) ==>
+            valid(ast.Match(
+              ast.Var(l('x), loc) :: I32, List(
+                (ast.Pattern.Alias(l('y), ast.Pattern.Ignore(loc) :: I32, loc) :: I32) ->
+                  (ast.Var(l('y), loc) :: I32)
+              ), loc
+            ) :: I32)
+        }
         "nonexhaustive" - {
           val matchLoc = Span(None, 0, 10)
           "i32" - {
