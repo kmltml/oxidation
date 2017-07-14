@@ -475,7 +475,10 @@ object Codegen {
       instructions(
         Inst.Flow(FlowControl.Goto(passLbl))
       )
-    case Typed(ast.Pattern.Var(n, _), t) =>
+    case Typed(ast.Pattern.Var(n, loc), t) =>
+      compilePattern(Typed(ast.Pattern.Alias(n, Typed(ast.Pattern.Ignore(loc), t), loc), t), matchee, passLbl, failLbl, reuseBindings)
+
+    case Typed(ast.Pattern.Alias(n, p, _), t) =>
       for {
         r <-
           if(reuseBindings)
@@ -483,11 +486,12 @@ object Codegen {
           else
             genReg(translateType(t))
         _ <- instructions(
-          Inst.Move(r, Op.Copy(matchee)),
-          Inst.Flow(FlowControl.Goto(passLbl))
+          Inst.Move(r, Op.Copy(matchee))
         )
         _ <- withBindings(n -> r)
+        _ <- compilePattern(p, matchee, passLbl, failLbl, reuseBindings)
       } yield ()
+
     case Typed(ast.Pattern.Struct(_, members, _, _), structType: analyze.Type.Struct) =>
       for {
         _ <- members.init.traverse_ {

@@ -439,6 +439,35 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               ), Val.R(r(1, _.I32)))
           }
         }
+        "Alias" - {
+          compileExpr(ast.Match(
+            ast.Var(l('x), loc) :: I32, List(
+              (ast.Pattern.Alias(l('y), ast.Pattern.IntLit(10, loc) :: I32, loc) :: I32) ->
+                (ast.Var(l('y), loc) :: I32),
+              (ast.Pattern.Ignore(loc) :: I32) -> (ast.IntLit(10, loc) :: I32)
+            ), loc
+          ) :: I32).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)), nextReg = 1)).value ==>
+            (insts(
+              Inst.Move(r(2, _.I32), Op.Copy(r(0, _.I32))),
+              Inst.Move(r(3, _.U1), Op.Binary(InfixOp.Eq, r(0, _.I32), i32(10))),
+              Inst.Flow(FlowControl.Branch(r(3, _.U1), Name.Local("case", 1), Name.Local("casenext", 1))),
+
+              Inst.Label(Name.Local("case", 1)),
+              Inst.Move(r(1, _.I32), Op.Copy(r(2, _.I32))),
+              Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
+
+              Inst.Label(Name.Local("casenext", 1)),
+              Inst.Flow(FlowControl.Goto(Name.Local("case", 2))),
+
+              Inst.Label(Name.Local("case", 2)),
+              Inst.Move(r(1, _.I32), Op.Copy(i32(10))),
+              Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
+
+              Inst.Label(Name.Local("casenext", 2)),
+              Inst.Label(Name.Local("matchafter", 0))
+
+            ), Val.R(r(1, _.I32)))
+        }
       }
       "Assign" - {
         "variable" - {

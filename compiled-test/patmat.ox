@@ -7,6 +7,8 @@ def tests(): u0 = {
            && add(twoints(10, 30)) == 40, "struct of two i32s pattern match")
     assert(select(seldata { b = true, x = 1, y = 2 }) == 1 &&
            select(seldata { b = false, x = 1, y = 2 }) == 2, "or of struct with bindings")
+    assert(alias(1) == 6 && alias(3) == 8 && alias(5) == 10 && alias(6) == 1 && alias(20) == 15,
+           "Pattern alias")
 }
 
 def foo(x: i32): i32 = match(x) {
@@ -28,6 +30,11 @@ def add(x: twoints): i32 = match(x) {
     case { a, b = 0 } => a
     case { a = 1, b = 2 } => 3
     case { a, b } => a + b
+}
+
+def alias(x: i32): i32 = match(x) {
+    case x @ (1 | 2 | 3 | 4 | 5) => x + 5
+    case x => x - 5
 }
 
 struct seldata = {
