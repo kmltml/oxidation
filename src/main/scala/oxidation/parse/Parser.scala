@@ -83,6 +83,7 @@ class Parser(file: Option[String]) {
   val pattern0: P[Pattern] =
     P( located(K("_")).map(Pattern.Ignore)
      | parenPattern
+     | aliasPattern
      | structPattern
      | varacc.map(_.pattern)
      | floatLiteral.map(_.pattern)
@@ -97,13 +98,17 @@ class Parser(file: Option[String]) {
   val structPattern: P[Pattern.Struct] = {
     val member = P(located(!K("_") ~ id.!) ~ ("=" ~/ pattern).?)
       .map { case (n, loc, p) => n -> p.getOrElse(Pattern.Var(Symbol.Unresolved(n), loc)) }
-    P(located(id.!.? ~ "{" ~/ member.repX(min = 1, sep = semiOrComa) ~ (semiOrComa ~ "_").!.? ~ "}"))
-      .map { case (typ, ms, e, loc) => Pattern.Struct(typ.map(Symbol.Unresolved), ms.toList, e.nonEmpty, loc) }
+    P(located(sym.? ~ "{" ~/ member.repX(min = 1, sep = semiOrComa) ~ (semiOrComa ~ "_").!.? ~ "}"))
+      .map { case (typ, ms, e, loc) => Pattern.Struct(typ, ms.toList, e.nonEmpty, loc) }
   }
 
   val parenPattern: P[Pattern] =
     P(located("(" ~/ pattern ~ ")"))
       .map { case (p, s) => p.withLoc(s) }
+
+  val aliasPattern: P[Pattern.Alias] =
+    P(located(sym ~ O("@") ~ pattern))
+      .map(Pattern.Alias.tupled)
 
   val definition: P[Def] = P(
     defdef | valdef | vardef | structdef | enumdef | typedef

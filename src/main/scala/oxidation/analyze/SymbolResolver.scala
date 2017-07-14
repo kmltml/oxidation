@@ -130,6 +130,7 @@ object SymbolResolver {
         import parse.ast.Pattern
         def findBindings(pattern: Pattern): List[Symbol] = pattern match {
             case Pattern.Var(Symbol.Unresolved(n), _) => List(Symbol.Local(n))
+            case Pattern.Alias(Symbol.Unresolved(n), pattern, _) => Symbol.Local(n) :: findBindings(pattern)
             case Pattern.Struct(_, members, _, _) => members.flatMap { case (_, p) => findBindings(p) }
             case Pattern.Or(left, right, _) => findBindings(left) ++ findBindings(right)
             case Pattern.Ignore(_) | Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.BoolLit(_, _)
@@ -192,6 +193,9 @@ object SymbolResolver {
 
   def solvePattern(pattern: parse.ast.Pattern, scope: Scope, global: Symbols): Res[parse.ast.Pattern] = pattern match {
     case parse.ast.Pattern.Var(Symbol.Unresolved(n), loc) => valid(parse.ast.Pattern.Var(Symbol.Local(n), loc))
+    case parse.ast.Pattern.Alias(Symbol.Unresolved(n), pattern, loc) =>
+      solvePattern(pattern, scope, global)
+        .map(parse.ast.Pattern.Alias(Symbol.Local(n), _, loc))
     case parse.ast.Pattern.Struct(typeName, members, ignoreExtra, loc) =>
       val solvedTypeName = typeName.traverse {
         case Symbol.Unresolved(s) => getOnlyOneSymbol(s, scope.types)

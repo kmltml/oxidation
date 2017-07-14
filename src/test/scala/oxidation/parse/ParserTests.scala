@@ -305,6 +305,10 @@ object ParserTests extends TestSuite {
             0 +> 11
           )
       }
+      "Alias" - {
+        pat.parse("x @ _").get.value ==>
+          Pattern.Alias("x", Pattern.Ignore(4 +> 1), 0 +> 5)
+      }
     }
 
     "definition should parse" - {
