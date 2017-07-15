@@ -231,13 +231,25 @@ object Codegen {
         matcheeVal <- compileExpr(matchee)
         r <- genReg(translateType(t))
         _ <- cases.traverse_ {
-          case ast.MatchCase(pattern, None, body) =>
+          case ast.MatchCase(pattern, guard, body) =>
             for {
               binds <- storeBindings
               lbli <- genLocalIndex
               caselbl = Name.Local("case", lbli)
+              guardlbl = Name.Local("guard", lbli)
               nextlbl = Name.Local("casenext", lbli)
-              _ <- compilePattern(pattern, matcheeVal, caselbl, nextlbl, reuseBindings = false)
+              _ <- compilePattern(pattern, matcheeVal, if(guard.nonEmpty) guardlbl else caselbl, nextlbl, reuseBindings = false)
+              _ <- guard.traverse_ { guardexp =>
+                for {
+                  _ <- instructions(
+                    Inst.Label(guardlbl)
+                  )
+                  guardRes <- compileExpr(guardexp)
+                  _ <- instructions(
+                    Inst.Flow(FlowControl.Branch(guardRes, caselbl, nextlbl))
+                  )
+                } yield ()
+              }
               _ <- instructions(
                 Inst.Label(caselbl)
               )

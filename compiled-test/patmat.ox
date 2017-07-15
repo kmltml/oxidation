@@ -9,6 +9,8 @@ def tests(): u0 = {
            select(seldata { b = false, x = 1, y = 2 }) == 2, "or of struct with bindings")
     assert(alias(1) == 6 && alias(3) == 8 && alias(5) == 10 && alias(6) == 1 && alias(20) == 15,
            "Pattern alias")
+    assert(guard(false, false) == 0 && guard(false, true) == 1 && guard(true, false) == 2 && guard(true, true) == 3,
+           "match guards")
 }
 
 def foo(x: i32): i32 = match(x) {
@@ -35,6 +37,13 @@ def add(x: twoints): i32 = match(x) {
 def alias(x: i32): i32 = match(x) {
     case x @ (1 | 2 | 3 | 4 | 5) => x + 5
     case x => x - 5
+}
+
+def guard(a: u1, b: u1): i32 = match(a) {
+    case true if b => 3
+    case false if b => 1
+    case x if b == x => 0
+    case _ => 2
 }
 
 struct seldata = {
