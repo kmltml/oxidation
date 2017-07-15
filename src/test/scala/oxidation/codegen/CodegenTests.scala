@@ -7,7 +7,7 @@ import ir._
 import oxidation.parse.Span
 import utest._
 
-object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with IrValSyntax {
+object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with IrValSyntax with MatchCaseSyntax {
 
   import Codegen.register
 

@@ -11,7 +11,7 @@ import cats.implicits._
 
 import Validated.{valid, invalid, invalidNel}
 
-object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
+object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with MatchCaseSyntax {
 
   def findType(expr: P.Expression, expectedType: ExpectedType, ctxt: Ctxt = Ctxt.default): ValidatedNel[TyperError, Type] =
     solveType(expr, expectedType, ctxt).map(_.typ)
@@ -341,6 +341,24 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
               ), loc
             ) :: I32)
         }
+        "with guards" - {
+          solveType(P.Match(
+            P.Var(l('x), loc), List(
+              P.MatchCase(P.Pattern.Var(l('y), loc),
+                Some(P.InfixAp(InfixOp.Leq, P.Var(l('y), loc), P.IntLit(10, loc), loc)),
+                P.Var(l('y), loc)),
+              P.Pattern.Ignore(loc) -> P.IntLit(20, loc)
+            ), loc
+          ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(I32)))) ==>
+            valid(ast.Match(
+              ast.Var(l('x), loc) :: I32, List(
+                ast.MatchCase(ast.Pattern.Var(l('y), loc) :: I32,
+                  Some(ast.InfixAp(InfixOp.Leq, ast.Var(l('y), loc) :: I32, ast.IntLit(10, loc) :: I32, loc) :: U1),
+                  ast.Var(l('y), loc) :: I32),
+                (ast.Pattern.Ignore(loc) :: I32) -> (ast.IntLit(20, loc) :: I32)
+              ), loc
+            ) :: I32)
+        }
         "nonexhaustive" - {
           val matchLoc = Span(None, 0, 10)
           "i32" - {
@@ -405,6 +423,17 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax {
                   MatchSet.Struct(List("x" -> MatchSet.Bool(false), "y" -> MatchSet.Bool(false))),
                   matchLoc
                 ))
+            }
+            "guard" - {
+              solveType(P.Match(
+                P.Var(l('x), loc), List(
+                  P.MatchCase(P.Pattern.BoolLit(true, loc),
+                    Some(P.BoolLit(false, loc)),
+                    P.IntLit(10, loc)),
+                  P.Pattern.BoolLit(false, loc) -> P.IntLit(20, loc)
+                ), matchLoc
+              ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(U1)))) ==>
+                invalidNel(TyperError.NonexhaustivePatternMatch(MatchSet.Bool(true), matchLoc))
             }
           }
         }

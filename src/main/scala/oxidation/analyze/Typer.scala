@@ -243,15 +243,18 @@ object Typer {
     case P.Match(matchee, cases, loc) =>
       solveType(matchee, ExpectedType.Undefined, ctxt)
         .andThen { typedMatchee =>
-          cases.traverse {
-            case (pattern, body) =>
-              solveMatchCase(typedMatchee.typ, expected, ctxt)(pattern, body)
-          }.andThen { typedCases =>
+          cases.traverse(solveMatchCase(typedMatchee.typ, expected, ctxt))
+            .andThen { typedCases =>
             val unhandled = typedCases.foldLeft(MatchSet.Any(typedMatchee.typ) : MatchSet) {
-              case (set, (Typed(pattern, _), _)) => set - pattern
+              case (set, ast.MatchCase(Typed(pattern, _), None, _)) => set - pattern
+              case (set, ast.MatchCase(_, Some(_), _)) => set
             }
-            val resultType = typedCases.map(_._2.typ).reduceLeft(commonType)
-            val unifiedCases = typedCases.traverse(_.traverse(unifyType(_, ExpectedType.Specific(resultType))))
+            val resultType = typedCases.map(_.body.typ).reduceLeft(commonType)
+            val unifiedCases = typedCases.traverse {
+              case ast.MatchCase(pat, guard, body) =>
+                unifyType(body, ExpectedType.Specific(resultType))
+                  .map(ast.MatchCase(pat, guard, _))
+            }
             unifiedCases
               .andThen(cs => unifyType(Typed(ast.Match(typedMatchee, cs, loc), resultType), expected)) <*
               (if(unhandled.isEmpty) valid(()) else invalidNel(TyperError.NonexhaustivePatternMatch(unhandled, loc)))
@@ -311,7 +314,7 @@ object Typer {
   }
 
   private def solveMatchCase(matcheeType: Type, expectedType: ExpectedType, ctxt: Ctxt)
-                            (pattern: P.Pattern, body: P.Expression): TyperResult[(Typed[ast.Pattern], Typed[ast.Expression])] = {
+                            (cas: P.MatchCase): TyperResult[ast.MatchCase] = {
     def findBindings(pattern: Typed[ast.Pattern]): TyperResult[List[(Symbol, Ctxt.Term)]] = pattern match {
       case Typed(ast.Pattern.Var(n, _), t) => valid(List(n -> Ctxt.Immutable(t)))
       case Typed(ast.Pattern.Alias(n, p, _), t) =>
@@ -328,10 +331,12 @@ object Typer {
       case Typed(ast.Pattern.Ignore(_) | ast.Pattern.IntLit(_, _) | ast.Pattern.FloatLit(_, _) | ast.Pattern.BoolLit(_, _)
            | ast.Pattern.CharLit(_, _), _) => valid(Nil)
     }
-    solvePattern(pattern, matcheeType, ctxt).andThen { typedPattern =>
+    solvePattern(cas.pattern, matcheeType, ctxt).andThen { typedPattern =>
       findBindings(typedPattern).andThen { bs =>
-        val bodyCtxt = bs.toMap
-        solveType(body, expectedType, ctxt.withTerms(bodyCtxt)).map(typedPattern -> _)
+        val bodyCtxt = ctxt.withTerms(bs.toMap)
+        ( cas.guard.traverse(solveType(_, ExpectedType.Specific(U1), bodyCtxt)),
+          solveType(cas.body, expectedType, bodyCtxt))
+          .map2(ast.MatchCase(typedPattern, _, _))
       }
     }
   }

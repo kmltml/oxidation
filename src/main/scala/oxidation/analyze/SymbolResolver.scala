@@ -126,7 +126,7 @@ object SymbolResolver {
         .map2(parse.ast.While(_, _, loc))
 
     case parse.ast.Match(matchee, cases, loc) =>
-      def solveCase(pattern: parse.ast.Pattern, body: parse.ast.Expression): Res[(parse.ast.Pattern, parse.ast.Expression)] = {
+      def solveCase(matchCase: parse.ast.MatchCase): Res[parse.ast.MatchCase] = {
         import parse.ast.Pattern
         def findBindings(pattern: Pattern): List[Symbol] = pattern match {
             case Pattern.Var(Symbol.Unresolved(n), _) => List(Symbol.Local(n))
@@ -136,14 +136,16 @@ object SymbolResolver {
             case Pattern.Ignore(_) | Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.BoolLit(_, _)
                | Pattern.CharLit(_, _) => Nil
           }
-        val bindings = findBindings(pattern)
+        val bindings = findBindings(matchCase.pattern)
+        val innerScope = bindings.foldLeft(scope)(_.shadowTerm(_))
 
-        ( solvePattern(pattern, scope, global),
-          solveExpr(body, bindings.foldLeft(scope)(_.shadowTerm(_)), global))
-          .map2((_, _))
+        ( solvePattern(matchCase.pattern, scope, global),
+          matchCase.guard.traverse(solveExpr(_, innerScope, global)),
+          solveExpr(matchCase.body, innerScope, global))
+          .map3(parse.ast.MatchCase)
       }
 
-      (solveExpr(matchee, scope, global), cases.traverse((solveCase _).tupled))
+      (solveExpr(matchee, scope, global), cases.traverse(solveCase))
         .map2(parse.ast.Match(_, _, loc))
 
     case parse.ast.Assign(left, op, right, loc) =>

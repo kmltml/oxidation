@@ -231,7 +231,7 @@ object Codegen {
         matcheeVal <- compileExpr(matchee)
         r <- genReg(translateType(t))
         _ <- cases.traverse_ {
-          case (pattern, body) =>
+          case ast.MatchCase(pattern, None, body) =>
             for {
               binds <- storeBindings
               lbli <- genLocalIndex

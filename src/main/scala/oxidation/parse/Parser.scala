@@ -297,7 +297,9 @@ class Parser(file: Option[String]) {
     P(located(K("while") ~/ "(" ~ expression ~ ")" ~/ expression)).map(While.tupled)
 
   private val matchexp: P[Match] = {
-    val cas = K("case") ~/ pattern ~ O("=>") ~ expression
+    val guard = K("if") ~/ expression
+    val cas = (K("case") ~/ pattern ~ guard.? ~ O("=>") ~ expression)
+      .map(MatchCase.tupled)
     P(located(K("match") ~/ "(" ~ expression ~ ")" ~/ "{" ~ cas.rep(min = 1) ~ "}"))
       .map { case (m, cs, l) => Match(m, cs.toList, l) }
   }

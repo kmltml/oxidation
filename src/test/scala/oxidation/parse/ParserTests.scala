@@ -5,7 +5,7 @@ import ast._
 import fastparse.core.Parsed
 import utest._
 
-object ParserTests extends TestSuite {
+object ParserTests extends TestSuite with MatchCaseSyntax {
 
   def assertFail(res: Parsed[_, _, _]): Unit = assertMatch(res) {
     case _: Parsed.Failure[_, _] =>
@@ -213,14 +213,29 @@ object ParserTests extends TestSuite {
         expr.parse("while(foo) bar()").get.value ==> While(Var("foo", 6 +> 3), App(Var("bar", 11 +> 3), Nil, 11 +> 5), 0 +> 16)
       }
       "a match expression" - {
-        expr.parse(
-          """match(foo) {
-            |  case 10 => 20
-            |  case x => x + 2
-            |}""".stripMargin.normalize).get.value ==> Match(Var("foo", 6 +> 3), List(
-              Pattern.IntLit(10, 20 +> 2) -> IntLit(20, 26 +> 2),
-              Pattern.Var("x", 36 +> 1) -> InfixAp(InfixOp.Add, Var("x", 41 +> 1), IntLit(2, 45 +> 1), 41 +> 5)
-            ), 0 +> 48)
+        "simple" - {
+          expr.parse(
+            """match(foo) {
+              |  case 10 => 20
+              |  case x => x + 2
+              |}""".stripMargin.normalize).get.value ==> Match(Var("foo", 6 +> 3), List(
+            Pattern.IntLit(10, 20 +> 2) -> IntLit(20, 26 +> 2),
+            Pattern.Var("x", 36 +> 1) -> InfixAp(InfixOp.Add, Var("x", 41 +> 1), IntLit(2, 45 +> 1), 41 +> 5)
+          ), 0 +> 48)
+        }
+        "with guards" - {
+          expr.parse(
+            """match(foo) {
+              |  case x if x >= 10 => x
+              |}
+            """.stripMargin.normalize).get.value ==>
+            Match(
+              Var("foo", 6 +> 3), List(
+                MatchCase(Pattern.Var("x", 20 +> 1), guard = Some(InfixAp(InfixOp.Geq, Var("x", 25 +> 1), IntLit(10, 30 +> 2), 25 +> 7)),
+                  Var("x", 36 +> 1))
+              ), 0 +> 39
+            )
+        }
       }
       "a variable assignment" - {
         expr.parse("foo = 42").get.value ==> Assign(Var("foo", 0 +> 3), None, IntLit(42, 6 +> 2), 0 +> 8)
