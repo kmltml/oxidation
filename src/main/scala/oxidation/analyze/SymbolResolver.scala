@@ -134,7 +134,7 @@ object SymbolResolver {
             case Pattern.Struct(_, members, _, _) => members.flatMap { case (_, p) => findBindings(p) }
             case Pattern.Or(left, right, _) => findBindings(left) ++ findBindings(right)
             case Pattern.Ignore(_) | Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.BoolLit(_, _)
-               | Pattern.CharLit(_, _) => Nil
+               | Pattern.CharLit(_, _) | Pattern.Pin(_, _) => Nil
           }
         val bindings = findBindings(matchCase.pattern)
         val innerScope = bindings.foldLeft(scope)(_.shadowTerm(_))
@@ -198,6 +198,9 @@ object SymbolResolver {
     case parse.ast.Pattern.Alias(Symbol.Unresolved(n), pattern, loc) =>
       solvePattern(pattern, scope, global)
         .map(parse.ast.Pattern.Alias(Symbol.Local(n), _, loc))
+    case parse.ast.Pattern.Pin(subexp, loc) =>
+      solveExpr(subexp, scope, global)
+        .map(parse.ast.Pattern.Pin(_, loc))
     case parse.ast.Pattern.Struct(typeName, members, ignoreExtra, loc) =>
       val solvedTypeName = typeName.traverse {
         case Symbol.Unresolved(s) => getOnlyOneSymbol(s, scope.types)

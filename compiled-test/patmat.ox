@@ -11,6 +11,7 @@ def tests(): u0 = {
            "Pattern alias")
     assert(guard(false, false) == 0 && guard(false, true) == 1 && guard(true, false) == 2 && guard(true, true) == 3,
            "match guards")
+    assert(!eq(1, 2) && eq(10, 10) && !eq(30, 29), "pinned var pattern")
 }
 
 def foo(x: i32): i32 = match(x) {
@@ -54,4 +55,9 @@ struct seldata = {
 
 def select(x: seldata): i32 = match(x) {
     case { b = true, x = a, _ } | { b = false, y = a, _ } => a
+}
+
+def eq(x: i32, y: i32): u1 = match(x) {
+    case ^y => true
+    case _ => false
 }

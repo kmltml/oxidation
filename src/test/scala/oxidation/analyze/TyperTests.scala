@@ -359,6 +359,20 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with Matc
               ), loc
             ) :: I32)
         }
+        "Pin" - {
+          solveType(P.Match(
+            P.Var(l('x), loc), List(
+              P.Pattern.Pin(P.Var(l('y), loc), loc) -> P.IntLit(10, loc),
+              P.Pattern.Ignore(loc) -> P.IntLit(20, loc)
+            ), loc
+          ), ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(I32), l('y) -> imm(I32)))) ==>
+            valid(ast.Match(
+              ast.Var(l('x), loc) :: I32, List(
+                (ast.Pattern.Pin(ast.Var(l('y), loc) :: I32, loc) :: I32) -> (ast.IntLit(10, loc) :: I32),
+                (ast.Pattern.Ignore(loc) :: I32) -> (ast.IntLit(20, loc) :: I32)
+              ), loc
+            ) :: I32)
+        }
         "nonexhaustive" - {
           val matchLoc = Span(None, 0, 10)
           "i32" - {

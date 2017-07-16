@@ -102,7 +102,7 @@ trait Ast {
       * there has to be a catch-all case to pass the exhaustivity checker.
       */
     def isInfinitesimal: Boolean = this match {
-      case Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.CharLit(_, _) => true
+      case Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.CharLit(_, _) | Pattern.Pin(_, _) => true
       case Pattern.Struct(_, members, _, _) => members.exists(t => extractTyped(t._2).isInfinitesimal)
       case Pattern.Or(l, r, _) => extractTyped(l).isInfinitesimal && extractTyped(r).isInfinitesimal
       case _ => false
@@ -117,6 +117,8 @@ trait Ast {
       case x: Pattern.CharLit => x.copy(loc = loc)
       case x: Pattern.Struct => x.copy(loc = loc)
       case x: Pattern.Or => x.copy(loc = loc)
+      case x: Pattern.Alias => x.copy(loc = loc)
+      case x: Pattern.Pin => x.copy(loc = loc)
     }
 
   }
@@ -132,6 +134,7 @@ trait Ast {
     final case class Struct(typeName: Option[Symbol], members: List[(String, Typed[Pattern])], ignoreExtra: Boolean, loc: Span) extends Pattern
     final case class Or(left: Typed[Pattern], right: Typed[Pattern], loc: Span) extends Pattern
     final case class Alias(name: Symbol, pattern: Typed[Pattern], loc: Span) extends Pattern
+    final case class Pin(subexp: Typed[Expression], loc: Span) extends Pattern
 
   }
 
@@ -164,7 +167,7 @@ trait Ast {
 
   def traverse[A](stmnt: Typed[BlockStatement])(f: PartialFunction[Typed[BlockStatement], A]): Vector[A] = {
     val result = f.lift(stmnt)
-    val more = stmnt match {
+    val more = extractTyped(stmnt) match {
       case _: IntLit | _: StringLit | _: BoolLit | _: Var | _: Extern |
            _: TypeAliasDef | _: StructDef | _: EnumDef | _: CharLit |
            _: UnitLit | _: FloatLit => Vector.empty[A]
@@ -177,7 +180,12 @@ trait Ast {
       case If(c, p, n, _) =>
         traverse(c)(f) ++ traverse(p)(f) ++ n.map(traverse(_)(f)).orEmpty
       case While(c, b, _) => traverse(c)(f) ++ traverse(b)(f)
-      case Match(m, c, _) => traverse(m)(f) ++ c.foldMap { case MatchCase(_, _, e) => traverse(m)(f) }
+      case Match(m, c, _) =>
+        def traversePattern(pattern: Typed[Pattern]): Vector[A] = extractTyped(pattern) match {
+          case Pattern.Pin(e, _) => traverse(e)(f)
+          case _ => Vector.empty
+        }
+        traverse(m)(f) ++ c.foldMap { case MatchCase(p, _, e) => traversePattern(p) ++ traverse(m)(f)}
       case Assign(l, _, r, _) => traverse(l)(f) ++ traverse(r)(f)
       case StructLit(_, members, _) => members.map(_._2).foldMap(traverse(_)(f))
 

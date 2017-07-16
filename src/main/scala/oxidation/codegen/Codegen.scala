@@ -504,6 +504,16 @@ object Codegen {
         _ <- compilePattern(p, matchee, passLbl, failLbl, reuseBindings)
       } yield ()
 
+    case Typed(ast.Pattern.Pin(subexp, _), _) =>
+      for {
+        cond <- genReg(Type.U1)
+        rhs <- compileExpr(subexp)
+        _ <- instructions(
+          Inst.Move(cond, Op.Binary(InfixOp.Eq, matchee, rhs)),
+          Inst.Flow(FlowControl.Branch(Val.R(cond), passLbl, failLbl))
+        )
+      } yield ()
+
     case Typed(ast.Pattern.Struct(_, members, _, _), structType: analyze.Type.Struct) =>
       for {
         _ <- members.init.traverse_ {

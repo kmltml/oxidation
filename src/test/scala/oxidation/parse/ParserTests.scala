@@ -324,6 +324,10 @@ object ParserTests extends TestSuite with MatchCaseSyntax {
         pat.parse("x @ _").get.value ==>
           Pattern.Alias("x", Pattern.Ignore(4 +> 1), 0 +> 5)
       }
+      "Pin" - {
+        pat.parse("^x").get.value ==>
+          Pattern.Pin(Var("x", 1 +> 1), 0 +> 2)
+      }
     }
 
     "definition should parse" - {

@@ -83,6 +83,7 @@ class Parser(file: Option[String]) {
   val pattern0: P[Pattern] =
     P( located(K("_")).map(Pattern.Ignore)
      | parenPattern
+     | pinnedPattern
      | aliasPattern
      | structPattern
      | varacc.map(_.pattern)
@@ -109,6 +110,10 @@ class Parser(file: Option[String]) {
   val aliasPattern: P[Pattern.Alias] =
     P(located(sym ~ O("@") ~ pattern))
       .map(Pattern.Alias.tupled)
+
+  val pinnedPattern: P[Pattern.Pin] =
+    P(located(O("^") ~ varacc))
+      .map(Pattern.Pin.tupled)
 
   val definition: P[Def] = P(
     defdef | valdef | vardef | structdef | enumdef | typedef

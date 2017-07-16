@@ -329,7 +329,7 @@ object Typer {
           }
 
       case Typed(ast.Pattern.Ignore(_) | ast.Pattern.IntLit(_, _) | ast.Pattern.FloatLit(_, _) | ast.Pattern.BoolLit(_, _)
-           | ast.Pattern.CharLit(_, _), _) => valid(Nil)
+           | ast.Pattern.CharLit(_, _) | ast.Pattern.Pin(_, _), _) => valid(Nil)
     }
     solvePattern(cas.pattern, matcheeType, ctxt).andThen { typedPattern =>
       findBindings(typedPattern).andThen { bs =>
@@ -347,6 +347,10 @@ object Typer {
     case P.Pattern.Alias(name, pattern, loc) =>
       solvePattern(pattern, matcheeType, ctxt)
         .map(p => Typed(ast.Pattern.Alias(name, p, loc), matcheeType))
+    case P.Pattern.Pin(subexp, loc) =>
+      solveType(subexp, ExpectedType.Specific(matcheeType), ctxt)
+        .map(s => Typed(ast.Pattern.Pin(s, loc), matcheeType))
+
     case P.Pattern.IntLit(value, loc) => matcheeType match {
       case t: Integral => valid(Typed(ast.Pattern.IntLit(value, loc), t))
       case t => invalidNel(TyperError.CantMatch(ExpectedType.Numeric(Some(I32)), t, loc))
