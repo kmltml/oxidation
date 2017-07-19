@@ -45,7 +45,7 @@ object SymbolSearch {
       case (d @ parse.ast.EnumDef(Symbol.Unresolved(name), None, variants)) :: rest =>
         val enumPath = pathPrefix :+ name
         val variantSymbols = variants.map {
-          case EnumVariantDef(name, _) => Symbol.Global(enumPath :+ name)
+          case EnumVariantDef(Symbol.Unresolved(name), _) => Symbol.Global(enumPath :+ name)
         }
         insertOnly(Symbol.Global(enumPath), types).toRight(DuplicatedSymbolError(Symbol.Global(enumPath), d))
           .flatMap(rec(rest, _, terms ++ variantSymbols))

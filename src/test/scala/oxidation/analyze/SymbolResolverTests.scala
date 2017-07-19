@@ -189,6 +189,21 @@ object SymbolResolverTests extends TestSuite with SymbolSyntax {
           VarDef(g('foo), Some(TypeName.Named(g('x, 'y, 'z))), IntLit(0, loc))
         ))
       }
+      "EnumDef" - {
+        resolveSymbols(Vector(
+          Module("x" :: Nil),
+          EnumDef(u('foo), None, List(
+            EnumVariantDef(u('a), Nil),
+            EnumVariantDef(u('b), Nil)
+          ))
+        ), BuiltinSymbols.symbols) ==> Right(Vector(
+          Module("x" :: Nil),
+          EnumDef(g('x, 'foo), None, List(
+            EnumVariantDef(g('x, 'foo, 'a), Nil),
+            EnumVariantDef(g('x, 'foo, 'b), Nil)
+          ))
+        ))
+      }
     }
   }
 

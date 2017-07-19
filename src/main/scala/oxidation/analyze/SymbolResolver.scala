@@ -68,9 +68,18 @@ object SymbolResolver {
 
     case parse.ast.StructDef(name, params, members) =>
       val localScope = params.getOrElse(Nil).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
-      members.traverse {
-        case StructMemberDef(name, tpe) => solveType(tpe, localScope).map(StructMemberDef(name, _))
-      }.map(parse.ast.StructDef(solveDefName(name, ctxt), params, _))
+      members.traverse(solveStructMemberDef(_, localScope))
+        .map(parse.ast.StructDef(solveDefName(name, ctxt), params, _))
+
+    case parse.ast.EnumDef(name, None, variants) =>
+      // TODO local enums, do i want them? (probably yes), will have to somehow create a local module-like thingie
+      val newName @ Symbol.Global(path) = solveDefName(name, ctxt)
+      variants.traverse {
+        case EnumVariantDef(Symbol.Unresolved(name), members) =>
+          members.traverse(solveStructMemberDef(_, scope))
+            .map(EnumVariantDef(Symbol.Global(path :+ name), _))
+      }.map(parse.ast.EnumDef(newName, None, _))
+
 
     case parse.ast.TypeAliasDef(name, params, body) =>
       val localScope = params.getOrElse(Nil).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
@@ -82,6 +91,9 @@ object SymbolResolver {
     case (Symbol.Unresolved(n), Local) => Symbol.Local(n)
     case (s, _) => s
   }
+
+  private def solveStructMemberDef(m: StructMemberDef, scope: Scope): Res[StructMemberDef] =
+    solveType(m.typ, scope).map(StructMemberDef(m.name, _))
 
   private def solveExpr(e: parse.ast.Expression, scope: Scope, global: Symbols): Res[parse.ast.Expression] = e match {
     case parse.ast.Var(Symbol.Unresolved(n), loc) =>

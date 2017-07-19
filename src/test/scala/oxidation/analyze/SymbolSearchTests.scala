@@ -48,8 +48,8 @@ object SymbolSearchTests extends TestSuite with SymbolSyntax {
         findSymbols(Vector(
           Module("foo" :: Nil),
           EnumDef(u('bar), None, List(
-            EnumVariantDef("x", Nil),
-            EnumVariantDef("y", Nil)
+            EnumVariantDef(u('x), Nil),
+            EnumVariantDef(u('y), Nil)
           ))
         )) ==> Right(
           Symbols.terms(g('foo, 'bar, 'x), g('foo, 'bar, 'y))

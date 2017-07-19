@@ -205,4 +205,4 @@ trait Ast {
 }
 
 final case class StructMemberDef(name: String, typ: TypeName)
-final case class EnumVariantDef(name: String, members: List[StructMemberDef])
+final case class EnumVariantDef(name: Symbol, members: List[StructMemberDef])
