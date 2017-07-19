@@ -51,6 +51,40 @@ object TypeInterpreterTests extends TestSuite with SymbolSyntax {
             assert(pointee eq list)
         }
       }
+      "EnumDef" - {
+        val Right(c) = solveTree(Vector(
+          EnumDef(g('foo), None, List(
+            EnumVariantDef(g('foo, 'x), List(
+              StructMemberDef("a", TypeName.Named(g('i32)))
+            )),
+            EnumVariantDef(g('foo, 'y), List(
+              StructMemberDef("a", TypeName.Named(g('i64)))
+            ))
+          ))
+        ), ctxt)
+        val foo = c.types(g('foo)).asInstanceOf[Enum]
+        foo.variants(0) ==> EnumVariant(g('foo, 'x), List(StructMember("a", I32)))
+        foo.variants(1) ==> EnumVariant(g('foo, 'y), List(StructMember("a", I64)))
+        c.terms ==> Map(
+          g('foo, 'x) -> Ctxt.Immutable(EnumVariant(g('foo, 'x), List(StructMember("a", I32)))),
+          g('foo, 'y) -> Ctxt.Immutable(EnumVariant(g('foo, 'y), List(StructMember("a", I64))))
+        )
+      }
+      "recursive EnumDef" - {
+        val Right(c) = solveTree(Vector(
+          EnumDef(g('List), None, List(
+            EnumVariantDef(g('List, 'Cons), List(
+              StructMemberDef("head", TypeName.Named(g('i32))),
+              StructMemberDef("tail", TypeName.ptr(TypeName.Named(g('List))))
+            )),
+            EnumVariantDef(g('List, 'Nil), Nil)
+          ))
+        ), ctxt)
+        val list = c.types(g('List)).asInstanceOf[Enum]
+        list.variants(0) ==> EnumVariant(g('List, 'Cons), List(
+          StructMember("head", I32), StructMember("tail", Ptr(list))))
+        list.variants(1) ==> EnumVariant(g('List, 'Nil), Nil)
+      }
     }
   }
 

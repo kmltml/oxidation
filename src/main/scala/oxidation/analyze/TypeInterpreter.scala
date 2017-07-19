@@ -46,6 +46,30 @@ object TypeInterpreter {
             s <- StateT.lift(struct)
             _ <- solved(d.name, s)
           } yield s
+
+        case untyped.EnumDef(_, None, variants) =>
+          case class Err(err: AnalysisError) extends Throwable
+
+          val enum = Try(Type.Enum(d.name) { self =>
+            val m: S[List[Type.EnumVariant]] = variants.traverse {
+              case EnumVariantDef(name, members) =>
+                val memberTypes = members.traverse {
+                  case StructMemberDef(name, tpe) => findType(tpe, defs).map(Type.StructMember(name, _))
+                }
+                memberTypes.map(Type.EnumVariant(name, _))
+            }
+            m.runA(ctxt.withTypes(Map(d.name -> self))) match {
+              case Left(err) => throw Err(err)
+              case Right(l) => l
+            }
+          }).toEither.left.map {
+            case Err(e) => e
+          }
+          for {
+            e <- StateT.lift(enum)
+            _ <- solved(d.name, e)
+            _ <- S.modify(_.withTerms(e.variants.map(v => v.name -> Ctxt.Immutable(v)).toMap))
+          } yield e
       }
     } yield t
 

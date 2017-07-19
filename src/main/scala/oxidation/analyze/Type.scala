@@ -74,4 +74,29 @@ object Type {
 
   final case class StructMember(name: String, typ: Type)
 
+  final class Enum(val name: Symbol, variantsF: Enum => List[EnumVariant]) extends Type {
+
+    val variants = variantsF(this)
+
+    override def equals(obj: Any): Boolean = obj match {
+      case e: Enum => (this eq e) || (e.name == name)
+      case _ => false
+    }
+
+    override def toString: String = s"Enum($name)"
+
+  }
+
+  object Enum {
+
+    def apply(name: Symbol, variants: List[EnumVariant]): Enum = new Enum(name, _ => variants)
+
+    def apply(name: Symbol)(f: Enum => List[EnumVariant]): Enum = new Enum(name, f)
+
+    def unapply(e: Enum): Option[(Symbol, List[EnumVariant])] = Some((e.name, e.variants))
+
+  }
+
+  final case class EnumVariant(name: Symbol, members: List[StructMember]) extends Type
+
 }
