@@ -387,8 +387,8 @@ object ParserTests extends TestSuite with MatchCaseSyntax {
             |}
           """.stripMargin).get.value ==>
           EnumDef("bool", None, List(
-            EnumVariant("True", Nil),
-            EnumVariant("False", Nil)
+            EnumVariantDef("True", Nil),
+            EnumVariantDef("False", Nil)
           ))
         defn.parse(
           """enum Option[A] = {
@@ -399,8 +399,8 @@ object ParserTests extends TestSuite with MatchCaseSyntax {
             |}
           """.stripMargin).get.value ==>
           EnumDef("Option", Some(List("A")), List(
-            EnumVariant("Some", List(StructMemberDef("value", TypeName.Named("A")))),
-            EnumVariant("None", Nil)
+            EnumVariantDef("Some", List(StructMemberDef("value", TypeName.Named("A")))),
+            EnumVariantDef("None", Nil)
           ))
       }
       "a type alias" - {

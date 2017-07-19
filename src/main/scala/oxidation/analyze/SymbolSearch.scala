@@ -41,6 +41,16 @@ object SymbolSearch {
           importedModules = Map.empty).asRight
       case parse.ast.Module(_) :: rest => rec(rest, types, terms)
       case parse.ast.Import(_, _) :: rest => rec(rest, types, terms)
+
+      case (d @ parse.ast.EnumDef(Symbol.Unresolved(name), None, variants)) :: rest =>
+        val enumPath = pathPrefix :+ name
+        val variantSymbols = variants.map {
+          case EnumVariantDef(name, _) => Symbol.Global(enumPath :+ name)
+        }
+        insertOnly(Symbol.Global(enumPath), types).toRight(DuplicatedSymbolError(Symbol.Global(enumPath), d))
+          .flatMap(rec(rest, _, terms ++ variantSymbols))
+
+
       case (d @ TypeDef(name)) :: rest =>
         val sym = Symbol.Global(pathPrefix :+ name)
         insertOnly(sym, types)

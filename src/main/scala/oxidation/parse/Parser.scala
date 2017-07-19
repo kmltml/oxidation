@@ -220,8 +220,8 @@ class Parser(file: Option[String]) {
   private val enumdef: P[EnumDef] = {
     val typeParams = "[" ~/ id.!.rep(sep = ",").map(_.toList) ~ "]"
     val variantMembers = "{" ~/ structMember.repX(sep = semiOrComa).map(_.toList) ~ "}"
-    val variant: P[EnumVariant] = (WS ~~ id.! ~ variantMembers.?).map {
-      case (n, m) => EnumVariant(n, m getOrElse Nil)
+    val variant: P[EnumVariantDef] = (WS ~~ id.! ~ variantMembers.?).map {
+      case (n, m) => EnumVariantDef(n, m getOrElse Nil)
     }
     val body = "{" ~~ variant.repX(sep = semi).map(_.toList) ~ "}"
     P(K("enum") ~/ sym ~ typeParams.? ~ O("=") ~/ body).map(EnumDef.tupled)

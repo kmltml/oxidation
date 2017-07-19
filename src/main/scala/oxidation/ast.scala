@@ -159,7 +159,7 @@ trait Ast {
   sealed trait TypeDef extends Def
 
   final case class StructDef(name: Symbol, typeParameters: Option[List[String]], members: List[StructMemberDef]) extends TypeDef
-  final case class EnumDef(name: Symbol, typeParameters: Option[List[String]], variants: List[EnumVariant]) extends TypeDef
+  final case class EnumDef(name: Symbol, typeParameters: Option[List[String]], variants: List[EnumVariantDef]) extends TypeDef
   final case class TypeAliasDef(name: Symbol, typeParameters: Option[List[String]], body: TypeName) extends TypeDef
 
   final case class Module(path: List[String]) extends TLD
@@ -205,4 +205,4 @@ trait Ast {
 }
 
 final case class StructMemberDef(name: String, typ: TypeName)
-final case class EnumVariant(name: String, members: List[StructMemberDef])
+final case class EnumVariantDef(name: String, members: List[StructMemberDef])

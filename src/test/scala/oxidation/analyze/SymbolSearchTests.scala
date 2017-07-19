@@ -44,6 +44,17 @@ object SymbolSearchTests extends TestSuite with SymbolSyntax {
           DefDef(u('main), None, None, Block(Vector.empty, loc))
         )) ==> Right(Symbols.terms(g('foo, 'bar, 'main)))
       }
+      "enum constructors" - {
+        findSymbols(Vector(
+          Module("foo" :: Nil),
+          EnumDef(u('bar), None, List(
+            EnumVariantDef("x", Nil),
+            EnumVariantDef("y", Nil)
+          ))
+        )) ==> Right(
+          Symbols.terms(g('foo, 'bar, 'x), g('foo, 'bar, 'y))
+          .withTypes(g('foo, 'bar)))
+      }
     }
   }
 
