@@ -45,7 +45,7 @@ class Parser(file: Option[String]) {
     (Index ~~ p ~~ Index) map { case (s, a, e) => seq(a, Span(file, s, e)) }
 
   val compilationUnit: P[Vector[TLD]] =
-    P((WS ~~ tld).repX(sep = semi).map(_.toVector) ~~ End)
+    P((WS ~~ tld).repX(sep = semi).map(_.toVector) ~ End)
 
   private val expression0: P[Expression] = P(
     stringLiteral | floatLiteral | intLiteral | structLit | charLiteral | unitLiteral |
@@ -212,14 +212,14 @@ class Parser(file: Option[String]) {
   private val structMember = (WS ~~ id.! ~~ WSNoNL ~~ ":" ~ typ).map(StructMemberDef.tupled)
 
   private val structdef: P[StructDef] = {
-    val body = "{" ~~ structMember.repX(sep = semi).map(_.toList) ~ "}"
+    val body = "{" ~~ structMember.repX(sep = semiOrComa).map(_.toList) ~ "}"
     val typeParams = "[" ~/ id.!.rep(sep = ",").map(_.toList) ~ "]"
     P(K("struct") ~/ sym ~ typeParams.? ~ O("=") ~ body).map(StructDef.tupled)
   }
 
   private val enumdef: P[EnumDef] = {
     val typeParams = "[" ~/ id.!.rep(sep = ",").map(_.toList) ~ "]"
-    val variantMembers = "{" ~/ structMember.repX(sep = semi).map(_.toList) ~ "}"
+    val variantMembers = "{" ~/ structMember.repX(sep = semiOrComa).map(_.toList) ~ "}"
     val variant: P[EnumVariant] = (WS ~~ id.! ~ variantMembers.?).map {
       case (n, m) => EnumVariant(n, m getOrElse Nil)
     }
