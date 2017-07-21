@@ -80,6 +80,21 @@ trait AstPrettyprint {
         case StructMemberDef(name, tpe) => s"Member($name, ".p + prettyprintTypeName(tpe) + ")"
       }.sep(", ".nl).indent + ")"
 
+
+    case ast.EnumDef(name, typeParams, variants) =>
+      val typeParamList = typeParams match {
+        case Some(ps) => s"[${ps mkString ", "}]"
+        case None => ""
+      }
+      s"EnumDef(${prettyprintSymbol(name)}$typeParamList, ".nl + variants.map {
+        case EnumVariantDef(name, Nil) =>
+          "Variant(".p + prettyprintSymbol(name) + ")"
+        case EnumVariantDef(name, members) =>
+          "Variant(".p + prettyprintSymbol(name) + ",".nl + members.map {
+            case StructMemberDef(name, typ) => s"Member($name, ".p + prettyprintTypeName(typ) + ")"
+          }.sep(", ".nl).indent + ")"
+      }.sep(",".nl).indent + ")"
+
     case ast.TypeAliasDef(name, typeParams, body) =>
       val typeParamList = typeParams match {
         case Some(ps) => s"[${ps mkString ", "}]"
@@ -140,6 +155,14 @@ trait AstPrettyprint {
       val els = neg.map(e => ", ".nl + prettyprintTypedExp(e).indent).getOrElse("".p)
       prefix + els + ")"
 
+    case ast.Match(matchee, cases, loc) =>
+      show"Match{$loc}$typeInfo(".nl + (prettyprintTypedExp(matchee) + ",".nl + cases.map {
+        case ast.MatchCase(pattern, guard, body) =>
+          val guardPP = guard.map(g => "Guard(".p + prettyprintTypedExp(g) + "),".nl).getOrElse("".p)
+          "Case(".nl + (prettyPrintTypedPattern(pattern) + ",".nl + guardPP +
+            prettyprintTypedExp(body) + ")").indent
+      }.sep(",".nl) + ")").indent
+
     case ast.InfixAp(op, left, right, loc) =>
       show"InfixAp{$loc}$typeInfo($op, ".nl + prettyprintTypedExp(left).indent + ", ".nl + prettyprintTypedExp(right).indent + ")"
 
@@ -188,6 +211,44 @@ trait AstPrettyprint {
 
     case ast.ArrLit(elems, loc) =>
       show"ArrLit{$loc}$typeInfo(".nl + elems.map(prettyprintTypedExp).sep(",".nl).indent + ")"
+  }
+
+  def prettyPrintTypedPattern(pattern: ast.Typed[ast.Pattern])(implicit translator: IndexTranslator): P
+
+  def prettyPrintPattern(p: ast.Pattern, typeInfo: String)(implicit translator: IndexTranslator): P = p match {
+    case ast.Pattern.Var(name, loc) =>
+      show"Var{$loc}$typeInfo(".p + prettyprintSymbol(name) + ")"
+    case ast.Pattern.Ignore(loc) =>
+      show"Ignore{$loc}"
+
+    case ast.Pattern.IntLit(i, loc) => i.toString + show"{$loc}"
+
+    case ast.Pattern.BoolLit(b, loc) => b.toString + show"{$loc}"
+
+    case ast.Pattern.FloatLit(f, loc) => f.toString + show"{$loc}"
+
+    case ast.Pattern.CharLit(c, loc) => c.toString + show"{$loc}"
+
+    case ast.Pattern.Struct(typeName, members, ignoreExtra, loc) =>
+      show"Struct{$loc}(".nl +
+        (typeName.map(prettyprintSymbol(_).p + ",".nl).getOrElse("".p) +
+        members.map {
+          case (n, p) => s"Member($n, ".p + prettyPrintTypedPattern(p) + ")".p
+        }.sep(",".nl) +
+        (if(ignoreExtra) "IgnoreExtra)" else ")").p).indent
+
+    case ast.Pattern.Or(left, right, loc) =>
+      show"Or{$loc}(".nl +
+        (prettyPrintTypedPattern(left) + ",".nl +
+        prettyPrintTypedPattern(right) + ")").indent
+
+    case ast.Pattern.Alias(name, pattern, loc) =>
+      show"Alias{$loc}(".nl +
+        (prettyprintSymbol(name).p + ",".nl +
+          prettyPrintTypedPattern(pattern) + ")").indent
+
+    case ast.Pattern.Pin(subexp, loc) =>
+      show"Pin{$loc}(".p + prettyprintTypedExp(subexp) + ")"
   }
 
   def stringify(p: P): String = {
@@ -250,6 +311,20 @@ object TypedAstPrettyprint extends AstPrettyprint {
     }
   }
 
+  override def prettyPrintTypedPattern(p: Typed[ast.Pattern])(implicit translator: IndexTranslator): P = {
+    val typ = prettyPrintType(p.typ)
+    p.expr match {
+      case ast.Pattern.IntLit(i, loc) => show"{$loc}[$typ]($i)"
+
+      case ast.Pattern.FloatLit(i, loc) => show"{$loc}[$typ]($i)"
+
+      case ast.Pattern.BoolLit(b, loc) => show"{$loc}[$typ]($b)"
+
+      case _ => prettyPrintPattern(p.expr, s"[$typ]")
+    }
+  }
+
+
   override def prettyprintTypedBlockStatement(e: Typed[ast.BlockStatement])(implicit translator: IndexTranslator): P = e match {
     case Typed(d: ast.Def, _) => prettyprintDef(d)
     case Typed(expr: ast.Expression, typ) => prettyprintTypedExp(Typed(expr, typ))
@@ -268,15 +343,30 @@ object TypedAstPrettyprint extends AstPrettyprint {
       s"$n$m"
     case Type.Ptr(Type.Struct(name, _)) => s"ptr[${prettyprintSymbol(name)}]"
     case Type.Ptr(pointee) => s"ptr[${prettyPrintType(pointee)}]"
+    case Type.Enum(name, variants) =>
+      val n = prettyprintSymbol(name)
+      val vs = variants.map {
+        case Type.EnumVariant(name, members) =>
+          val n = prettyprintSymbol(name)
+          val m = members.map {
+            case Type.StructMember(name, typ) => s"$name: ${prettyPrintType(typ)}"
+          }.mkString("{", ", ", "}")
+          s"$n$m"
+      }.mkString("(", "|", ")")
+      s"$n$vs"
+
     case _ => t.toString
   }
 
   override def prettyprintTypeInfo(t: Type): P = prettyPrintType(t)
+
 }
 object ParseAstPrettyprint extends AstPrettyprint {
   val ast = parse.ast
 
   override def prettyprintTypedExp(e: ast.Expression)(implicit translator: IndexTranslator): P = prettyprintExp(e, "")
+
+  override def prettyPrintTypedPattern(p: ast.Pattern)(implicit translator: IndexTranslator): P = prettyPrintPattern(p, "")
 
   override def prettyprintTypedBlockStatement(e: ast.BlockStatement)(implicit translator: IndexTranslator): P = e match {
     case d: ast.Def => prettyprintDef(d)
