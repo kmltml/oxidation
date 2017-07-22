@@ -21,8 +21,8 @@ object TypeTraverseTests extends TestSuite
     "solveTree" - {
       "a simple interdependent graph" - {
         TypeTraverse.solveTree(DependencyGraph(Map(
-          g('a) -> DependencyEntry(Set(g('b)), None),
-          g('b) -> DependencyEntry(Set(), Some(TypeName.Named(g('i64))))
+          g('a) -> DependencyEntry(Set(g('b)), explicitType = false),
+          g('b) -> DependencyEntry(Set(), explicitType = true)
         )), Vector(
           untyped.DefDef(g('a), Some(List(untyped.Param("x", TypeName.Named(g('i32))))), None,
             untyped.InfixAp(InfixOp.Eq, untyped.Var(l('x), loc), untyped.Var(g('b), loc), loc)),
@@ -35,8 +35,8 @@ object TypeTraverseTests extends TestSuite
       }
       "type a def as a function type" - {
         TypeTraverse.solveTree(DependencyGraph(Map(
-          g('a) -> DependencyEntry(Set(), None),
-          g('b) -> DependencyEntry(Set(g('a)), None)
+          g('a) -> DependencyEntry(Set(), explicitType = false),
+          g('b) -> DependencyEntry(Set(g('a)), explicitType = false)
         )), Vector(
           untyped.DefDef(g('a), Some(List(untyped.Param("x", TypeName.Named(g('i32))))), None, untyped.Var(l('x), loc)),
           untyped.ValDef(g('b), None, untyped.Var(g('a), loc))
@@ -47,7 +47,7 @@ object TypeTraverseTests extends TestSuite
       }
       "a recursive def with type annotation" - {
         TypeTraverse.solveTree(DependencyGraph(Map(
-          g('factorial) -> DependencyEntry(Set(), Some(TypeName.Named(g('i64))))
+          g('factorial) -> DependencyEntry(Set(), explicitType = true)
         )), Vector(
           untyped.DefDef(g('factorial), Some(List(untyped.Param("i", TypeName.Named(g('i64))))), Some(TypeName.Named(g('i64))),
             untyped.App(untyped.Var(g('factorial), loc), List(untyped.Var(l('i), loc)), loc))

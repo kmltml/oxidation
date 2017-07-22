@@ -28,7 +28,7 @@ object TypeTraverse {
     val defsByName = defs.collect {
       case d: untyped.TermDef => d.name -> d
     }.toMap
-    val orderedDefs = roots.traverse(postOrder(_, Set.empty)).map(_.flatten.distinct.map(defsByName))
+    val orderedDefs = roots.traverse(postOrder(_, Set.empty)).map(_.flatten.distinct.flatMap(defsByName.get))
     assert(orderedDefs.forall(_.toSet === defsByName.values.toSet))
 
     val explicitDefs = defs.collect {
