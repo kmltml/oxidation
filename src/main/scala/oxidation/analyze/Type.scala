@@ -5,7 +5,9 @@ sealed trait Type
 
 object Type {
 
-  sealed trait Num extends Type
+  sealed trait ValueType extends Type
+
+  sealed trait Num extends ValueType
 
   sealed trait Integral extends Num
 
@@ -37,12 +39,12 @@ object Type {
   case object F32 extends F(32)
   case object F64 extends F(64)
 
-  case object U1 extends Type
-  case object U0 extends Type
+  case object U1 extends ValueType
+  case object U0 extends ValueType
 
-  final case class Ptr(pointee: Type) extends Type
+  final case class Ptr(pointee: Type) extends ValueType
 
-  final case class Arr(member: Type, size: Int) extends Type
+  final case class Arr(member: Type, size: Int) extends ValueType
 
   final case class Fun(params: List[Type], ret: Type) extends Type
 
@@ -74,7 +76,7 @@ object Type {
 
   final case class StructMember(name: String, typ: Type)
 
-  final class Enum(val name: Symbol, variantsF: Enum => List[EnumVariant]) extends Type {
+  final class Enum(val name: Symbol, variantsF: Enum => List[EnumVariant]) extends ValueType {
 
     val variants = variantsF(this)
 
@@ -97,6 +99,8 @@ object Type {
 
   }
 
-  final case class EnumVariant(name: Symbol, members: List[StructMember]) extends Type
+  final case class EnumVariant(name: Symbol, members: List[StructMember])
+
+  final case class EnumConstructor(enumType: Enum, variant: EnumVariant) extends Type
 
 }

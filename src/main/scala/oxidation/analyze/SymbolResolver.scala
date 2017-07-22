@@ -100,7 +100,7 @@ object SymbolResolver {
       getOnlyOneSymbol(n, scope.terms).map(parse.ast.Var(_, loc))
 
     case parse.ast.StructLit(Symbol.Unresolved(name), members, loc) =>
-      (getOnlyOneSymbol(name, scope.types), members.traverse {
+      (getOnlyOneSymbol(name, scope.types |+| scope.terms), members.traverse {
         case (n, e) => solveExpr(e, scope, global).map(n -> _)
       }).map2(parse.ast.StructLit(_, _, loc))
 

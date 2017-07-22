@@ -146,7 +146,14 @@ trait AstPrettyprint {
         case (name, exp) => s"($name, ".nl + (prettyprintTypedExp(exp) + ")").indent
       }.sep(",".nl)
       show"StructLit{$loc}$typeInfo(".p + prettyprintSymbol(name) + ",".nl +
-        ("Members(".nl + memberpp.indent + ")").indent
+        ("Members(".nl + memberpp.indent + "))").indent
+
+    case ast.EnumLit(name, members, loc) =>
+      val memberpp = members.map {
+        case (name, exp) => s"($name, ".nl + (prettyprintTypedExp(exp) + ")").indent
+      }.sep(",".nl)
+      show"EnumLit{$loc}$typeInfo(".p + name + ",".nl +
+        ("Members(".nl + memberpp.indent + "))").indent
 
     case ast.Var(v, loc) => prettyprintSymbol(v) + show"{$loc}"
 
@@ -342,6 +349,7 @@ object TypedAstPrettyprint extends AstPrettyprint {
       }.mkString("{", ", ", "}")
       s"$n$m"
     case Type.Ptr(Type.Struct(name, _)) => s"ptr[${prettyprintSymbol(name)}]"
+    case Type.Ptr(Type.Enum(name, _)) => s"ptr[${prettyprintSymbol(name)}]"
     case Type.Ptr(pointee) => s"ptr[${prettyPrintType(pointee)}]"
     case Type.Enum(name, variants) =>
       val n = prettyprintSymbol(name)
@@ -354,6 +362,11 @@ object TypedAstPrettyprint extends AstPrettyprint {
           s"$n$m"
       }.mkString("(", "|", ")")
       s"$n$vs"
+    case Type.EnumConstructor(_, Type.EnumVariant(variantName, members)) =>
+      val m = members.map {
+        case Type.StructMember(name, typ) => s"$name: ${prettyPrintType(typ)}"
+      }.mkString("{", ", ", "}")
+      s"constructor[$m => ${prettyprintSymbol(variantName)}]"
 
     case _ => t.toString
   }

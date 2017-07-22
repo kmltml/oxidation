@@ -72,20 +72,38 @@ object Typer {
       } yield Typed(ast.App(Typed(ast.Var(sqrt, sqrtloc), Type.Fun(List(pt), pt)), List(typedParam), loc), pt))
 
     case P.StructLit(name, members, loc) =>
-      Validated.fromEither(for {
-        struct <- lookupType(TypeName.Named(name), ctxt) match {
-          case s: Struct => Right(s)
-          case t => Left(TyperError.NotAStruct(t, loc))
-        }
-        _ <- Either.cond(members.map(_._1).toSet == struct.members.map(_.name).toSet, (),
-                          TyperError.WrongStructMembers(expected = struct.members.map(_.name).toSet, found = members.map(_._1).toSet, loc))
-      } yield struct).toValidatedNel.andThen { struct: Struct =>
-        val typesMap = struct.members.map(m => m.name -> m.typ).toMap
+      def solveMembers(expectedType: String => ExpectedType): TyperResult[List[(String, Typed[ast.Expression])]] =
         members.traverse {
           case (name, expr) =>
-            val expectedType = ExpectedType.Specific(typesMap(name))
-            solveType(expr, expectedType, ctxt).map(name -> _)
-        }.map(typedMembers => Typed(ast.StructLit(name, typedMembers, loc), struct))
+            solveType(expr, expectedType(name), ctxt).map(name -> _)
+        }
+
+      def checkMemberSet(expected: Set[String], found: Set[String]): TyperResult[Unit] =
+        if(expected == found) valid(()) else invalidNel(TyperError.WrongStructMembers(expected, found, loc))
+
+      ctxt.types.get(name).map {
+        case struct: Type.Struct =>
+          val correctMemberSet = checkMemberSet(members.map(_._1).toSet, struct.members.map(_.name).toSet)
+
+          val expectedTypeFun = struct.members.map(m => m.name -> m.typ).toMap
+            .andThen(ExpectedType.Specific)
+            .lift.andThen(_ getOrElse ExpectedType.Undefined)
+
+          correctMemberSet *>
+            solveMembers(expectedTypeFun).map(typedMembers => Typed(ast.StructLit(name, typedMembers, loc), struct))
+        case t => invalidNel(TyperError.NotAStruct(t, loc))
+      }.getOrElse {
+        ctxt.terms(name).typ match {
+          case Type.EnumConstructor(enum, variant) =>
+            val correctMemberSet = checkMemberSet(members.map(_._1).toSet, variant.members.map(_.name).toSet)
+
+            val expectedTypeFun = variant.members.map(m => m.name -> m.typ).toMap
+              .andThen(ExpectedType.Specific)
+              .lift.andThen(_ getOrElse ExpectedType.Undefined)
+
+            correctMemberSet *>
+              solveMembers(expectedTypeFun).map(typedMembers => Typed(ast.EnumLit(variant.name.name, typedMembers, loc), enum))
+        }
       }
 
     case P.PrefixAp(PrefixOp.Inv, right, loc) =>
@@ -185,9 +203,14 @@ object Typer {
 
 
     case P.Var(name, loc) =>
-      ctxt.terms.get(name)
+      ctxt.terms.get(name).map(_.typ)
         .toValidNel(TyperError.SymbolNotFound(name, loc))
-        .andThen(t => unifyType(Typed(ast.Var(name, loc), t.typ), expected))
+        .andThen {
+          case Type.EnumConstructor(enum, variant) =>
+            solveType(P.StructLit(name, Nil, loc), expected, ctxt)
+          case t =>
+            unifyType(Typed(ast.Var(name, loc), t), expected)          
+        }
 
     case P.Select(expr, member, loc) =>
       Validated.fromEither(for {

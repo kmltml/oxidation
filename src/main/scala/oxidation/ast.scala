@@ -26,6 +26,7 @@ trait Ast {
       case x: CharLit => x.copy(loc = loc)
       case x: StringLit => x.copy(loc = loc)
       case x: StructLit => x.copy(loc = loc)
+      case x: EnumLit => x.copy(loc = loc)
       case x: UnitLit => x.copy(loc = loc)
       case x: InfixAp => x.copy(loc = loc)
       case x: PrefixAp => x.copy(loc = loc)
@@ -64,6 +65,7 @@ trait Ast {
   }
   final case class StringLit(value: String, loc: Span) extends Expression
   final case class StructLit(name: Symbol, members: List[(String, Typed[Expression])], loc: Span) extends Expression
+  final case class EnumLit(variantName: String, members: List[(String, Typed[Expression])], loc: Span) extends Expression
   final case class UnitLit(loc: Span) extends Expression
   final case class InfixAp(operator: InfixOp, left: Typed[Expression], right: Typed[Expression], loc: Span) extends Expression
   final case class PrefixAp(operator: PrefixOp, expr: Typed[Expression], loc: Span) extends Expression
@@ -188,6 +190,7 @@ trait Ast {
         traverse(m)(f) ++ c.foldMap { case MatchCase(p, _, e) => traversePattern(p) ++ traverse(m)(f)}
       case Assign(l, _, r, _) => traverse(l)(f) ++ traverse(r)(f)
       case StructLit(_, members, _) => members.map(_._2).foldMap(traverse(_)(f))
+      case EnumLit(_, members, _) => members.map(_._2).foldMap(traverse(_)(f))
 
       case DefDef(_, _, _, b) => traverse(b)(f)
       case ValDef(_, _, v) => traverse(v)(f)

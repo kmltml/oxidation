@@ -63,11 +63,13 @@ object TypeInterpreterTests extends TestSuite with SymbolSyntax {
           ))
         ), ctxt)
         val foo = c.types(g('foo)).asInstanceOf[Enum]
-        foo.variants(0) ==> EnumVariant(g('foo, 'x), List(StructMember("a", I32)))
-        foo.variants(1) ==> EnumVariant(g('foo, 'y), List(StructMember("a", I64)))
+        val foo_x = EnumVariant(g('foo, 'x), List(StructMember("a", I32)))
+        val foo_y = EnumVariant(g('foo, 'y), List(StructMember("a", I64)))
+        foo.variants(0) ==> foo_x
+        foo.variants(1) ==> foo_y
         c.terms ==> Map(
-          g('foo, 'x) -> Ctxt.Immutable(EnumVariant(g('foo, 'x), List(StructMember("a", I32)))),
-          g('foo, 'y) -> Ctxt.Immutable(EnumVariant(g('foo, 'y), List(StructMember("a", I64))))
+          g('foo, 'x) -> Ctxt.Immutable(EnumConstructor(foo, foo_x)),
+          g('foo, 'y) -> Ctxt.Immutable(EnumConstructor(foo, foo_y))
         )
       }
       "recursive EnumDef" - {

@@ -54,6 +54,29 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with Matc
             "x" -> (ast.IntLit(10, loc) :: I32), "y" -> (ast.IntLit(20, loc) :: I64)
           ), loc) :: Vec2)
       }
+      "enum literals" - {
+        val some = EnumVariant(g('option, 'some), List(
+          StructMember("value", I32)
+        ))
+        val none = EnumVariant(g('option, 'none), Nil)
+        val option = Enum(g('option_i32), List(some, none))
+        val cons = EnumConstructor(option, _ : EnumVariant)
+        val ctxt = Ctxt.default
+          .withTypes(Map(g('option) -> option))
+          .withTerms(Map(g('option, 'some) -> imm(cons(some)), g('option, 'none) -> imm(cons(none))))
+        "No-param ref" - {
+          solveType(P.Var(g('option, 'none), loc), ExpectedType.Undefined, ctxt) ==>
+            valid(ast.EnumLit("none", Nil, loc) :: option)
+        }
+        "StructLit" - {
+          solveType(P.StructLit(g('option, 'some), List(
+            "value" -> P.IntLit(20, loc)
+          ), loc), ExpectedType.Undefined, ctxt) ==>
+            valid(ast.EnumLit("some", List(
+              "value" -> (ast.IntLit(20, loc) :: I32)
+            ), loc) :: option)
+        }
+      }
       "UnitLit" - {
         solveType(P.UnitLit(loc), ExpectedType.Undefined, Ctxt.default) ==> valid(ast.UnitLit(loc) :: U0)
       }

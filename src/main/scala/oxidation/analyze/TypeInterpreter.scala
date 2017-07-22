@@ -68,7 +68,7 @@ object TypeInterpreter {
           for {
             e <- StateT.lift(enum)
             _ <- solved(d.name, e)
-            _ <- S.modify(_.withTerms(e.variants.map(v => v.name -> Ctxt.Immutable(v)).toMap))
+            _ <- S.modify(_.withTerms(e.variants.map(v => v.name -> Ctxt.Immutable(Type.EnumConstructor(e, v))).toMap))
           } yield e
       }
     } yield t
