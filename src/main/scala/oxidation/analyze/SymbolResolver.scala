@@ -77,7 +77,7 @@ object SymbolResolver {
       variants.traverse {
         case EnumVariantDef(Symbol.Unresolved(name), members) =>
           members.traverse(solveStructMemberDef(_, scope))
-            .map(EnumVariantDef(Symbol.Global(path :+ name), _))
+            .map(EnumVariantDef(Symbol.Global(path ++ name), _))
       }.map(parse.ast.EnumDef(newName, None, _))
 
 
@@ -87,8 +87,8 @@ object SymbolResolver {
   }
 
   private def solveDefName(name: Symbol, ctxt: DefContext): Symbol = (name, ctxt) match {
-    case (Symbol.Unresolved(n), TopLevel(module)) => Symbol.Global(module :+ n)
-    case (Symbol.Unresolved(n), Local) => Symbol.Local(n)
+    case (Symbol.Unresolved(n), TopLevel(module)) => Symbol.Global(module ++ n)
+    case (Symbol.Unresolved(n :: Nil), Local) => Symbol.Local(n)
     case (s, _) => s
   }
 
@@ -141,8 +141,9 @@ object SymbolResolver {
       def solveCase(matchCase: parse.ast.MatchCase): Res[parse.ast.MatchCase] = {
         import parse.ast.Pattern
         def findBindings(pattern: Pattern): List[Symbol] = pattern match {
-            case Pattern.Var(Symbol.Unresolved(n), _) => List(Symbol.Local(n))
-            case Pattern.Alias(Symbol.Unresolved(n), pattern, _) => Symbol.Local(n) :: findBindings(pattern)
+            case Pattern.Var(Symbol.Unresolved(n :: Nil), _) => List(Symbol.Local(n))
+            case Pattern.Var(_, _) => Nil
+            case Pattern.Alias(Symbol.Unresolved(n :: Nil), pattern, _) => Symbol.Local(n) :: findBindings(pattern)
             case Pattern.Struct(_, members, _, _) => members.flatMap { case (_, p) => findBindings(p) }
             case Pattern.Or(left, right, _) => findBindings(left) ++ findBindings(right)
             case Pattern.Ignore(_) | Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.BoolLit(_, _)
@@ -167,8 +168,8 @@ object SymbolResolver {
     case parse.ast.Block(stmnts, loc) =>
       // TODO should forward references be reported here, or should a later pass take care of them?
       val locals = stmnts.collect {
-        case parse.ast.ValDef(Symbol.Unresolved(name), _, _) => name
-        case parse.ast.VarDef(Symbol.Unresolved(name), _, _) => name
+        case parse.ast.ValDef(Symbol.Unresolved(name :: Nil), _, _) => name
+        case parse.ast.VarDef(Symbol.Unresolved(name :: Nil), _, _) => name
       }
       val interiorScope = locals.foldLeft(scope)((s, l) => s.shadowTerm(Symbol.Local(l)))
       stmnts.traverse {
@@ -195,7 +196,7 @@ object SymbolResolver {
   }
 
   private def solveModule(p: parse.ast.Expression, scope: Scope, global: Symbols): Option[List[String]] = p match {
-    case parse.ast.Var(Symbol.Unresolved(v), _) =>
+    case parse.ast.Var(Symbol.Unresolved(v :: Nil), _) =>
       scope.importedModules.get(v).filter(_.size == 1).map(_.head)
     case parse.ast.Select(p, m, _) =>
       for {
@@ -206,8 +207,8 @@ object SymbolResolver {
   }
 
   def solvePattern(pattern: parse.ast.Pattern, scope: Scope, global: Symbols): Res[parse.ast.Pattern] = pattern match {
-    case parse.ast.Pattern.Var(Symbol.Unresolved(n), loc) => valid(parse.ast.Pattern.Var(Symbol.Local(n), loc))
-    case parse.ast.Pattern.Alias(Symbol.Unresolved(n), pattern, loc) =>
+    case parse.ast.Pattern.Var(Symbol.Unresolved(n :: Nil), loc) => valid(parse.ast.Pattern.Var(Symbol.Local(n), loc))
+    case parse.ast.Pattern.Alias(Symbol.Unresolved(n :: Nil), pattern, loc) =>
       solvePattern(pattern, scope, global)
         .map(parse.ast.Pattern.Alias(Symbol.Local(n), _, loc))
     case parse.ast.Pattern.Pin(subexp, loc) =>
@@ -229,11 +230,14 @@ object SymbolResolver {
          | parse.ast.Pattern.BoolLit(_, _) | parse.ast.Pattern.CharLit(_, _) => valid(pattern)
   }
 
-  private def getOnlyOneSymbol(s: String, scope: Multimap[String, Symbol]): Res[Symbol] =
-    scope.get(s)
-      .toValidNel(SymbolNotFound(s))
-      .andThen {
-        case ss if ss.size == 1 => valid(ss.head)
-        case ss => invalidNel(AmbiguousSymbolReference(s, ss))
-      }
+  private def getOnlyOneSymbol(s: List[String], scope: Multimap[String, Symbol]): Res[Symbol] = s match {
+    case s :: Nil =>
+      scope.get(s)
+        .toValidNel(SymbolNotFound(s))
+        .andThen {
+          case ss if ss.size == 1 => valid(ss.head)
+          case ss => invalidNel(AmbiguousSymbolReference(s, ss))
+        }
+
+  }
 }

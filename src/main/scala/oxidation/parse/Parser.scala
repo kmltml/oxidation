@@ -86,7 +86,7 @@ class Parser(file: Option[String]) {
      | pinnedPattern
      | aliasPattern
      | structPattern
-     | varacc.map(_.pattern)
+     | varPattern
      | floatLiteral.map(_.pattern)
      | boolLiteral.map(_.pattern)
      | charLiteral.map(_.pattern)
@@ -98,9 +98,9 @@ class Parser(file: Option[String]) {
 
   val structPattern: P[Pattern.Struct] = {
     val member = P(located(!K("_") ~ id.!) ~ ("=" ~/ pattern).?)
-      .map { case (n, loc, p) => n -> p.getOrElse(Pattern.Var(Symbol.Unresolved(n), loc)) }
-    P(located(sym.? ~ "{" ~/ member.repX(min = 1, sep = semiOrComa) ~ (semiOrComa ~ "_").!.? ~ "}"))
-      .map { case (typ, ms, e, loc) => Pattern.Struct(typ, ms.toList, e.nonEmpty, loc) }
+      .map { case (n, loc, p) => n -> p.getOrElse(Pattern.Var(Symbol.Unresolved(List(n)), loc)) }
+    P(located(path.? ~ "{" ~/ member.repX(min = 1, sep = semiOrComa) ~ (semiOrComa ~ "_").!.? ~ "}"))
+      .map { case (typ, ms, e, loc) => Pattern.Struct(typ.map(Symbol.Unresolved), ms.toList, e.nonEmpty, loc) }
   }
 
   val parenPattern: P[Pattern] =
@@ -115,6 +115,10 @@ class Parser(file: Option[String]) {
     P(located(O("^") ~ varacc))
       .map(Pattern.Pin.tupled)
 
+  val varPattern: P[Pattern.Var] =
+    P(located(path))
+      .map { case (p, loc) => Pattern.Var(Symbol.Unresolved(p), loc) }
+
   val definition: P[Def] = P(
     defdef | valdef | vardef | structdef | enumdef | typedef
   )
@@ -125,8 +129,10 @@ class Parser(file: Option[String]) {
   val module: P[Module] =
     P(K("module") ~ id.!.rep(sep = ".").map(_.toList)).map(Module)
 
+  val path: P[List[String]] =
+    P(id.!.rep(sep = ".", min = 1).map(_.toList))
+
   val imprt: P[Import] = P {
-    val path = id.!.rep(sep = ".", min = 1).map(_.toList)
     val membersSelector = ("." ~ "{" ~/ id.!.rep(sep = ",", min = 1).map(_.toList) ~ "}").map(ImportSpecifier.Members)
     val selector = membersSelector
     (K("import") ~ path ~ selector.?).map {
@@ -175,7 +181,7 @@ class Parser(file: Option[String]) {
     !keyword ~ idStart ~~ idRest
   }
 
-  private val sym: P[Symbol] = P(id.!).map(Symbol.Unresolved)
+  private val sym: P[Symbol] = P(id.!).map(n => Symbol.Unresolved(List(n)))
 
   val typ: P[TypeName] = P(
     (namedType ~ typeParams.rep).map {

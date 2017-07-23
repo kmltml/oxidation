@@ -11,7 +11,7 @@ object ParserTests extends TestSuite with MatchCaseSyntax {
     case _: Parsed.Failure[_, _] =>
   }
 
-  implicit def unresolvedSymbol(n: String): Symbol = Symbol.Unresolved(n)
+  implicit def unresolvedSymbol(n: String): Symbol = Symbol.Unresolved(List(n))
 
   implicit def span(s: (Int, Int)): Span = Span(None, s._1, s._2)
 
@@ -259,6 +259,7 @@ object ParserTests extends TestSuite with MatchCaseSyntax {
     "Pattern" - {
       val pat = p.whole(p.pattern)
       "Var" - (pat.parse("xyz").get.value ==> Pattern.Var("xyz", 0 +> 3))
+      "Var path" - (pat.parse("x.y.z").get.value ==> Pattern.Var(Symbol.Unresolved(List("x", "y", "z")), 0 +> 5))
       "Ignore" - (pat.parse("_").get.value ==> Pattern.Ignore(0 +> 1))
       "IntLit" - (pat.parse("10").get.value ==> Pattern.IntLit(10, 0 +> 2))
       "FloatLit" - (pat.parse("10.0").get.value ==> Pattern.FloatLit(10.0, 0 +> 4))
@@ -274,6 +275,12 @@ object ParserTests extends TestSuite with MatchCaseSyntax {
               "x" -> Pattern.IntLit(10, 12 +> 2),
               "y" -> Pattern.Ignore(20 +> 1)
             ), ignoreExtra = false, 0 +> 23)
+        }
+        "explicit path" -{
+          pat.parse("option.some { value }").get.value ==>
+          Pattern.Struct(Some(Symbol.Unresolved(List("option", "some"))), List(
+            "value" -> Pattern.Var("value", 14 +> 5)
+          ), ignoreExtra = false, 0 +> 21)
         }
         "basic implicit" - {
           pat.parse("{ x = 10, y = _ }").get.value ==>
@@ -404,8 +411,8 @@ object ParserTests extends TestSuite with MatchCaseSyntax {
           ))
       }
       "a type alias" - {
-        defn.parse("type unit = u0").get.value ==> TypeAliasDef("unit", None, TypeName.Named(Symbol.Unresolved("u0")))
-        defn.parse("type id[a] = a").get.value ==> TypeAliasDef("id", Some(List("a")), TypeName.Named(Symbol.Unresolved("a")))
+        defn.parse("type unit = u0").get.value ==> TypeAliasDef("unit", None, TypeName.Named("u0"))
+        defn.parse("type id[a] = a").get.value ==> TypeAliasDef("id", Some(List("a")), TypeName.Named("a"))
       }
     }
 

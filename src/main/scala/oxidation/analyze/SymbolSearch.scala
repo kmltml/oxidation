@@ -10,7 +10,7 @@ object SymbolSearch {
   final case class DuplicatedSymbolError(symbol: Symbol, second: parse.ast.Def) extends AnalysisError
 
   object TypeDef {
-    def unapply(d: parse.ast.Def): Option[String] = d match {
+    def unapply(d: parse.ast.Def): Option[List[String]] = d match {
       case parse.ast.StructDef(Symbol.Unresolved(name), _, _) => Some(name)
       case parse.ast.EnumDef(Symbol.Unresolved(name), _, _) => Some(name)
       case parse.ast.TypeAliasDef(Symbol.Unresolved(name), _, _) => Some(name)
@@ -19,7 +19,7 @@ object SymbolSearch {
   }
 
   object TermDef {
-    def unapply(d: parse.ast.Def): Option[String] = d match {
+    def unapply(d: parse.ast.Def): Option[List[String]] = d match {
       case parse.ast.DefDef(Symbol.Unresolved(name), _, _, _) => Some(name)
       case parse.ast.ValDef(Symbol.Unresolved(name), _, _) => Some(name)
       case parse.ast.VarDef(Symbol.Unresolved(name), _, _) => Some(name)
@@ -43,21 +43,21 @@ object SymbolSearch {
       case parse.ast.Import(_, _) :: rest => rec(rest, types, terms)
 
       case (d @ parse.ast.EnumDef(Symbol.Unresolved(name), None, variants)) :: rest =>
-        val enumPath = pathPrefix :+ name
+        val enumPath = pathPrefix ++ name
         val variantSymbols = variants.map {
-          case EnumVariantDef(Symbol.Unresolved(name), _) => Symbol.Global(enumPath :+ name)
+          case EnumVariantDef(Symbol.Unresolved(name), _) => Symbol.Global(enumPath ++ name)
         }
         insertOnly(Symbol.Global(enumPath), types).toRight(DuplicatedSymbolError(Symbol.Global(enumPath), d))
           .flatMap(rec(rest, _, terms ++ variantSymbols))
 
 
       case (d @ TypeDef(name)) :: rest =>
-        val sym = Symbol.Global(pathPrefix :+ name)
+        val sym = Symbol.Global(pathPrefix ++ name)
         insertOnly(sym, types)
           .toRight(DuplicatedSymbolError(sym, d))
           .flatMap(t => rec(rest, t, terms))
       case (d @ TermDef(name)) :: rest =>
-        val sym = Symbol.Global(pathPrefix :+ name)
+        val sym = Symbol.Global(pathPrefix ++ name)
         insertOnly(sym, terms)
           .toRight(DuplicatedSymbolError(sym, d))
           .flatMap(t => rec(rest, types, t))

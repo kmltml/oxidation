@@ -12,7 +12,9 @@ sealed trait Symbol {
 
 object Symbol {
 
-  final case class Unresolved(name: String) extends Symbol
+  final case class Unresolved(path: List[String]) extends Symbol {
+    def name = path.last
+  }
   final case class Global(path: List[String]) extends Symbol {
     require(path.nonEmpty)
     def name: String = path.last
@@ -20,7 +22,7 @@ object Symbol {
   final case class Local(name: String) extends Symbol
 
   implicit val show: Show[Symbol] = {
-    case Unresolved(n) => s"?$n"
+    case Unresolved(path) => s"?${path mkString ","}"
     case Local(n) => s"$$$n"
     case Global(path) => s"@${path.mkString(",")}"
   }
