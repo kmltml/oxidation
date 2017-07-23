@@ -49,11 +49,11 @@ object SymbolResolver {
 
   private def solveDef(d: parse.ast.Def, scope: Scope, global: Symbols, ctxt: DefContext): Res[parse.ast.Def] = d match {
     case parse.ast.ValDef(name, tpe, value) =>
-      (tpe.traverse(solveType(_, scope)), solveExpr(value, scope, global))
+      (tpe.traverse(solveType(_, scope, global)), solveExpr(value, scope, global))
         .map2(parse.ast.ValDef(solveDefName(name, ctxt), _, _))
 
     case parse.ast.VarDef(name, tpe, value) =>
-      (tpe.traverse(solveType(_, scope)), solveExpr(value, scope, global))
+      (tpe.traverse(solveType(_, scope, global)), solveExpr(value, scope, global))
         .map2(parse.ast.VarDef(solveDefName(name, ctxt), _, _))
 
     case parse.ast.DefDef(name, params, tpe, value) =>
@@ -62,13 +62,13 @@ object SymbolResolver {
       val newScope = params.getOrElse(Nil)
         .foldLeft(scope)((s, p) => s.shadowTerm(Symbol.Local(p.name)))
       (params.traverse(_.traverse {
-        case parse.ast.Param(name, tpe) => solveType(tpe, scope).map(parse.ast.Param(name, _))
-      }), tpe.traverse(solveType(_, scope)), solveExpr(value, newScope, global))
+        case parse.ast.Param(name, tpe) => solveType(tpe, scope, global).map(parse.ast.Param(name, _))
+      }), tpe.traverse(solveType(_, scope, global)), solveExpr(value, newScope, global))
         .map3(parse.ast.DefDef(solveDefName(name, ctxt), _, _, _))
 
     case parse.ast.StructDef(name, params, members) =>
       val localScope = params.getOrElse(Nil).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
-      members.traverse(solveStructMemberDef(_, localScope))
+      members.traverse(solveStructMemberDef(_, localScope, global))
         .map(parse.ast.StructDef(solveDefName(name, ctxt), params, _))
 
     case parse.ast.EnumDef(name, None, variants) =>
@@ -76,14 +76,14 @@ object SymbolResolver {
       val newName @ Symbol.Global(path) = solveDefName(name, ctxt)
       variants.traverse {
         case EnumVariantDef(Symbol.Unresolved(name), members) =>
-          members.traverse(solveStructMemberDef(_, scope))
+          members.traverse(solveStructMemberDef(_, scope, global))
             .map(EnumVariantDef(Symbol.Global(path ++ name), _))
       }.map(parse.ast.EnumDef(newName, None, _))
 
 
     case parse.ast.TypeAliasDef(name, params, body) =>
       val localScope = params.getOrElse(Nil).foldLeft(scope)((s, l) => s.shadowType(Symbol.Local(l)))
-      solveType(body, localScope).map(parse.ast.TypeAliasDef(solveDefName(name, ctxt), params, _))
+      solveType(body, localScope, global).map(parse.ast.TypeAliasDef(solveDefName(name, ctxt), params, _))
   }
 
   private def solveDefName(name: Symbol, ctxt: DefContext): Symbol = (name, ctxt) match {
@@ -92,15 +92,19 @@ object SymbolResolver {
     case (s, _) => s
   }
 
-  private def solveStructMemberDef(m: StructMemberDef, scope: Scope): Res[StructMemberDef] =
-    solveType(m.typ, scope).map(StructMemberDef(m.name, _))
+  private def solveStructMemberDef(m: StructMemberDef, scope: Scope, global: Symbols): Res[StructMemberDef] =
+    solveType(m.typ, scope, global).map(StructMemberDef(m.name, _))
 
   private def solveExpr(e: parse.ast.Expression, scope: Scope, global: Symbols): Res[parse.ast.Expression] = e match {
-    case parse.ast.Var(Symbol.Unresolved(n), loc) =>
+    case parse.ast.Var(Symbol.Unresolved(n :: Nil), loc) =>
       getOnlyOneSymbol(n, scope.terms).map(parse.ast.Var(_, loc))
 
     case parse.ast.StructLit(Symbol.Unresolved(name), members, loc) =>
-      (getOnlyOneSymbol(name, scope.types |+| scope.terms), members.traverse {
+      val solvedType = name match {
+        case n :: Nil => getOnlyOneSymbol(n, scope.types |+| scope.terms)
+        case p => getPathSymbol(name, global.types |+| global.terms, scope, global)
+      }
+      (solvedType, members.traverse {
         case (n, e) => solveExpr(e, scope, global).map(n -> _)
       }).map2(parse.ast.StructLit(_, _, loc))
 
@@ -117,7 +121,7 @@ object SymbolResolver {
         .map2(parse.ast.App(_, _, loc))
 
     case parse.ast.TypeApp(expr, params, loc) =>
-      (solveExpr(expr, scope, global), params.traverse(solveType(_, scope)))
+      (solveExpr(expr, scope, global), params.traverse(solveType(_, scope, global)))
         .map2(parse.ast.TypeApp(_, _, loc))
 
     case parse.ast.Select(expr, member, loc) =>
@@ -183,12 +187,14 @@ object SymbolResolver {
     case parse.ast.Widen(_, _) | parse.ast.Ignore(_, _) => ??? // theese should only be present after the typer
   }
 
-  private def solveType(t: TypeName, scope: Scope): Res[TypeName] = t match {
-    case TypeName.Named(Symbol.Unresolved(sym)) =>
+  private def solveType(t: TypeName, scope: Scope, global: Symbols): Res[TypeName] = t match {
+    case TypeName.Named(Symbol.Unresolved(sym :: Nil)) =>
       getOnlyOneSymbol(sym, scope.types).map(TypeName.Named)
+    case TypeName.Named(Symbol.Unresolved(sym)) =>
+      getPathSymbol(sym, global.types, scope, global).map(TypeName.Named)
 
     case TypeName.App(const, params) =>
-      (solveType(const, scope), params.traverse(solveType(_, scope)))
+      (solveType(const, scope, global), params.traverse(solveType(_, scope, global)))
         .map2(TypeName.App)
 
     case l: TypeName.IntLiteral => valid(l)
@@ -208,6 +214,11 @@ object SymbolResolver {
 
   def solvePattern(pattern: parse.ast.Pattern, scope: Scope, global: Symbols): Res[parse.ast.Pattern] = pattern match {
     case parse.ast.Pattern.Var(Symbol.Unresolved(n :: Nil), loc) => valid(parse.ast.Pattern.Var(Symbol.Local(n), loc))
+
+    case parse.ast.Pattern.Var(Symbol.Unresolved(path), loc) =>
+      getPathSymbol(path, global.terms, scope, global)
+        .map(parse.ast.Pattern.Var(_, loc))
+
     case parse.ast.Pattern.Alias(Symbol.Unresolved(n :: Nil), pattern, loc) =>
       solvePattern(pattern, scope, global)
         .map(parse.ast.Pattern.Alias(Symbol.Local(n), _, loc))
@@ -216,7 +227,8 @@ object SymbolResolver {
         .map(parse.ast.Pattern.Pin(_, loc))
     case parse.ast.Pattern.Struct(typeName, members, ignoreExtra, loc) =>
       val solvedTypeName = typeName.traverse {
-        case Symbol.Unresolved(s) => getOnlyOneSymbol(s, scope.types)
+        case Symbol.Unresolved(s :: Nil) => getOnlyOneSymbol(s, scope.terms |+| scope.types)
+        case Symbol.Unresolved(s) => getPathSymbol(s, global.types |+| global.terms, scope, global)
       }
       val solvedMembers = members.traverse {
         case (name, pat) => solvePattern(pat, scope, global).map(name -> _)
@@ -230,14 +242,28 @@ object SymbolResolver {
          | parse.ast.Pattern.BoolLit(_, _) | parse.ast.Pattern.CharLit(_, _) => valid(pattern)
   }
 
-  private def getOnlyOneSymbol(s: List[String], scope: Multimap[String, Symbol]): Res[Symbol] = s match {
-    case s :: Nil =>
-      scope.get(s)
-        .toValidNel(SymbolNotFound(s))
-        .andThen {
-          case ss if ss.size == 1 => valid(ss.head)
-          case ss => invalidNel(AmbiguousSymbolReference(s, ss))
-        }
+  private def getOnlyOneSymbol(s: String, scope: Multimap[String, Symbol]): Res[Symbol] = 
+    scope.get(s)
+      .toValidNel(SymbolNotFound(s))
+      .andThen {
+        case ss if ss.size == 1 => valid(ss.head)
+        case ss => invalidNel(AmbiguousSymbolReference(s, ss))
+      }
 
+  private def getPathSymbol(s: List[String], searchSpace: Multimap[String, Symbol], scope: Scope, global: Symbols): Res[Symbol] = {
+    def search(path: List[String]): Option[List[String]] = path match {
+      case n :: Nil =>
+        scope.importedModules.get(n).map(_.toList).collect { case x :: Nil => x }
+      case m :: p =>
+        for {
+          prefix <- search(p)
+          x <- Some(prefix :+ m).filter(global.modules.contains)
+        } yield x
+    }
+
+    (for {
+      prefix <- search(s.init.reverse)
+      res <- Some(Symbol.Global(prefix :+ s.last)).filter(searchSpace.values.flatten.toSeq.contains)
+    } yield res).toValidNel(SymbolNotFound(s mkString "."))
   }
 }

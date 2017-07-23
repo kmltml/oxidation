@@ -4,7 +4,7 @@ package analyze
 import oxidation.parse.Span
 import utest._
 
-object SymbolResolverTests extends TestSuite with SymbolSyntax {
+object SymbolResolverTests extends TestSuite with SymbolSyntax with MatchCaseSyntax {
 
   import SymbolResolver._
   import parse.ast._
@@ -202,6 +202,21 @@ object SymbolResolverTests extends TestSuite with SymbolSyntax {
             EnumVariantDef(g('x, 'foo, 'a), Nil),
             EnumVariantDef(g('x, 'foo, 'b), Nil)
           ))
+        ))
+      }
+      "solve patterns with paths" - {
+        resolveSymbols(Vector(
+          ValDef(u('foo), None, Match(UnitLit(loc), List(
+            Pattern.Struct(Some(u('x, 'y, 'z, 'struct)), Nil, ignoreExtra = true, loc) -> UnitLit(loc),
+            Pattern.Struct(Some(u('enum, 'variant)), Nil, ignoreExtra = true, loc) -> UnitLit(loc),
+            Pattern.Var(u('List, 'Nil), loc) -> UnitLit(loc)
+          ), loc))
+        ), BuiltinSymbols.symbols.withTypes(g('x, 'y, 'z, 'struct)).withTerms(g('enum, 'variant), g('List, 'Nil))) ==> Right(Vector(
+          ValDef(g('foo), None, Match(UnitLit(loc), List(
+            Pattern.Struct(Some(g('x, 'y, 'z, 'struct)), Nil, ignoreExtra = true, loc) -> UnitLit(loc),
+            Pattern.Struct(Some(g('enum, 'variant)), Nil, ignoreExtra = true, loc) -> UnitLit(loc),
+            Pattern.Var(g('List, 'Nil), loc) -> UnitLit(loc)
+          ), loc))
         ))
       }
     }
