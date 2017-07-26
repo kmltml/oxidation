@@ -300,16 +300,14 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with Matc
             P.Var(l('x), loc), List(
               P.Pattern.Var(g('option, 'none), loc) -> P.IntLit(0, loc),
               P.Pattern.Struct(Some(g('option, 'some)), List("value" -> P.Pattern.Var(l('a), loc)), ignoreExtra = false, loc) ->
-                P.Var(l('a), loc),
-              P.Pattern.Ignore(loc) -> P.IntLit(0, loc)
+                P.Var(l('a), loc)
             ), loc
           ), ExpectedType.Undefined, ctxt.withTerms(Map(l('x) -> imm(option)))) ==>
             valid(ast.Match(
               ast.Var(l('x), loc) :: option, List(
                 (ast.Pattern.Enum(g('option, 'none), Nil, ignoreExtra = false, loc) :: option) -> (ast.IntLit(0, loc) :: I32),
                 (ast.Pattern.Enum(g('option, 'some), List("value" -> (ast.Pattern.Var(l('a), loc) :: I32)), ignoreExtra = false, loc) :: option) ->
-                  (ast.Var(l('a), loc) :: I32),
-                (ast.Pattern.Ignore(loc) :: option) -> (ast.IntLit(0, loc) :: I32)
+                  (ast.Var(l('a), loc) :: I32)
               ), loc
             ) :: I32)
 
