@@ -106,6 +106,7 @@ trait Ast {
     def isInfinitesimal: Boolean = this match {
       case Pattern.IntLit(_, _) | Pattern.FloatLit(_, _) | Pattern.CharLit(_, _) | Pattern.Pin(_, _) => true
       case Pattern.Struct(_, members, _, _) => members.exists(t => extractTyped(t._2).isInfinitesimal)
+      case Pattern.Enum(_, members, _, _) => members.exists(t => extractTyped(t._2).isInfinitesimal)
       case Pattern.Or(l, r, _) => extractTyped(l).isInfinitesimal && extractTyped(r).isInfinitesimal
       case _ => false
     }
@@ -118,6 +119,7 @@ trait Ast {
       case x: Pattern.BoolLit => x.copy(loc = loc)
       case x: Pattern.CharLit => x.copy(loc = loc)
       case x: Pattern.Struct => x.copy(loc = loc)
+      case x: Pattern.Enum => x.copy(loc = loc)
       case x: Pattern.Or => x.copy(loc = loc)
       case x: Pattern.Alias => x.copy(loc = loc)
       case x: Pattern.Pin => x.copy(loc = loc)
@@ -134,6 +136,7 @@ trait Ast {
     final case class BoolLit(value: Boolean, loc: Span) extends Pattern
     final case class CharLit(value: Char, loc: Span) extends Pattern
     final case class Struct(typeName: Option[Symbol], members: List[(String, Typed[Pattern])], ignoreExtra: Boolean, loc: Span) extends Pattern
+    final case class Enum(variant: Symbol, members: List[(String, Typed[Pattern])], ignoreExtra: Boolean, loc: Span) extends Pattern
     final case class Or(left: Typed[Pattern], right: Typed[Pattern], loc: Span) extends Pattern
     final case class Alias(name: Symbol, pattern: Typed[Pattern], loc: Span) extends Pattern
     final case class Pin(subexp: Typed[Expression], loc: Span) extends Pattern

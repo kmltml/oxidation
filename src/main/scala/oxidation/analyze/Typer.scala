@@ -343,6 +343,7 @@ object Typer {
       case Typed(ast.Pattern.Alias(n, p, _), t) =>
         findBindings(p).map((n -> Ctxt.Immutable(t)) :: _)
       case Typed(ast.Pattern.Struct(_, ms, _, _), _) => ms.traverse(m => findBindings(m._2)).map(_.flatten)
+      case Typed(ast.Pattern.Enum(_, ms, _, _), _) => ms.traverse(m => findBindings(m._2)).map(_.flatten)
       case Typed(ast.Pattern.Or(left, right, loc), _) =>
         (findBindings(left), findBindings(right))
           .map2((_, _))
@@ -366,7 +367,11 @@ object Typer {
 
   private def solvePattern(pattern: P.Pattern, matcheeType: Type, ctxt: Ctxt): TyperResult[Typed[ast.Pattern]] = pattern match {
     case P.Pattern.Ignore(loc) => valid(Typed(ast.Pattern.Ignore(loc), matcheeType))
-    case P.Pattern.Var(name, loc) => valid(Typed(ast.Pattern.Var(name, loc), matcheeType))
+    case P.Pattern.Var(name: Symbol.Local, loc) => valid(Typed(ast.Pattern.Var(name, loc), matcheeType))
+    case P.Pattern.Var(name: Symbol.Global, loc) => matcheeType match {
+      case _: Type.Enum => solvePattern(P.Pattern.Struct(Some(name), Nil, ignoreExtra = false, loc), matcheeType, ctxt)
+      case _ => solvePattern(P.Pattern.Pin(P.Var(name, loc), loc), matcheeType, ctxt)
+    }
     case P.Pattern.Alias(name, pattern, loc) =>
       solvePattern(pattern, matcheeType, ctxt)
         .map(p => Typed(ast.Pattern.Alias(name, p, loc), matcheeType))
@@ -410,7 +415,28 @@ object Typer {
         }.toInvalidNel(())
 
         typedMembers.map(ms => Typed(ast.Pattern.Struct(typ, ms, ignoreExtra, loc), matcheeType)) <*
-          allMembersHandled <* correctExplicitType
+        allMembersHandled <* correctExplicitType
+
+      case enumType @ Type.Enum(name, matcheeVariants) =>
+        typ.toValidNel(TyperError.NoVariantSpecified(loc))
+          .andThen(variantName => matcheeVariants.find(_.name == variantName)
+            .toValidNel(TyperError.VariantNotFound(enumType, variantName, loc)))
+          .andThen { variant =>
+            val typedMembers = memberPatterns.traverse {
+              case (name, pattern) =>
+                variant.members.find(_.name == name).toValidNel(TyperError.MemberNotFound(name, matcheeType, pattern.loc))
+                  .andThen(member => solvePattern(pattern, member.typ, ctxt).map(name -> _))
+            }
+            lazy val matcheeMemberNames = variant.members.map(_.name).toSet
+            lazy val patternMemberNames = memberPatterns.map(_._1).toSet
+            val allMembersHandled =
+              if(ignoreExtra || matcheeMemberNames == patternMemberNames)
+                valid(())
+              else invalidNel(TyperError.WrongStructMembers(matcheeMemberNames, patternMemberNames, loc))
+
+            typedMembers.map(ms => Typed(ast.Pattern.Enum(variant.name, ms, ignoreExtra, loc), matcheeType))
+          }
+        
     }
     case P.Pattern.Or(left, right, loc) =>
       (solvePattern(left, matcheeType, ctxt), solvePattern(right, matcheeType, ctxt))

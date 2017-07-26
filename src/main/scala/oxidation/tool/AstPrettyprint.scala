@@ -242,7 +242,15 @@ trait AstPrettyprint {
         members.map {
           case (n, p) => s"Member($n, ".p + prettyPrintTypedPattern(p) + ")".p
         }.sep(",".nl) +
-        (if(ignoreExtra) "IgnoreExtra)" else ")").p).indent
+          (if(ignoreExtra) "IgnoreExtra)" else ")").p).indent
+
+    case ast.Pattern.Enum(variant, members, ignoreExtra, loc) =>
+      show"Struct{$loc}(".nl +
+        prettyprintSymbol(variant).p + ",".nl +
+        (members.map {
+          case (n, p) => s"Member($n, ".p + prettyPrintTypedPattern(p) + ")".p
+        }.sep(",".nl) +
+          (if(ignoreExtra) "IgnoreExtra)" else ")").p).indent
 
     case ast.Pattern.Or(left, right, loc) =>
       show"Or{$loc}(".nl +

@@ -283,6 +283,37 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with Matc
               ), loc
             ) :: U1)
         }
+        "enum" - {
+          val some = EnumVariant(g('option, 'some), List(StructMember("value", I32)))
+          val none = EnumVariant(g('option, 'none), Nil)
+          val option = Type.Enum(g('option), List(some, none))
+          val cons = Type.EnumConstructor(option, _: EnumVariant)
+
+          val ctxt = Ctxt.default.withTerms(Map(
+            g('option, 'some) -> imm(cons(some)),
+            g('option, 'none) -> imm(cons(none))
+          )).withTypes(Map(
+            g('option) -> option
+          ))
+
+          solveType(P.Match(
+            P.Var(l('x), loc), List(
+              P.Pattern.Var(g('option, 'none), loc) -> P.IntLit(0, loc),
+              P.Pattern.Struct(Some(g('option, 'some)), List("value" -> P.Pattern.Var(l('a), loc)), ignoreExtra = false, loc) ->
+                P.Var(l('a), loc),
+              P.Pattern.Ignore(loc) -> P.IntLit(0, loc)
+            ), loc
+          ), ExpectedType.Undefined, ctxt.withTerms(Map(l('x) -> imm(option)))) ==>
+            valid(ast.Match(
+              ast.Var(l('x), loc) :: option, List(
+                (ast.Pattern.Enum(g('option, 'none), Nil, ignoreExtra = false, loc) :: option) -> (ast.IntLit(0, loc) :: I32),
+                (ast.Pattern.Enum(g('option, 'some), List("value" -> (ast.Pattern.Var(l('a), loc) :: I32)), ignoreExtra = false, loc) :: option) ->
+                  (ast.Var(l('a), loc) :: I32),
+                (ast.Pattern.Ignore(loc) :: option) -> (ast.IntLit(0, loc) :: I32)
+              ), loc
+            ) :: I32)
+
+        }
         "Or" - {
           "i32 constants" - {
             solveType(P.Match(
