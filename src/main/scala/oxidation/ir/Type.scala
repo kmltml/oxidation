@@ -17,6 +17,7 @@ sealed trait Type {
     case U0 | U1 => 1
     case Fun(_, _) => ???
     case Struct(members) => members.map(_.size).sum
+    case e @ Enum(variants) => variants.map(_.size).max + e.tagType.size
     case Arr(member, elemCount) => member.size * elemCount
   }
 
@@ -70,10 +71,23 @@ object Type {
 
   final case class Arr(member: Type, elems: Int) extends Type
 
+  final case class Enum(variants: List[Struct]) extends Type {
+
+    lazy val tagType: Type = {
+      val variantCount = variants.size
+      if(variantCount <= (1 << 8)) U8
+      else if(variantCount <= (1 << 16)) U16
+      else if(variantCount <= (1 << 32)) U32
+      else U64
+    }
+
+  }
+
   implicit val show: Show[Type] = new Show[Type] {
     def show(t: Type): String = t match {
       case Fun(params, ret) => show"(${params.map(show).mkString(", ")}) => ${show(ret)}"
       case Struct(members) => members.map(show).mkString("{", ", ", "}")
+      case Enum(variants) => variants.map(show).mkString("(", "|", ")")
       case t => t.toString.toLowerCase
     }
   }

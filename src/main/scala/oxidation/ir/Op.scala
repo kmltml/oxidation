@@ -28,6 +28,8 @@ sealed trait Op {
     case Op.Stackalloc(_) => Set.empty
     case Op.StructCopy(v, s) => s.values.toSet + v
     case Op.Sqrt(v) => Set(v)
+    case Op.TagOf(v) => Set(v)
+    case Op.Unpack(v, _) => Set(v)
   }
 
 }
@@ -49,6 +51,8 @@ object Op {
   final case class Elem(arr: Val, index: Val) extends Op
   final case class ArrStore(arr: Val, index: Val, value: Val) extends Op
   final case class Sqrt(src: Val) extends Op
+  final case class TagOf(src: Val) extends Op
+  final case class Unpack(src: Val, variant: Int) extends Op
   case object Garbled extends Op // Assigned to register to indicate, that some instruction also writes to this register as a side effect
 
   implicit val show: Show[Op] = {
@@ -68,5 +72,7 @@ object Op {
     case ArrStore(arr, index, value) => show"arrstore $arr ($index) = $value"
     case Garbled => "garbled"
     case Sqrt(v) => show"sqrt($v)"
+    case TagOf(v) => show"tagof($v)"
+    case Unpack(v, t) => show"unpack.$t($v)"
   }
 }

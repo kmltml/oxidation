@@ -63,12 +63,14 @@ object Val {
   final case class GlobalAddr(name: Name) extends Val {
     override def typ: Type = Type.Ptr
   }
+  final case class Enum(tag: Int, members: Vector[Val], typ: Type) extends Val
 
   implicit val show: Show[Val] = {
     case R(reg) => reg.show
     case I(value, typ) => show"($value)[$typ]"
     case G(n, typ) => show"(@$n)[$typ]"
     case Struct(members) => members.map(_.show).mkString("{", ", ", "}")
+    case Enum(tag, members, typ) => s"($tag)" + members.map(_.show).mkString("{", ",", "}") + show"[$typ]"
     case Const(e, t) => show"const ($e)[$t]"
     case GlobalAddr(n) => show"(&@$n)[ptr]"
     case arr @ Array(elems) =>

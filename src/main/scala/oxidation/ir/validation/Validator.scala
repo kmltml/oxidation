@@ -226,6 +226,18 @@ object Validator {
         itype <- valType(loc, index)
         _ <- expect(loc, Type.I64, itype)
       } yield Some(atype.member)
+
+    case Op.TagOf(src) =>
+      valType(loc, src).flatMap {
+        case e: Type.Enum => ES.pure(Some(e.tagType))
+        case t => ES.raiseError(ValidationError.NotAnEnum(loc, t))
+      }
+
+    case Op.Unpack(src, tag) =>
+      valType(loc, src).flatMap {
+        case e: Type.Enum => ES.pure(Some(e.variants(tag)))
+        case t => ES.raiseError(ValidationError.NotAnEnum(loc, t))
+      }
   }
 
   private def valType(loc: Location, v: Val): EitherT[State[Set[Register], ?], ValidationError, Type] = v match {

@@ -44,6 +44,8 @@ object Tag {
     final val Elem = 1 + StructCopy
     final val ArrStore = 1 + Elem
     final val Sqrt = 1 + ArrStore
+    final val TagOf = 1 + Sqrt
+    final val Unpack = 1 + TagOf
   }
 
   object Val {
@@ -51,7 +53,8 @@ object Tag {
     final val R = 1 + I
     final val G = 1 + R
     final val Struct = 1 + G
-    final val Const = 1 + Struct
+    final val Enum = 1 + Struct
+    final val Const = 1 + Enum
     final val GlobalAddr = 1 + Const
     final val Array = 1 + GlobalAddr
     final val UArr = 1 + Array

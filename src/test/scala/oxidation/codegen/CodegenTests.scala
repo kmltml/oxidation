@@ -51,6 +51,16 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
         ), loc) :: BuiltinSymbols.StrType).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.Ptr)), nextReg = 1)).value ==>
           (insts(), Val.Struct(Vector(r(0, _.Ptr), Val.I(10, ir.Type.U32))))
       }
+      "EnumLit" - {
+        val option = Enum(g('Option), List(
+          EnumVariant(g('Option, 'Some), List(StructMember("value", I32))),
+          EnumVariant(g('Option, 'None), Nil)
+        ))
+        compileExpr(ast.EnumLit("Some", List(
+          "value" -> (ast.IntLit(10, loc) :: I32)
+        ), loc) :: option).run.runA(CodegenState()).value ==>
+        (insts(), Val.Enum(0, Vector(i32(10)), ir.Type.Enum(List(ir.Type.Struct(Vector(ir.Type.I32)), ir.Type.Struct(Vector.empty)))))
+      }
       "StringLit" - {
         compileExpr(ast.StringLit("Hello, world!", loc) :: BuiltinSymbols.StrType).run.runA(CodegenState()).value ==>
           (Codegen.Log(Vector.empty, Vector(ConstantPoolEntry.Str("Hello, world!"))),
@@ -351,6 +361,56 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Inst.Label(Name.Local("casenext", 3)),
               Inst.Label(Name.Local("matchafter", 0))
 
+            ), Val.R(r(1, _.I32)))
+        }
+        "enum" - {
+          val option = Enum(g('Option), List(
+            EnumVariant(g('Option, 'Some), List(StructMember("value", I32))),
+            EnumVariant(g('Option, 'None), Nil)
+          ))
+          val irSome = ir.Type.Struct(Vector(ir.Type.I32))
+          val irNone = ir.Type.Struct(Vector.empty)
+          val irOption = ir.Type.Enum(List(irSome, irNone))
+          val r0 = register(0, irOption)
+          compileExpr(ast.Match(
+            ast.Var(l('x), loc) :: option, List(
+              (ast.Pattern.Enum(g('Option, 'Some), List(
+                "value" -> (ast.Pattern.Var(l('y), loc) :: I32)
+              ), ignoreExtra = false, loc) :: option) -> (ast.Var(l('y), loc) :: I32),
+              (ast.Pattern.Enum(g('Option, 'None), Nil, ignoreExtra = false, loc) :: option) ->
+                (ast.IntLit(0, loc) :: I32)
+            ), loc
+          ) :: I32).run.runA(CodegenState(registerBindings = Map(l('x) -> r0), nextReg = 1)).value ==>
+            (insts(
+              Inst.Move(r(2, _.U8), Op.TagOf(r0)),
+              Inst.Move(r(3, _.U1), Op.Binary(InfixOp.Eq, r(2, _.U8), u8(0))),
+              Inst.Flow(FlowControl.Branch(r(3, _.U1), Name.Local("enum", 2), Name.Local("casenext", 1))),
+
+              Inst.Label(Name.Local("enum", 2)),
+              Inst.Move(register(4, irSome), Op.Unpack(r0, 0)),
+              Inst.Move(r(5, _.I32), Op.Member(register(4, irSome), 0)),
+              Inst.Move(r(6, _.I32), Op.Copy(r(5, _.I32))),
+              Inst.Flow(FlowControl.Goto(Name.Local("case", 1))),
+
+              Inst.Label(Name.Local("case", 1)),
+              Inst.Move(r(1, _.I32), Op.Copy(r(6, _.I32))),
+              Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
+
+              Inst.Label(Name.Local("casenext", 1)),
+              Inst.Move(r(7, _.U8), Op.TagOf(r0)),
+              Inst.Move(r(8, _.U1), Op.Binary(InfixOp.Eq, r(7, _.U8), u8(1))),
+              Inst.Flow(FlowControl.Branch(r(8, _.U1), Name.Local("enum", 4), Name.Local("casenext", 3))),
+
+              Inst.Label(Name.Local("enum", 4)),
+              Inst.Move(register(9, irNone), Op.Unpack(r0, 1)),
+              Inst.Flow(FlowControl.Goto(Name.Local("case", 3))),
+
+              Inst.Label(Name.Local("case", 3)),
+              Inst.Move(r(1, _.I32), Op.Copy(i32(0))),
+              Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
+
+              Inst.Label(Name.Local("casenext", 3)),
+              Inst.Label(Name.Local("matchafter", 0))
             ), Val.R(r(1, _.I32)))
         }
         "Or" - {

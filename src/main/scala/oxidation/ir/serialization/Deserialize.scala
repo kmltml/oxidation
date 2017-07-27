@@ -96,6 +96,8 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Op.Elem => Op.Elem(readVal(), readVal())
     case Tag.Op.ArrStore => Op.ArrStore(readVal(), readVal(), readVal())
     case Tag.Op.Sqrt => Op.Sqrt(readVal())
+    case Tag.Op.TagOf => Op.TagOf(readVal())
+    case Tag.Op.Unpack => Op.Unpack(readVal(), readInt())
   }
 
   def readInfixOp(): InfixOp = readTag() match {
@@ -130,6 +132,7 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Val.I => Val.I(readLong(), readType())
     case Tag.Val.R => Val.R(readRegister())
     case Tag.Val.Struct => Val.Struct(readSeq(readVal).toVector)
+    case Tag.Val.Enum => Val.Enum(readInt(), readSeq(readVal).toVector, readType())
     case Tag.Val.Const => Val.Const(readConstantPoolEntry(), readType())
     case Tag.Val.GlobalAddr => Val.GlobalAddr(readName())
     case Tag.Val.Array => Val.Array(readSeq(readVal).toList)

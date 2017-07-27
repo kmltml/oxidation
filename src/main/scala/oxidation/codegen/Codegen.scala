@@ -53,6 +53,17 @@ object Codegen {
         orderedMemberVals = memberVals.sortBy(_._1).map(_._2)
       } yield Val.Struct(orderedMemberVals)
 
+    case Typed(ast.EnumLit(variantName, members, _), typ @ analyze.Type.Enum(_, variants)) =>
+      val (variant, tag) = variants.zipWithIndex.find(_._1.name.name == variantName).get
+      for {
+        memberVals <- members.traverse {
+          case (name, value) =>
+            compileExpr(value)
+              .map(v => variant.members.indexWhere(_.name == name) -> v)
+        }
+        orderedMemberVals = memberVals.sortBy(_._1).map(_._2)
+      } yield Val.Enum(tag, orderedMemberVals.toVector, translateType(typ))
+
     case Typed(ast.StringLit(v, _), BuiltinSymbols.StrType) =>
       val cpe = ConstantPoolEntry.Str(v)
       constants(cpe).as(Val.Struct(Vector(Val.Const(cpe, Type.Ptr), Val.I(v.length, Type.U32))))
@@ -515,27 +526,27 @@ object Codegen {
       } yield ()
 
     case Typed(ast.Pattern.Struct(_, members, _, _), structType: analyze.Type.Struct) =>
+      compileProductPattern(members, matchee, passLbl, failLbl, reuseBindings, n => structType.members.indexWhere(_.name == n))
+
+    case Typed(ast.Pattern.Enum(variantName, members, _, _), enumType: analyze.Type.Enum) =>
+      val translatedType = translateType(enumType).asInstanceOf[Type.Enum]
       for {
-        _ <- members.init.traverse_ {
-          case (memberName, pattern) =>
-            for {
-              memberReg <- genReg(translateType(pattern.typ))
-              _ <- instructions(
-                Inst.Move(memberReg, Op.Member(matchee, structType.indexOf(memberName)))
-              )
-              structlbl <- genLocalName("struct")
-              _ <- compilePattern(pattern, Val.R(memberReg), structlbl, failLbl, reuseBindings)
-              _ <- instructions(
-                Inst.Label(structlbl)
-              )
-            } yield ()
-        }
-        lastPattern = members.last
-        lastMemberReg <- genReg(translateType(lastPattern._2.typ))
+        tagReg <- genReg(translatedType.tagType)
+        condReg <- genReg(Type.U1)
+        enumlbl <- genLocalName("enum")
+        tag = enumType.variants.indexWhere(_.name == variantName)
+        variant = enumType.variants(tag)
         _ <- instructions(
-          Inst.Move(lastMemberReg, Op.Member(matchee, structType.indexOf(lastPattern._1)))
+          Inst.Move(tagReg, Op.TagOf(matchee)),
+          Inst.Move(condReg, Op.Binary(InfixOp.Eq, Val.R(tagReg), Val.I(tag, translatedType.tagType))),
+          Inst.Flow(FlowControl.Branch(Val.R(condReg), enumlbl, failLbl)),
+          Inst.Label(enumlbl)
         )
-        _ <- compilePattern(lastPattern._2, Val.R(lastMemberReg), passLbl, failLbl, reuseBindings)
+        unpackedReg <- genReg(translatedType.variants(tag))
+        _ <- instructions(
+          Inst.Move(unpackedReg, Op.Unpack(matchee, tag))
+        )
+        _ <- compileProductPattern(members, Val.R(unpackedReg), passLbl, failLbl, reuseBindings, n => variant.members.indexWhere(_.name == n))
       } yield ()
 
     case Typed(ast.Pattern.Or(left, right, _), _) =>
@@ -565,6 +576,36 @@ object Codegen {
       } yield ()
   }
 
+  private def compileProductPattern(members: List[(String, Typed[ast.Pattern])], matchee: Val,
+    passlbl: Name, faillbl: Name, reuseBindings: Boolean,
+    indexOf: String => Int): Res[Unit] = members match {
+
+    case Nil => instructions(Inst.Flow(FlowControl.Goto(passlbl)))
+    case _ => for {
+      _ <- members.init.traverse_ {
+        case (memberName, pattern) =>
+          for {
+            memberReg <- genReg(translateType(pattern.typ))
+            _ <- instructions(
+              Inst.Move(memberReg, Op.Member(matchee, indexOf(memberName)))
+            )
+            structlbl <- genLocalName("struct")
+            _ <- compilePattern(pattern, Val.R(memberReg), structlbl, faillbl, reuseBindings)
+            _ <- instructions(
+              Inst.Label(structlbl)
+            )
+          } yield ()
+      }
+      lastPattern = members.last
+      lastMemberReg <- genReg(translateType(lastPattern._2.typ))
+      _ <- instructions(
+        Inst.Move(lastMemberReg, Op.Member(matchee, indexOf(lastPattern._1)))
+      )
+      _ <- compilePattern(lastPattern._2, Val.R(lastMemberReg), passlbl, faillbl, reuseBindings)
+    } yield ()
+
+  }
+
   private def translateType(t: analyze.Type): ir.Type = t match {
     case analyze.Type.I8 => ir.Type.I8
     case analyze.Type.I16 => ir.Type.I16
@@ -589,6 +630,11 @@ object Codegen {
     case analyze.Type.Arr(member, size) => ir.Type.Arr(translateType(member), size)
 
     case analyze.Type.Struct(_, members) => ir.Type.Struct(members.map(m => translateType(m.typ)).toVector)
+
+    case analyze.Type.Enum(_, variants) => ir.Type.Enum(variants.map {
+      case analyze.Type.EnumVariant(_, members) =>
+        ir.Type.Struct(members.map(m => translateType(m.typ)).toVector)
+    })
 
   }
 
