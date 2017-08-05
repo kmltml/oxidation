@@ -73,7 +73,7 @@ object Compile {
       termDefs = resolvedSymbols.collect {
         case d: parse.ast.TermDef => d
       }
-      deps = DependencyGraph.build(termDefs).prune
+      deps = DependencyGraph.build(resolvedSymbols).prune
       typed <- TypeTraverse.solveTree(deps, termDefs, ctxt).leftMap(AnalysisErrors).toEither
       irDefs = typed.map {
         case d: analyze.ast.TermDef => Codegen.compileDef(d)

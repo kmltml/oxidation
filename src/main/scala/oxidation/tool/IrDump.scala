@@ -109,7 +109,7 @@ object IrDump extends App {
       case d: parse.ast.TermDef => d
     }
     val deps = phase("dependency-graph") {
-      DependencyGraph.build(termDefs).prune
+      DependencyGraph.build(resolvedSymbols).prune
     }
     val typed = phase("type") {
       get(TypeTraverse.solveTree(deps, termDefs, ctxt).toEither)
