@@ -29,6 +29,10 @@ object ExprWeaken extends IdPass {
     case Inst.Move(dest, Op.Binary(InfixOp.Add, v, Val.I(0, _))) =>
       Vector(Inst.Move(dest, Op.Copy(v)))
 
+    // x >> 0 = x << 0 = x
+    case Inst.Move(dest, Op.Binary(InfixOp.Shr | InfixOp.Shl, v, Val.I(0, _))) =>
+      Vector(Inst.Move(dest, Op.Copy(v)))
+
     // x * (2|4|8|...) == (2|4|8|...) * x == x << (1|2|3|...)
     case Inst.Move(dest, Op.Binary(InfixOp.Mul, v, Val.I(i, _)))
       if JLong.bitCount(i) == 1 =>
@@ -50,6 +54,9 @@ object ExprWeaken extends IdPass {
     case Inst.Move(dest, Op.Binary(InfixOp.Mod, v, Val.I(i, _)))
       if JLong.bitCount(i) == 1 =>
       Vector(Inst.Move(dest, Op.Binary(InfixOp.BitAnd, v, Val.I(i - 1, dest.typ))))
+
+    case Inst.Move(dest, Op.Widen(Val.I(i, _))) =>
+      Vector(Inst.Move(dest, Op.Copy(Val.I(i, dest.typ))))
 
   }
 
