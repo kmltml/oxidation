@@ -287,7 +287,8 @@ class Parser(file: Option[String]) {
 
   private val structLit: P[StructLit] = {
     val member = P(id.! ~ "=" ~ expression)
-    P(located(sym ~ "{" ~/ member.repX(sep = semiOrComa).map(_.toList) ~ "}")).map(StructLit.tupled)
+    P(located(path ~ "{" ~/ member.repX(sep = semiOrComa).map(_.toList) ~ "}"))
+      .map { case (typ, ms, loc) => StructLit(Symbol.Unresolved(typ), ms, loc) }
   }
 
   private val varacc: P[Var] =

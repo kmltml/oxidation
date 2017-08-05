@@ -71,6 +71,12 @@ object ParserTests extends TestSuite with MatchCaseSyntax {
             "x" -> IntLit(10, 13 +> 2),
             "y" -> IntLit(20, 21 +> 2)
           ), 0 +> 25)
+        "with path name" - {
+          expr.parse("Option.Some { value = 10 }").get.value ==>
+            StructLit(Symbol.Unresolved(List("Option", "Some")), List(
+              "value" -> IntLit(10, 22 +> 2)
+            ), 0 +> 26)
+        }
       }
       "unit literal" - {
         expr.parse("()").get.value ==> UnitLit(0 +> 2)
