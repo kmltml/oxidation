@@ -31,7 +31,9 @@ object Type {
 
   sealed trait Num extends Type
 
-  sealed trait Integral extends Num
+  sealed trait Integral extends Num {
+    def w: Int
+  }
 
   sealed abstract class I(val w: Int) extends Integral
   object I {
@@ -79,6 +81,47 @@ object Type {
       else if(variantCount <= (1 << 16)) U16
       else if(variantCount <= (1 << 32)) U32
       else U64
+    }
+
+    lazy val repr: Struct = {
+      val memberCount = (variants.map(_.size + tagType.size).max + 7) / 8
+      Struct(Vector.fill(memberCount)(U64))
+    }
+
+    lazy val (mappings: Vector[PackedStruct], tagLoc: PackedAtom) = {
+      case class AllocState(members: Vector[AllocMember])
+      case class AllocMember(bytesAvailable: Int, bytesTaken: Int) {
+        def -(bytes: Int): AllocMember = AllocMember(bytesAvailable - bytes, bytesTaken + bytes)
+      }
+      type S[A] = State[AllocState, A]
+      val S = implicitly[MonadState[S, AllocState]]
+
+      def allocAtom(bytes: Int): S[PackedAtom] = State {
+        case AllocState(members) =>
+          val (member, memberIndex) = members.zipWithIndex
+            .sortBy(_._1.bytesTaken) // prefer members without taken bytes to avoid shifting
+            .find(bytes <= _._1.bytesAvailable)
+            .get
+
+          val newState = AllocState(members.updated(memberIndex, member - bytes))
+          val loc = PackedAtom(memberIndex, member.bytesTaken)
+          (newState, loc)
+      }
+      def allocStruct(struct: Struct): S[PackedStruct] =
+        struct.members
+          .zipWithIndex
+          .sortBy(-_._1.size) // sort descending by member size
+          .traverse { case (s, i) => alloc(s).map((_, i)) }
+          .map(ms => PackedStruct(ms.sortBy(_._2).map(_._1)))
+
+      def alloc(tpe: Type): S[PackedLoc] = tpe match {
+        case s: Struct => allocStruct(s).widen
+        case t => allocAtom(t.size).widen
+      }
+
+      val (init, tag) = alloc(tagType).run(AllocState(repr.members.map(m => AllocMember(m.size, 0)))).value
+      val variantMappings = variants.map(allocStruct(_).runA(init).value)
+      (variantMappings.toVector, tag)
     }
 
   }

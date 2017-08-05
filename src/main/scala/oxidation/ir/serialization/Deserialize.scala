@@ -133,7 +133,7 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Val.I => Val.I(readLong(), readType())
     case Tag.Val.R => Val.R(readRegister())
     case Tag.Val.Struct => Val.Struct(readSeq(readVal).toVector)
-    case Tag.Val.Enum => Val.Enum(readInt(), readSeq(readVal).toVector, readType())
+    case Tag.Val.Enum => Val.Enum(readInt(), readSeq(readVal).toVector, readType().asInstanceOf[Type.Enum])
     case Tag.Val.Const => Val.Const(readConstantPoolEntry(), readType())
     case Tag.Val.GlobalAddr => Val.GlobalAddr(readName())
     case Tag.Val.Array => Val.Array(readSeq(readVal).toList)

@@ -36,6 +36,7 @@ object IrDump extends App {
     "arr-init" -> pass.ArrInit,
     "explicit-blocks" -> pass.ExplicitBlocks,
     "val-interpret" -> pass.ValInterpretPass,
+    "enum-lowering" -> pass.EnumLoweringPass,
     "struct-lowering" -> pass.StructLowering,
     "unit-removal"    -> pass.UnitRemoval,
     "array-dealiasing" -> pass.ArrayDealiasing,

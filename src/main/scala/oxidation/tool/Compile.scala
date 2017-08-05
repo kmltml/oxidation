@@ -86,6 +86,7 @@ object Compile {
         pass.ArrInit,
         pass.ExplicitBlocks,
         pass.ValInterpretPass,
+        pass.EnumLoweringPass,
         pass.StructLowering,
         pass.UnitRemoval,
         pass.ArrayDealiasing,

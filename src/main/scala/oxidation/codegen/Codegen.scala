@@ -62,7 +62,7 @@ object Codegen {
               .map(v => variant.members.indexWhere(_.name == name) -> v)
         }
         orderedMemberVals = memberVals.sortBy(_._1).map(_._2)
-      } yield Val.Enum(tag, orderedMemberVals.toVector, translateType(typ))
+      } yield Val.Enum(tag, orderedMemberVals.toVector, translateType(typ).asInstanceOf[Type.Enum])
 
     case Typed(ast.StringLit(v, _), BuiltinSymbols.StrType) =>
       val cpe = ConstantPoolEntry.Str(v)
