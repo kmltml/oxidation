@@ -409,6 +409,9 @@ class Amd64Target { this: Output =>
         case ir.Type.F64 => cvtsi2sd(toVal(dest), toVal(v))
       }
 
+      case ir.Op.Reinterpret(src, _) =>
+        mov(toVal(dest), toVal(src))
+
       case ir.Op.Sqrt(src) =>
         src.typ match {
           case ir.Type.F32 => sqrtss(toVal(dest), toVal(src))

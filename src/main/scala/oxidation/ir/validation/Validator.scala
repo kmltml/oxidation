@@ -86,6 +86,7 @@ object Validator {
     case Op.Widen(v)  => valType(loc, v).as(None)
     case Op.Trim(v)  => valType(loc, v).as(None)
     case Op.Convert(v, t) => valType(loc, v).as(Some(t))
+    case Op.Reinterpret(v, t) => valType(loc, v) as Some(t)
     case Op.Sqrt(v) =>
       for {
         vt <- valType(loc, v)

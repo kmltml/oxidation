@@ -36,7 +36,8 @@ object Tag {
     final val Store  = 1 + Load
     final val Widen  = 1 + Store
     final val Convert  = 1 + Widen
-    final val Garbled  = 1 + Convert
+    final val Reinterpret = 1 + Convert
+    final val Garbled  = 1 + Reinterpret
     final val Member = 1 + Garbled
     final val Stackalloc = 1 + Member
     final val Trim = 1 + Stackalloc

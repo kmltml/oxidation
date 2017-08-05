@@ -22,6 +22,7 @@ sealed trait Op {
     case Op.Widen(v) => Set(v)
     case Op.Trim(v) => Set(v)
     case Op.Convert(v, _) => Set(v)
+    case Op.Reinterpret(v, _) => Set(v)
     case Op.Member(s, _) => Set(s)
     case Op.Elem(a, i) => Set(a, i)
     case Op.ArrStore(a, i, v) => Set(a, i, v)
@@ -45,6 +46,7 @@ object Op {
   final case class Widen(v: Val) extends Op
   final case class Trim(v: Val) extends Op
   final case class Convert(v: Val, to: Type) extends Op
+  final case class Reinterpret(v: Val, as: Type) extends Op
   final case class Member(src: Val, index: Int) extends Op
   final case class Stackalloc(size: Int) extends Op
   final case class StructCopy(src: Val, substs: Map[Int, Val]) extends Op
@@ -65,6 +67,7 @@ object Op {
     case Widen(v) => show"widen $v"
     case Trim(v) => show"trim $v"
     case Convert(v, t) => show"convert[$t] $v"
+    case Reinterpret(v, t) => show"reinterpret[$t] $v"
     case Member(s, i) => show"member $s.$i"
     case Stackalloc(s) => show"stackalloc $s"
     case StructCopy(src, substs) => show"structcopy $src { ${substs.map{ case (k, v) => show".$k -> $v" } mkString ", " } }"

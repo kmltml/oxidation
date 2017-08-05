@@ -88,6 +88,7 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Op.Store => Op.Store(readVal(), readVal(), readVal())
     case Tag.Op.Widen => Op.Widen(readVal())
     case Tag.Op.Convert => Op.Convert(readVal(), readType())
+    case Tag.Op.Reinterpret => Op.Reinterpret(readVal(), readType())
     case Tag.Op.Garbled => Op.Garbled
     case Tag.Op.Member => Op.Member(readVal(), readInt())
     case Tag.Op.Stackalloc => Op.Stackalloc(readInt())
