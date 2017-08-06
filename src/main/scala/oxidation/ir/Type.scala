@@ -17,7 +17,7 @@ sealed trait Type {
     case U0 | U1 => 1
     case Fun(_, _) => ???
     case Struct(members) => members.map(_.size).sum
-    case e @ Enum(variants) => variants.map(_.size).max + e.tagType.size
+    case e @ Enum(variants) => e.repr.size
     case Arr(member, elemCount) => member.size * elemCount
   }
 
