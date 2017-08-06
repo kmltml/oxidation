@@ -14,28 +14,79 @@ def putchar(c: u8): u32 = extern
 
 def getchar(): u8 = extern
 
-def printString(s: str): u0 = {
-    var i: u32 = 0
-    while(i < s.length) {
-        putchar(s.data(i))
-        i += 1
-    }
+enum Op = {
+    Add { value: u8 }
+    Move { value: i32 }
+    LoopStart { end: u32 }
+    LoopEnd { start: u32 }
+    Out
+    In
+    Exit
+    Zero
 }
 
-def fromCString(p: ptr[u8]): str = {
+def optimise(in: ptr[u8]): ptr[Op] = {
+    val out = cast[ptr[Op]](malloc(5 * 1024 * 1024 * 8))
+    val loopStack = stackalloc[arr[u32, 128]]
+    var stackTop: i64 = -1
     var i: u32 = 0
-    while(p(i) != 0) {
+    var ip: u32 = 0
+    out(ip) = Op.Add { value = 0 }
+    while(in(i) != 0) {
+        val char = in(i)
+        match(char) {
+            case '+' | '-' => {
+                match(out(ip)) {
+                    case Op.Add { value } => 
+                        out(ip) = Op.Add { value = if(char == '+') value + 1 else value - 1 }
+                    case _ => {
+                        ip += 1
+                        out(ip) = Op.Add { value = if(char == '+') 1 else 255 }
+                    }
+                }
+            }
+            case '<' | '>' => {
+                match(out(ip)) {
+                    case Op.Move { value } =>
+                        out(ip) = Op.Move { value = if(char == '<') value - 1 else value + 1 }
+                    case _ => {
+                        ip += 1
+                        out(ip) = Op.Move { value = if(char == '<') -1 else 1 }
+                    }
+                }
+            }
+            case '[' => {
+                ip += 1
+                if(in(i + 1) == '-' && in(i + 2) == ']') {
+                    out(ip) = Op.Zero
+                    i += 2
+                } else {
+                    stackTop += 1
+                    loopStack()(stackTop) = ip
+                    out(ip) = Op.LoopStart { end = 0 }
+                }
+            }
+            case ']' => {
+                val start = loopStack()(stackTop)
+                stackTop -= 1
+                ip += 1
+                out(start) = Op.LoopStart { end = ip }
+                out(ip) = Op.LoopEnd { start = start }
+            }
+            case '.' => {
+                ip += 1
+                out(ip) = Op.Out
+            }
+            case ',' => {
+                ip += 1
+                out(ip) = Op.In
+            }
+            case _ => ()
+        }
         i += 1
     }
-    str {
-        data = p
-        length = i
-    }
-}
-
-def println(s: str): u0 = {
-    printString(s)
-    putchar('\n')
+    out(ip + 1) = Op.Exit
+    out
 }
 
 def main(argc: u64, args: ptr[ptr[u16]]): i32 = {
@@ -52,6 +103,9 @@ def main(argc: u64, args: ptr[ptr[u16]]): i32 = {
     fclose(file)
     buffer(readBytes) = 0
 
+    val program = optimise(buffer)
+    // TODO free the buffer
+
     val memorySize: u32 = 30000
     val memory = malloc(memorySize)
     {
@@ -64,80 +118,23 @@ def main(argc: u64, args: ptr[ptr[u16]]): i32 = {
 
     var ip: u64 = 0
     var head: u64 = 0
-    while(ip < bufferSize && buffer(ip) != 0) {
-        val instr = buffer(ip)
+    var running = true
+    while(running) {
         head = head % memorySize
-        match(instr) {
-            case '+' => {
-                memory(head) += 1
-                ip += 1
-            }
-            case '-' => {
-                memory(head) -= 1
-                ip += 1
-            }
-            case '>' => {
-                head += 1
-                ip += 1
-            }
-            case '<' => {
-                head -= 1
-                ip += 1
-            }
-            case '.' => {
-                putchar(memory(head))
-                ip += 1
-            }
-            case ',' => {
-                memory(head) = getchar()
-                ip += 1
-            }
-            case '[' =>
+        match(program(ip)) {
+            case Op.Add { value } => memory(head) += value
+            case Op.Move { value } => head = cast[u64](head + value)
+            case Op.LoopStart { end } => 
                 if(memory(head) == 0) {
-                    ip = findClosingBrace(ip, buffer) + 1
-                } else {
-                    ip += 1
+                    ip = end
                 }
-            case ']' =>
-                if(memory(head) != 0) {
-                    ip = findOpeningBrace(ip, buffer) + 1
-                } else {
-                    ip += 1
-                }
-            case _ =>
-                // comment - skip
-                ip += 1
+            case Op.LoopEnd { start } => ip = start - 1
+            case Op.In => memory(head) = getchar()
+            case Op.Out => putchar(memory(head))
+            case Op.Zero => memory(head) = 0
+            case Op.Exit => running = false                
         }
+        ip += 1
     }
     0
-}
-
-def findClosingBrace(ip: u64, program: ptr[u8]): u64 = {
-    var p = ip + 1
-    var n = 1
-    while(n > 0) {
-        val instr = program(p)
-        if(instr == '[') {
-            n += 1
-        } else if(instr == ']') {
-            n -= 1
-        }
-        p += 1
-    }
-    p - 1
-}
-
-def findOpeningBrace(ip: u64, program: ptr[u8]): u64 = {
-    var p = ip - 1
-    var n = 1
-    while(n > 0) {
-        val instr = program(p)
-        if(instr == '[') {
-            n -= 1
-        } else if(instr == ']') {
-            n += 1
-        }
-        p -= 1
-    }
-    p + 1
 }
