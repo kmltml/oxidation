@@ -26,37 +26,40 @@ trait Pass {
 
   def onFlow: ir.FlowControl =?> F[(Vector[ir.Inst], ir.FlowControl)] = PartialFunction.empty
 
-  def onVal: ir.Val =?> F[ir.Val] = PartialFunction.empty
+  def onVal: ir.Val =?> F[(Vector[ir.Inst], ir.Val)] = PartialFunction.empty
 
-  def txVal(v: ir.Val): F[ir.Val] = {
-    onVal.lift(v).getOrElse(F.pure(v))
+  def txVal(v: ir.Val): F[(Vector[ir.Inst], ir.Val)] = {
+    onVal.lift(v).getOrElse(F.pure((Vector.empty, v)))
   }
+
+  private def txValW(v: ir.Val): WriterT[F, Vector[ir.Inst], ir.Val] =
+    WriterT(txVal(v))
 
   def txInstruction(inst: ir.Inst): F[Vector[ir.Inst]] = {
     onInstruction.lift(inst).getOrElse(F.pure(Vector(inst))).flatMap(_.traverse {
       case ir.Inst.Eval(dest, op) => (op match {
-        case ir.Op.Binary(op, left, right) => (txVal(left), txVal(right)).map2(ir.Op.Binary(op, _, _))
-        case ir.Op.Copy(src) => txVal(src).map(ir.Op.Copy)
-        case ir.Op.Call(fn, params) => txVal(fn).map(ir.Op.Call(_, params)) // TODO params too?
-        case ir.Op.Unary(op, right) => txVal(right).map(ir.Op.Unary(op, _))
-        case ir.Op.Load(addr, offset) => (txVal(addr), txVal(offset)).map2(ir.Op.Load)
-        case ir.Op.Store(addr, offset, value) => (txVal(addr), txVal(offset), txVal(value)).map3(ir.Op.Store)
-        case ir.Op.Widen(v) => txVal(v).map(ir.Op.Widen)
-        case ir.Op.Trim(v) => txVal(v).map(ir.Op.Trim)
-        case ir.Op.Convert(v, t) => txVal(v).map(ir.Op.Convert(_, t))
-        case ir.Op.Reinterpret(v, t) => txVal(v).map(ir.Op.Reinterpret(_, t))
-        case ir.Op.Member(src, index) => txVal(src).map(ir.Op.Member(_, index))
-        case o: ir.Op.Stackalloc => F.pure(o)
+        case ir.Op.Binary(op, left, right) => (txValW(left), txValW(right)).map2(ir.Op.Binary(op, _, _))
+        case ir.Op.Copy(src) => txValW(src).map(ir.Op.Copy)
+        case ir.Op.Call(fn, params) => txValW(fn).map(ir.Op.Call(_, params)) // TODO params too?
+        case ir.Op.Unary(op, right) => txValW(right).map(ir.Op.Unary(op, _))
+        case ir.Op.Load(addr, offset) => (txValW(addr), txValW(offset)).map2(ir.Op.Load)
+        case ir.Op.Store(addr, offset, value) => (txValW(addr), txValW(offset), txValW(value)).map3(ir.Op.Store)
+        case ir.Op.Widen(v) => txValW(v).map(ir.Op.Widen)
+        case ir.Op.Trim(v) => txValW(v).map(ir.Op.Trim)
+        case ir.Op.Convert(v, t) => txValW(v).map(ir.Op.Convert(_, t))
+        case ir.Op.Reinterpret(v, t) => txValW(v).map(ir.Op.Reinterpret(_, t))
+        case ir.Op.Member(src, index) => txValW(src).map(ir.Op.Member(_, index))
+        case o: ir.Op.Stackalloc => WriterT(F.pure((Vector.empty, o)))
         case ir.Op.StructCopy(src, substs) =>
-          val s = substs.toList.traverse { case (i, v) => txVal(v).map(i -> _) }.map(_.toMap)
-          (txVal(src), s).map2(ir.Op.StructCopy)
-        case ir.Op.Elem(arr, index) => (txVal(arr), txVal(index)).map2(ir.Op.Elem)
-        case ir.Op.ArrStore(arr, index, value) => (txVal(arr), txVal(index), txVal(value)).map3(ir.Op.ArrStore)
-        case ir.Op.Garbled => F.pure(ir.Op.Garbled)
-        case ir.Op.Sqrt(s) => txVal(s).map(ir.Op.Sqrt)
-        case ir.Op.TagOf(v) => txVal(v).map(ir.Op.TagOf)
-        case ir.Op.Unpack(s, v) => txVal(s).map(ir.Op.Unpack(_, v))
-      }) map (o => Vector(ir.Inst.Eval(dest, o)))
+          val s = substs.toList.traverse { case (i, v) => txValW(v).map(i -> _) }.map(_.toMap)
+          (txValW(src), s).map2(ir.Op.StructCopy)
+        case ir.Op.Elem(arr, index) => (txValW(arr), txValW(index)).map2(ir.Op.Elem)
+        case ir.Op.ArrStore(arr, index, value) => (txValW(arr), txValW(index), txValW(value)).map3(ir.Op.ArrStore)
+        case ir.Op.Garbled => WriterT(F.pure((Vector.empty, ir.Op.Garbled)))
+        case ir.Op.Sqrt(s) => txValW(s).map(ir.Op.Sqrt)
+        case ir.Op.TagOf(v) => txValW(v).map(ir.Op.TagOf)
+        case ir.Op.Unpack(s, v) => txValW(s).map(ir.Op.Unpack(_, v))
+      }).run.map { case (insts, o) => insts :+ ir.Inst.Eval(dest, o) }
 
       case lbl: ir.Inst.Label => F.pure(Vector[ir.Inst](lbl))
       case ir.Inst.Flow(flow) =>
@@ -69,9 +72,14 @@ trait Pass {
 
   def txFlow(flow: ir.FlowControl): F[(Vector[ir.Inst], ir.FlowControl)] = {
     onFlow.lift(flow).getOrElse(F.pure((Vector.empty, flow))).flatMap {
-      case (pre, ir.FlowControl.Return(v)) => txVal(v).map(ir.FlowControl.Return).map(pre -> _)
-      case (pre, goto: ir.FlowControl.Goto) => F.pure((pre, goto))
-      case (pre, ir.FlowControl.Branch(cond, ifTrue, ifFalse)) => txVal(cond).map(ir.FlowControl.Branch(_, ifTrue, ifFalse)).map(pre -> _)
+      case (pre, ir.FlowControl.Return(v)) =>
+        txValW(v).map(ir.FlowControl.Return).run
+          .map { case (is, f) => (pre ++ is, f) }
+      case (pre, goto: ir.FlowControl.Goto) =>
+        F.pure((pre, goto))
+      case (pre, ir.FlowControl.Branch(cond, ifTrue, ifFalse)) =>
+        txValW(cond).map(ir.FlowControl.Branch(_, ifTrue, ifFalse)).run
+          .map { case (is, f) => (pre ++ is, f) }
     }
   }
 
@@ -95,7 +103,13 @@ trait Pass {
         val newBody = body.traverse(txBlock).map(_.flatten)
         newBody.map(body => ir.Def.ComputedVal(name, body, typ, constantPool))
       case efun: ir.Def.ExternFun => F.pure(efun)
-      case ir.Def.TrivialVal(n, v) => txVal(v).map(ir.Def.TrivialVal(n, _))
+      case ir.Def.TrivialVal(n, v) => txVal(v).map {
+        case (Vector(), v) => ir.Def.TrivialVal(n, v)
+
+        //TODO maybe some constant search should be done below?
+        case (is, v) => ir.Def.ComputedVal(n, Vector(
+          ir.Block(Name.Local("body", 0), is, ir.FlowControl.Return(v))), v.typ, Set.empty)
+      }
     })
   }
 

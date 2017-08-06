@@ -153,24 +153,6 @@ object EnumLoweringPass extends Pass {
       unpack(e.mappings(variant), src, dest.typ)
         .map { case (insts, v) => insts :+ Inst.Move(dest, Op.Copy(v)) }
 
-    case Inst.Move(dest, Op.Copy(src @ Val.Enum(tag, members, e: Type.Enum))) =>
-      for {
-        packedTag <- pack(e.tagLoc, Val.I(tag, e.tagType))
-        packedMembers <- pack(e.mappings(tag), src)
-        toCollect = packedTag._2 |+| packedMembers._2
-        memberVals <- e.repr.members.zipWithIndex.traverse { case (typ, index) =>
-          toCollect.getOrElse(index, Nil) match {
-            case Nil => F.pure((Vector.empty[Inst], Val.I(0, typ): Val))
-            case v :: vs =>
-              vs.foldM((Vector.empty[Inst], v)) { case ((insts, a), b) =>
-                genReg(typ)
-                  .map(r => (insts :+ Inst.Move(r, Op.Binary(InfixOp.BitOr, a, b)), Val.R(r): Val))
-              }
-          }
-        }
-      } yield packedTag._1 ++ packedMembers._1 ++ memberVals.flatMap(_._1) :+
-      Inst.Move(dest.copy(typ = txType(dest.typ)), Op.Copy(Val.Struct(memberVals.map(_._2))))
-
     case Inst.Eval(dest, Op.Call(fun, params)) =>
       F.pure(Vector(
         // leave fun unchanged, because Pass magic calls onVal on it for us
@@ -197,9 +179,28 @@ object EnumLoweringPass extends Pass {
 
   override val onVal = {
     case Val.R(r) =>
-      F.pure(Val.R(txReg(r)))
+      F.pure((Vector.empty, Val.R(txReg(r))))
     case Val.G(name, t) =>
-      F.pure(Val.G(name, txType(t)))
+      F.pure((Vector.empty, Val.G(name, txType(t))))
+    case src @ Val.Enum(tag, members, enumType) =>
+      for {
+        packedTag <- pack(enumType.tagLoc, Val.I(tag, enumType.tagType))
+        packedMembers <- pack(enumType.mappings(tag), src)
+        toCollect = packedTag._2 |+| packedMembers._2
+        memberVals <- enumType.repr.members.zipWithIndex.traverse { case (typ, index) =>
+          toCollect.getOrElse(index, Nil) match {
+            case Nil => F.pure((Vector.empty[Inst], Val.I(0, typ): Val))
+            case v :: vs =>
+              vs.foldM((Vector.empty[Inst], v)) { case ((insts, a), b) =>
+                genReg(typ)
+                  .map(r => (insts :+ Inst.Move(r, Op.Binary(InfixOp.BitOr, a, b)), Val.R(r): Val))
+              }
+          }
+        }
+      } yield (
+        packedTag._1 ++ packedMembers._1 ++ memberVals.flatMap(_._1),
+        Val.Struct(memberVals.map(_._2))
+      )
   }
 
 }

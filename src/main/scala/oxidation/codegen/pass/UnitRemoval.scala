@@ -12,7 +12,7 @@ object UnitRemoval extends IdPass {
   override def name = "unit-removal"
 
   override val onVal = {
-    case Val(_, Type.U0) => Val.I(0, Type.U0)
+    case Val(_, Type.U0) => (Vector.empty, Val.I(0, Type.U0))
   }
 
   override val onInstruction = {
