@@ -6,6 +6,7 @@ object ExpectedType {
 
   case object Undefined extends ExpectedType
   case object Appliable extends ExpectedType
+  case object Value extends ExpectedType
   case class Numeric(supertypeOf: Option[Type]) extends ExpectedType
   case class Specific(typ: Type) extends ExpectedType
 

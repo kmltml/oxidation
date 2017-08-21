@@ -39,10 +39,10 @@ object TypeTraverseTests extends TestSuite
           g('b) -> DependencyEntry(Set(g('a)), explicitType = false)
         )), Vector(
           untyped.DefDef(g('a), Some(List(untyped.Param("x", TypeName.Named(g('i32))))), None, untyped.Var(l('x), loc)),
-          untyped.ValDef(g('b), None, untyped.Var(g('a), loc))
+          untyped.ValDef(g('b), None, untyped.App(untyped.Var(g('a), loc), List(untyped.IntLit(10, loc)), loc))
         ), Ctxt.default) ==> valid(Set(
           ast.DefDef(g('a), Some(List(ast.Param("x", I32))), None, ast.Var(l('x), loc) :: I32),
-          ast.ValDef(g('b), None, ast.Var(g('a), loc) :: Fun(List(I32), I32))
+          ast.ValDef(g('b), None, ast.App(ast.Var(g('a), loc) :: Fun(List(I32), I32), List(ast.IntLit(10, loc) :: I32), loc) :: I32)
         ))
       }
       "a recursive def with type annotation" - {

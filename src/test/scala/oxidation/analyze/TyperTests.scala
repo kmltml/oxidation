@@ -65,13 +65,13 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with Matc
           .withTypes(Map(g('option) -> option))
           .withTerms(Map(g('option, 'some) -> imm(cons(some)), g('option, 'none) -> imm(cons(none))))
         "No-param ref" - {
-          solveType(P.Var(g('option, 'none), loc), ExpectedType.Undefined, ctxt) ==>
+          solveType(P.Var(g('option, 'none), loc), ExpectedType.Value, ctxt) ==>
             valid(ast.EnumLit("none", Nil, loc) :: option)
         }
         "StructLit" - {
           solveType(P.StructLit(g('option, 'some), List(
             "value" -> P.IntLit(20, loc)
-          ), loc), ExpectedType.Undefined, ctxt) ==>
+          ), loc), ExpectedType.Value, ctxt) ==>
             valid(ast.EnumLit("some", List(
               "value" -> (ast.IntLit(20, loc) :: I32)
             ), loc) :: option)
@@ -171,11 +171,26 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with Matc
           ast.Assign(ast.Var(l('x), loc) :: I32, None, ast.IntLit(20, loc) :: I32, loc) :: U0,
           ast.Var(l('x), loc) :: I32
         ), loc) :: I32)
+        "assigning global function to local val" - {
+          solveType(P.Block(Vector(
+            P.ValDef(l('x), None, P.Var(g('foo), loc)),
+            P.App(P.Var(l('x), loc), Nil, loc)
+          ), loc), ExpectedType.Value, Ctxt.default.withTerms(Map(g('foo) -> imm(Fun(Nil, I32))))) ==>
+            valid(ast.Block(Vector(
+              ast.ValDef(l('x), None, ast.Convert(ast.Var(g('foo), loc) :: Fun(Nil, I32), loc) :: FunPtr(Nil, I32)) :: U0,
+              ast.App(ast.Var(l('x), loc) :: FunPtr(Nil, I32), Nil, loc) :: I32
+            ), loc) :: I32)
+        }
       }
       "App" - {
         "Fun" - {
           findType(P.App(P.Var(g('foo), loc), List(P.IntLit(32, loc)), loc), ExpectedType.Undefined,
             Ctxt.terms(g('foo) -> imm(Fun(List(I64), U1)))) ==> valid(U1)
+        }
+        "FunPtr" - {
+          solveType(P.App(P.Var(l('foo), loc), List(P.IntLit(89, loc)), loc), ExpectedType.Value,
+            Ctxt.terms(l('foo) -> imm(FunPtr(List(I32), U64)))) ==>
+            valid(ast.App(ast.Var(l('foo), loc) :: FunPtr(List(I32), U64), List(ast.IntLit(89, loc) :: I32), loc) :: U64)
         }
         "Ptr" - {
           "without offset" - {

@@ -46,9 +46,15 @@ object Type {
 
   final case class Arr(member: Type, size: Int) extends ValueType
 
-  final case class Fun(params: List[Type], ret: Type) extends Type
+  final case class Fun(params: List[Type], ret: Type) extends Type {
 
-  final class Struct(val name: Symbol, membersF: Struct => List[StructMember]) extends Type {
+    def ptr: FunPtr = FunPtr(params, ret)
+
+  }
+
+  final case class FunPtr(params: List[Type], ret: Type) extends ValueType
+
+  final class Struct(val name: Symbol, membersF: Struct => List[StructMember]) extends ValueType {
 
     val members = membersF(this)
 
