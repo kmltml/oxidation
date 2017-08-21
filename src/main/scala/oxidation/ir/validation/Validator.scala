@@ -108,25 +108,28 @@ object Validator {
       } yield Some(srcType)
 
     case Op.Call(fn, params) =>
-      for {
-        fnType <- valType(loc, fn).flatMap {
-          case f: Type.Fun => ES.pure(f)
-          case t => ES.raiseError[Type.Fun](ValidationError.NotAFunction(loc, t))
-        }
-        signature = flatten(fnType.params)
-        flattenedVals = flatten(params.map(_.typ))
-        _ <- cond(signature.size == flattenedVals.size, ValidationError.WrongArity(loc, signature.size, flattenedVals.size))
-        _ <- (signature zip flattenedVals).traverse_ {
-          case (e, f) =>
-            if(e == f) ES.pure(())
-            else ES.raiseError[Unit](ValidationError.WrongType(loc, e, f))
-        }
-        retType = flatten(List(fnType.ret)) match {
-          case Nil => Type.U0
-          case t :: Nil => t
-          case ts => Type.Struct(ts.toVector)
-        }
-      } yield Some(retType)
+      valType(loc, fn).flatMap {
+        case Type.Fun(paramTypes, ret) =>
+          val signature = flatten(paramTypes)
+          val flattenedVals = flatten(params.map(_.typ))
+          for {
+            _ <- cond(signature.size == flattenedVals.size, ValidationError.WrongArity(loc, signature.size, flattenedVals.size))
+            _ <- (signature zip flattenedVals).traverse_ {
+              case (e, f) =>
+                if(e == f) ES.pure(())
+                else ES.raiseError[Unit](ValidationError.WrongType(loc, e, f))
+            }
+            retType = flatten(List(ret)) match {
+              case Nil => Type.U0
+              case t :: Nil => t
+              case ts => Type.Struct(ts.toVector)
+            }
+          } yield Some(retType)
+
+        case Type.Ptr => params.traverse(r => valType(loc, Val.R(r))) as None
+
+        case t => ES.raiseError(ValidationError.NotAFunction(loc, t))
+      }
     case Op.Member(src, index) =>
       for {
         structType <- valType(loc, src).flatMap {

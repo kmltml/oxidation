@@ -131,6 +131,14 @@ object Codegen {
         )
       } yield Val.R(r)
 
+    case Typed(ast.Convert(Typed(ast.Var(Symbol.Global(path), _), analyze.Type.Fun(_, _)), _), t: analyze.Type.FunPtr) =>
+      for {
+        r <- genReg(translateType(t))
+        _ <- instructions(
+          Inst.Move(r, Op.Copy(Val.GlobalAddr(Name.Global(path))))
+        )
+      } yield Val.R(r)
+
     case Typed(ast.Convert(src, _), valType) =>
       for {
         v <- compileExpr(src)
@@ -287,7 +295,7 @@ object Codegen {
         )
       } yield Val.R(r)
 
-    case Typed(ast.App(Typed(fn, fnType: analyze.Type.Fun), params, _), t) =>
+    case Typed(ast.App(Typed(fn, fnType @ (analyze.Type.Fun(_, _) | analyze.Type.FunPtr(_, _))), params, _), t) =>
       for {
         fnVal <- fn match {
           case ast.Var(Symbol.Global(path), _) => Res.pure(Val.G(Name.Global(path), translateType(fnType)))
@@ -625,7 +633,7 @@ object Codegen {
     case analyze.Type.Fun(params, ret) =>
       ir.Type.Fun(params.map(translateType), translateType(ret))
 
-    case analyze.Type.Ptr(_) => ir.Type.Ptr
+    case analyze.Type.Ptr(_) | analyze.Type.FunPtr(_, _) => ir.Type.Ptr
 
     case analyze.Type.Arr(member, size) => ir.Type.Arr(translateType(member), size)
 

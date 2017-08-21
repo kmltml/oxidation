@@ -9,5 +9,6 @@ def main(): i32 = {
     floats.tests()
     patmat.tests()
     enums.tests()
+    fun.tests()
     0
 }

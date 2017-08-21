@@ -267,18 +267,18 @@ class Amd64Target { this: Output =>
     label(EntryPointName),
     sub(RSP, 32 + 8),
 
-    call(Name.Global(List("GetCommandLineW"))),
+    call(Val.L(Name.Global(List("GetCommandLineW")))),
 
     mov(RCX, RAX),
     lea(RDX, Val.m(None, RSP, 32)),
-    call(Name.Global(List("CommandLineToArgvW"))),
+    call(Val.L(Name.Global(List("CommandLineToArgvW")))),
 
     mov(RCX, Val.m(None, RSP, 32)),
     mov(RDX, RAX),
-    call(Name.Global(List("main"))),
+    call(Val.L(Name.Global(List("main")))),
 
     mov(RCX, RAX),
-    call(Name.Global(List("exit")))
+    call(Val.L(Name.Global(List("exit"))))
 
   ).combineAll
 
@@ -367,7 +367,7 @@ class Amd64Target { this: Output =>
       mov(dest, toVal(value))
 
 
-    case ir.Inst.Eval(_, ir.Op.Call(ir.Val.G(fun, _), params)) =>
+    case ir.Inst.Eval(_, ir.Op.Call(fun, params)) =>
       val stackParams = params.drop(4)
       val alignedStackParamsSize = (stackParams.size * 8 + 15) & ~15
       Vector(
@@ -381,7 +381,7 @@ class Amd64Target { this: Output =>
               case _ => mov(dest, toVal(r))
             }
         },
-        call(fun),
+        call(toVal(fun)),
         if(stackParams.nonEmpty) add(RSP, alignedStackParamsSize) else M.empty
       ).combineAll
 
@@ -593,6 +593,7 @@ class Amd64Target { this: Output =>
     case ir.Val.R(r) => ctxt.bindings(r)
     case ir.Val.Const(entry, _) => Val.L(ctxt.constants(entry))
     case ir.Val.GlobalAddr(n) => Val.L(n)
+    case ir.Val.G(n, _) => Val.L(n)
     case f : ir.Val.F32 => Val.m(None, ctxt.floats(f))
     case f : ir.Val.F64 => Val.m(None, ctxt.floats(f))
   }

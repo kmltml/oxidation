@@ -177,6 +177,13 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Inst.Move(r(1, _.I32), Op.Convert(r(0, _.F64), ir.Type.I32))
             ), Val.R(r(1, _.I32)))
         }
+        "global i32 => u1  ->  funptr[i32 => u1]" - {
+          compileExpr(ast.Convert(ast.Var(g('foo), loc) :: Fun(List(I32), U1), loc) :: FunPtr(List(I32), U1))
+            .run.runA(CodegenState()).value ==>
+            (insts(
+              Inst.Move(r(0, _.Ptr), Op.Copy(Val.GlobalAddr(Name.Global(List("foo")))))
+            ), Val.R(r(0, _.Ptr)))
+        }
       }
       "Ignore" - {
         compileExpr(ast.Ignore(ast.App(ast.Var(g('foo), loc) :: Fun(List(I32), I32), List(ast.IntLit(42, loc) :: I32), loc) :: I32, loc) :: U0)
@@ -652,13 +659,22 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
       }
       "App" - {
         "function" - {
-          compileExpr(ast.App(ast.Var(g('f), loc) :: Fun(List(I32), U1), List(ast.IntLit(10, loc) :: I32), loc) :: I32)
+          compileExpr(ast.App(ast.Var(g('f), loc) :: Fun(List(I32), I32), List(ast.IntLit(10, loc) :: I32), loc) :: I32)
             .run.runA(CodegenState()).value ==>
             (insts(
               Inst.Move(r(0, _.I32), Op.Copy(10)),
-              Inst.Move(r(1, _.I32), Op.Call(Val.G(Name.Global(List("f")), ir.Type.Fun(List(ir.Type.I32), ir.Type.U1)), List(r(0, _.I32)))),
+              Inst.Move(r(1, _.I32), Op.Call(Val.G(Name.Global(List("f")), ir.Type.Fun(List(ir.Type.I32), ir.Type.I32)), List(r(0, _.I32)))),
               Inst.Move(r(2, _.I32), Op.Copy(r(1, _.I32)))
             ), Val.R(r(2, _.I32)))
+        }
+        "FunPtr" - {
+          compileExpr(ast.App(ast.Var(l('f), loc) :: FunPtr(List(I32), U1), List(ast.IntLit(10, loc) :: I32), loc) :: U1)
+            .run.runA(CodegenState(registerBindings = Map(l('f) -> r(0, _.Ptr)), nextReg = 1)).value ==>
+            (insts(
+              Inst.Move(r(1, _.I32), Op.Copy(10)),
+              Inst.Move(r(2, _.U1), Op.Call(r(0, _.Ptr), List(r(1, _.I32)))),
+              Inst.Move(r(3, _.U1), Op.Copy(r(2, _.U1)))
+            ), Val.R(r(3, _.U1)))
         }
         "pointer" - {
           compileExpr(ast.App(ast.Var(l('p), loc) :: Ptr(I32), Nil, loc) :: I32)
