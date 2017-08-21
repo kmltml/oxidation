@@ -435,6 +435,30 @@ object ParserTests extends TestSuite with MatchCaseSyntax {
         tpe.parse("arr[i32, 10]").get.value ==>
           TypeName.App(TypeName.Named("arr"), List(TypeName.Named("i32"), TypeName.IntLiteral(10)))
       }
+      "Fun" - {
+        "single parameter without parens" - {
+          tpe.parse("i32 => i32").get.value ==>
+            TypeName.Fun(List(TypeName.Named("i32")), TypeName.Named("i32"))
+        }
+        "curried" - {
+          "without parens" - {
+            tpe.parse("i32 => i16 => i64").get.value ==>
+              TypeName.Fun(List(TypeName.Named("i32")), TypeName.Fun(List(TypeName.Named("i16")), TypeName.Named("i64")))
+          }
+          "with parens" - {
+            tpe.parse("(i32) => (i16) => i64").get.value ==>
+              TypeName.Fun(List(TypeName.Named("i32")), TypeName.Fun(List(TypeName.Named("i16")), TypeName.Named("i64")))
+          }
+        }
+        "single parameter with parens" - {
+          tpe.parse("(i32) => i32").get.value ==>
+            TypeName.Fun(List(TypeName.Named("i32")), TypeName.Named("i32"))
+        }
+        "multiple parameters" - {
+          tpe.parse("(i32, i32) => i32").get.value ==>
+            TypeName.Fun(List(TypeName.Named("i32"), TypeName.Named("i32")), TypeName.Named("i32"))
+        }
+      }
     }
 
     "top-level definition should parse" - {

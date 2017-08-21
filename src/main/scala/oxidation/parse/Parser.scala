@@ -164,6 +164,12 @@ class Parser(file: Option[String]) {
     bs.foldLeft(head) { case (a, (op, b)) => ap(op, a, b) }
   }
 
+  private def infixr[Term, Op](exp: => P[Term], op: => P[Op])(ap: (Op, Term, Term) => Term): P[Term] = P(
+    (NoCut(exp) ~ op).rep(min = 0) ~ exp
+  ).map { case (as, last) =>
+      as.foldRight(last) { case ((a, op), b) => ap(op, a, b) }
+  }
+
   private def infixexprl(exp: => P[Expression], op: => P[InfixOp]): P[Expression] =
     infixl(exp, op){ (o, a, b) => InfixAp(o, a, b, Span(file, a.loc.start, b.loc.end)) }
 
@@ -183,12 +189,20 @@ class Parser(file: Option[String]) {
 
   private val sym: P[Symbol] = P(id.!).map(n => Symbol.Unresolved(List(n)))
 
-  val typ: P[TypeName] = P(
+  val typ0: P[TypeName] = P(
     (namedType ~ typeParams.rep).map {
       case (t, paramLists) =>
         paramLists.foldLeft(t: TypeName)(TypeName.App(_, _))
     } | intType
   )(Name("type"))
+
+  val typ1: P[TypeName] = {
+    val params: P[List[TypeName]] = P(("(" ~/ typ.rep(sep = ",".~/).map(_.toList) ~ ")") | NoCut(typ0).map(List(_)))
+    P((params ~ O("=>")).rep(min = 0) ~ typ0)
+      .map { case (as, last) => as.foldRight(last)((a, b) => TypeName.Fun(a, b)) }
+  }
+
+  val typ: P[TypeName] = typ1
 
   private val namedType: P[TypeName.Named] = sym.map(TypeName.Named)
 

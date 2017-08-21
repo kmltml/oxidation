@@ -197,6 +197,10 @@ object SymbolResolver {
       (solveType(const, scope, global), params.traverse(solveType(_, scope, global)))
         .map2(TypeName.App)
 
+    case TypeName.Fun(params, ret) =>
+      (params.traverse(solveType(_, scope, global)), solveType(ret, scope, global))
+        .map2(TypeName.Fun)
+
     case l: TypeName.IntLiteral => valid(l)
 
   }
