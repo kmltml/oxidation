@@ -21,8 +21,10 @@ import scala.sys.process.{Process, ProcessLogger}
 object Compile {
 
   case class Options(infiles: Seq[File] = Seq.empty,
+                     output: Option[File] = None,
                      validate: Boolean = false,
-                     timing: Boolean = false) extends LogOptions
+                     timing: Boolean = false,
+                     passthrough: Vector[String] = Vector.empty) extends LogOptions
 
   val optParser = new scopt.OptionParser[Options]("oxc") {
 
@@ -33,6 +35,12 @@ object Compile {
 
     opt[Unit]('v', "validate")
       .action((_, o) => o.copy(validate = true))
+
+    opt[String]('g', "gcc").unbounded()
+      .action((s, o) => o.copy(passthrough = o.passthrough :+ s))
+
+    opt[File]('o', "output")
+      .action((f, o) => o.copy(output = Some(f)))
 
     arg[File]("infiles")
       .required().unbounded()
@@ -116,7 +124,7 @@ object Compile {
       _ = targetFolder.mkdir()
       asmFile = new File(targetFolder, baseName + ".asm")
       objFile = new File(targetFolder, baseName + ".obj")
-      exeFile = new File(targetFolder, baseName + ".exe")
+      exeFile = options.output.getOrElse(new File(targetFolder, baseName + ".exe"))
       out = new FileWriter(asmFile)
       _ = {
         ( target.outputExtraDefs |+|
@@ -130,7 +138,9 @@ object Compile {
       }
       _ <- run("nasm", "-fwin64", "-o", objFile.getAbsolutePath, asmFile.getAbsolutePath)
         .left.map(AssemblerError)
-      _ <- run("gcc", objFile.getAbsolutePath, show"-Wl,-e${target.EntryPointName}", "-o", exeFile.getAbsolutePath)
+      gccOptions = Seq(objFile.getAbsolutePath, show"-Wl,-e${target.EntryPointName}", "-o", exeFile.getAbsolutePath) ++
+        options.passthrough.map(s => s"-$s")
+      _ <- run(("gcc" +: gccOptions): _*)
         .left.map(LinkerError)
     } yield (exeFile, Stats(target.spillCount))
   }
