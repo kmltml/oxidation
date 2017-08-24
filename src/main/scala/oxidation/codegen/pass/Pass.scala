@@ -113,4 +113,7 @@ trait Pass {
     })
   }
 
+  def txDefs(ds: Vector[ir.Def]): F[Vector[ir.Def]] =
+    ds.traverse(txDef).map(_.flatten)
+
 }

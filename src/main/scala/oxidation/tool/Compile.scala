@@ -94,6 +94,7 @@ object Compile {
         pass.ArrInit,
         pass.ExplicitBlocks,
         pass.ValInterpretPass,
+        pass.ConstantInlining,
         pass.EnumLoweringPass,
         pass.StructLowering,
         pass.UnitRemoval,
@@ -101,9 +102,9 @@ object Compile {
         pass.ConstantRemoval,
         pass.ExprWeaken
       )
-      passed <- passes.foldLeft(Right(irDefs): Either[CompileError, Set[ir.Def]]) { (defs, pass) =>
+      passed <- passes.foldLeft(Right(irDefs.toVector): Either[CompileError, Vector[ir.Def]]) { (defs, pass) =>
         defs.flatMap { defs =>
-          val d = defs.flatMap(d => pass.extract(pass.txDef(d)))
+          val d = pass.extract(pass.txDefs(defs))
           if(options.validate)
             d.traverse_(Validator.validateDef).left.map(ValidatorError(_, s"pass ${pass.name}")).as(d)
           else Right(d)
@@ -112,7 +113,7 @@ object Compile {
       constants: Set[ConstantPoolEntry] = passed.flatMap {
         case ir.Def.Fun(_, _, _, _, c) => c
         case _ => Set.empty[ConstantPoolEntry]
-      }
+      }.toSet
       namedConstants = constants.toVector.zipWithIndex.map {
         case (c, i) => c -> Name.Global(List("$const", i.toString))
       }.toMap

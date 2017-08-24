@@ -3,7 +3,9 @@ package ir
 
 import oxidation.codegen.Name
 
-sealed trait Def
+sealed trait Def {
+  def name: Name
+}
 
 object Def {
 

@@ -32,22 +32,23 @@ object IrDump extends App {
   case object Binary extends Format
 
 
-  val AllPasses: List[(String, Pass)] = List(
-    "arr-init" -> pass.ArrInit,
-    "explicit-blocks" -> pass.ExplicitBlocks,
-    "val-interpret" -> pass.ValInterpretPass,
-    "enum-lowering" -> pass.EnumLoweringPass,
-    "struct-lowering" -> pass.StructLowering,
-    "unit-removal"    -> pass.UnitRemoval,
-    "array-dealiasing" -> pass.ArrayDealiasing,
-    "constant-removal" -> pass.ConstantRemoval,
-    "expr-weaken" -> pass.ExprWeaken,
-    "amd64-backend"   -> Amd64BackendPass,
-    "block-linearization" -> BlockLinearizationPass
+  val AllPasses: List[Pass] = List(
+    pass.ArrInit,
+    pass.ExplicitBlocks,
+    pass.ValInterpretPass,
+    pass.ConstantInlining,
+    pass.EnumLoweringPass,
+    pass.StructLowering,
+    pass.UnitRemoval,
+    pass.ArrayDealiasing,
+    pass.ConstantRemoval,
+    pass.ExprWeaken,
+    Amd64BackendPass,
+    BlockLinearizationPass
   )
 
   implicit val passRead: scopt.Read[Pass] =
-    scopt.Read.reads(n => AllPasses.find(_._1 == n).map(_._2)
+    scopt.Read.reads(n => AllPasses.find(_.name == n)
       .getOrElse(throw new IllegalArgumentException(s"No pass named $n")))
 
   val optParser = new scopt.OptionParser[Options]("astdump") {
@@ -61,7 +62,7 @@ object IrDump extends App {
       .required().unbounded()
       .action((f, o) => o.copy(infiles = o.infiles :+ f))
 
-    def upTo(p: Pass): List[Pass] = AllPasses.map(_._2).reverse.dropWhile(_ != p).reverse
+    def upTo(p: Pass): List[Pass] = AllPasses.reverse.dropWhile(_ != p).reverse
 
     opt[Pass]('p', "passupto")
       .action((p, o) => o.copy(passes = upTo(p)))
@@ -119,7 +120,7 @@ object IrDump extends App {
     val irDefs = phase("codegen") {
       typed.map {
         case d: analyze.ast.TermDef => Codegen.compileDef(d)
-      }
+      }.toVector
     }
 
     def fileAfterPhase(out: File, phase: String): File = {
@@ -127,7 +128,7 @@ object IrDump extends App {
       new File(out.getParentFile, s"$name-$phase$ext")
     }
 
-    def dumpAfter(phase: String, defs: Set[ir.Def]): Unit = options.out match {
+    def dumpAfter(phase: String, defs: Vector[ir.Def]): Unit = options.out match {
       case None =>
         println(s"--- Ir after phase $phase ---")
         dump(defs, System.out, options)
@@ -139,8 +140,8 @@ object IrDump extends App {
     if(options.dumpAfterEachPass) {
       dumpAfter("codegen", irDefs)
     }
-    val passed = options.passes.foldLeft(irDefs) { (defs, pass) =>
-      val res = defs.flatMap(d => pass.extract(pass.txDef(d)))
+    val passed = options.passes.foldLeft(irDefs.toVector) { (defs, pass) =>
+      val res = pass.extract(pass.txDefs(defs))
       if(options.dumpAfterEachPass) {
         dumpAfter(pass.name, res)
       }
@@ -156,7 +157,7 @@ object IrDump extends App {
     }
   }
 
-  def dump(defs: Set[ir.Def], out: OutputStream, opts: Options): Unit = opts.format match {
+  def dump(defs: Vector[ir.Def], out: OutputStream, opts: Options): Unit = opts.format match {
     case Textual =>
       val writer = new PrintWriter(out, true)
       defs.foreach {
