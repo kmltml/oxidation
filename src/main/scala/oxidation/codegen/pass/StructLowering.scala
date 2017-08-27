@@ -92,7 +92,7 @@ object StructLowering extends Pass {
   override def onInstruction: Inst =?> F[Vector[Inst]] = {
     case Inst.Eval(dest, Op.Call(fn, params)) =>
       for {
-        newParams <- params.traverse(flatten).map(_.flatten)
+        newParams <- params.traverse{ case Val.R(r) => flatten(r) }.map(_.flatten.map(Val.R))
         res <- dest match {
           case Some(destReg @ Register(_, _, retType: Type.Struct)) if fitsInRegisters(retType) =>
             def rebuild(reg: Register, t: Type.Struct, regs: List[Register]): F[(List[Register], Register)] = {
@@ -128,7 +128,7 @@ object StructLowering extends Pass {
               load <- txInstruction(Inst.Move(destReg, Op.Load(Val.R(returned), Val.I(0, Type.I64))))
             } yield Vector(
               Inst.Move(sret, Op.Stackalloc(retType.size)),
-              Inst.Move(returned, Op.Call(newfun, sret +: newParams))
+              Inst.Move(returned, Op.Call(newfun, Val.R(sret) +: newParams))
             ) ++ load
 
           case dest => F.pure(Vector(Inst.Eval(dest, Op.Call(fn, newParams))))

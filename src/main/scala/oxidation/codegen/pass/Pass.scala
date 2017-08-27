@@ -40,7 +40,7 @@ trait Pass {
       case ir.Inst.Eval(dest, op) => (op match {
         case ir.Op.Binary(op, left, right) => (txValW(left), txValW(right)).map2(ir.Op.Binary(op, _, _))
         case ir.Op.Copy(src) => txValW(src).map(ir.Op.Copy)
-        case ir.Op.Call(fn, params) => txValW(fn).map(ir.Op.Call(_, params)) // TODO params too?
+        case ir.Op.Call(fn, params) => (txValW(fn), params.traverse(txValW)).map2(ir.Op.Call)
         case ir.Op.Unary(op, right) => txValW(right).map(ir.Op.Unary(op, _))
         case ir.Op.Load(addr, offset) => (txValW(addr), txValW(offset)).map2(ir.Op.Load)
         case ir.Op.Store(addr, offset, value) => (txValW(addr), txValW(offset), txValW(value)).map3(ir.Op.Store)

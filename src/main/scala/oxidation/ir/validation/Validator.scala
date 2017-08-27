@@ -126,7 +126,7 @@ object Validator {
             }
           } yield Some(retType)
 
-        case Type.Ptr => params.traverse(r => valType(loc, Val.R(r))) as None
+        case Type.Ptr => params.traverse(p => valType(loc, p)) as None
 
         case t => ES.raiseError(ValidationError.NotAFunction(loc, t))
       }

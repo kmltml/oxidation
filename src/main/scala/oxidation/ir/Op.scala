@@ -13,7 +13,7 @@ sealed trait Op {
 
   def vals: Set[Val] = this match {
     case Op.Binary(_, l, r) => Set(l, r)
-    case Op.Call(fn, params) => params.map(ir.Val.R).toSet + fn
+    case Op.Call(fn, params) => params.toSet + fn
     case Op.Copy(v) => Set(v)
     case Op.Unary(_, v) => Set(v)
     case Op.Garbled => Set.empty
@@ -39,7 +39,7 @@ object Op {
 
   final case class Binary(op: InfixOp, left: Val, right: Val) extends Op
   final case class Copy(src: Val) extends Op
-  final case class Call(fn: Val, params: List[Register]) extends Op
+  final case class Call(fn: Val, params: List[Val]) extends Op
   final case class Unary(op: PrefixOp, right: Val) extends Op
   final case class Load(addr: Val, offset: Val) extends Op
   final case class Store(addr: Val, offset: Val, value: Val) extends Op

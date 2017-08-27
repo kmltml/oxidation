@@ -310,7 +310,7 @@ object Codegen {
             _ <- instructions(
               Inst.Move(r, Op.Copy(p))
             )
-          } yield r
+          } yield Val.R(r)
         }
         temp <- genReg(translateType(t))
         r <- genReg(translateType(t))

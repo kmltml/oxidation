@@ -126,7 +126,7 @@ object Amd64BackendPass extends Pass {
 
     case Inst.Eval(dest, call @ Op.Call(_, params)) =>
       val paramColours = params.zipWithIndex.collect {
-        case t @ (Register(_, _, _: Type.Integral | Type.U1 | Type.Ptr), _) => t
+        case (ir.Val.R(r @ Register(_, _, _: Type.Integral | Type.U1 | Type.Ptr)), i) => (r, i)
       }.collect {
         case (r, 0) => r -> RegLoc.C
         case (r, 1) => r -> RegLoc.D
@@ -134,7 +134,7 @@ object Amd64BackendPass extends Pass {
         case (r, 3) => r -> RegLoc.R9
       }
       val floatParamColours = params.zipWithIndex.collect {
-        case t @ (Register(_, _, _: Type.F), _) => t
+        case (ir.Val.R(r @ Register(_, _, _: Type.F)), i) => (r, i)
       }.collect {
         case (r, 0) => r -> Xmm0
         case (r, 1) => r -> Xmm1

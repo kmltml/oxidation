@@ -153,12 +153,6 @@ object EnumLoweringPass extends Pass {
       unpack(e.mappings(variant), src, dest.typ)
         .map { case (insts, v) => insts :+ Inst.Move(dest, Op.Copy(v)) }
 
-    case Inst.Eval(dest, Op.Call(fun, params)) =>
-      F.pure(Vector(
-        // leave fun unchanged, because Pass magic calls onVal on it for us
-        Inst.Eval(dest.map(txReg), Op.Call(fun, params.map(txReg)))
-      ))
-
     case Inst.Move(dest @ Register(_, _, _: Type.Enum), op) =>
       F.pure(Vector(
         Inst.Move(txReg(dest), op)
