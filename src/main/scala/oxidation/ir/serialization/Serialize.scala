@@ -123,6 +123,7 @@ class Serialize(val out: DataOutputStream) {
     case Op.Sqrt(s) => writeTag(Tag.Op.Sqrt); writeVal(s)
     case Op.TagOf(s) => writeTag(Tag.Op.TagOf); writeVal(s)
     case Op.Unpack(s, v) => writeTag(Tag.Op.Unpack); writeVal(s); writeInt(v)
+    case Op.Phi(s) => writeTag(Tag.Op.Phi); writeSeq(s.toSeq){ case (n, r) => writeName(n); writeRegister(r) }
   }
 
   def writeInfixOp(o: InfixOp): Unit = writeTag(o match {

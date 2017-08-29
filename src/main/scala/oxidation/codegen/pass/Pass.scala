@@ -59,6 +59,7 @@ trait Pass {
         case ir.Op.Sqrt(s) => txValW(s).map(ir.Op.Sqrt)
         case ir.Op.TagOf(v) => txValW(v).map(ir.Op.TagOf)
         case ir.Op.Unpack(s, v) => txValW(s).map(ir.Op.Unpack(_, v))
+        case phi: ir.Op.Phi => WriterT(F.pure((Vector.empty, phi))) // TODO transform registers in phi?
       }).run.map { case (insts, o) => insts :+ ir.Inst.Eval(dest, o) }
 
       case lbl: ir.Inst.Label => F.pure(Vector[ir.Inst](lbl))

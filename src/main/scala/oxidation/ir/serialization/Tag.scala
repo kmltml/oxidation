@@ -47,6 +47,7 @@ object Tag {
     final val Sqrt = 1 + ArrStore
     final val TagOf = 1 + Sqrt
     final val Unpack = 1 + TagOf
+    final val Phi = 1 + Unpack
   }
 
   object Val {

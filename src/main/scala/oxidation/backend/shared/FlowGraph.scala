@@ -3,8 +3,9 @@ package backend
 package shared
 
 import codegen.Name
+import scala.collection.mutable
 
-class FlowGraph(val blocks: Map[Name, ir.Block]) {
+class FlowGraph(val blocks: Map[Name, ir.Block], val entry: Name) {
 
   lazy val parents: Memo[Name, Set[Name]] = Memo { n =>
     blocks.keys.filter(children(_) contains n).toSet
@@ -34,11 +35,20 @@ class FlowGraph(val blocks: Map[Name, ir.Block]) {
     go(name, Set.empty)
   }
 
+  def postorder: Vector[Name] = {
+    val visited = mutable.Set.empty[Name]
+    def go(name: Name): Vector[Name] = {
+      visited += name
+      (children(name) -- visited).toVector.flatMap(go(_)) :+ name
+    }
+    go(entry)
+  }
+
 }
 
 object FlowGraph {
 
-  def apply(blocks: Map[Name, ir.Block]): FlowGraph = new FlowGraph(blocks)
-  def apply(blocks: Seq[ir.Block]): FlowGraph = FlowGraph(blocks.map(b => b.name -> b).toMap)
+  def apply(blocks: Map[Name, ir.Block], entry: Name): FlowGraph = new FlowGraph(blocks, entry)
+  def apply(blocks: Seq[ir.Block]): FlowGraph = FlowGraph(blocks.map(b => b.name -> b).toMap, blocks.head.name)
 
 }

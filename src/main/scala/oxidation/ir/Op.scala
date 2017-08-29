@@ -31,6 +31,7 @@ sealed trait Op {
     case Op.Sqrt(v) => Set(v)
     case Op.TagOf(v) => Set(v)
     case Op.Unpack(v, _) => Set(v)
+    case Op.Phi(s) => s.values.map(Val.R).toSet
   }
 
 }
@@ -55,6 +56,7 @@ object Op {
   final case class Sqrt(src: Val) extends Op
   final case class TagOf(src: Val) extends Op
   final case class Unpack(src: Val, variant: Int) extends Op
+  final case class Phi(srcs: Map[Name, Register]) extends Op
   case object Garbled extends Op // Assigned to register to indicate, that some instruction also writes to this register as a side effect
 
   implicit val show: Show[Op] = {
@@ -77,5 +79,8 @@ object Op {
     case Sqrt(v) => show"sqrt($v)"
     case TagOf(v) => show"tagof($v)"
     case Unpack(v, t) => show"unpack.$t($v)"
+    case Phi(s) =>
+      val branches = s.map { case (n, r) => show"$n -> $r"}.mkString(", ")
+      show"phi $branches"
   }
 }

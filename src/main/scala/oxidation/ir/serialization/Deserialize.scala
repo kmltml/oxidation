@@ -100,6 +100,7 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Op.Sqrt => Op.Sqrt(readVal())
     case Tag.Op.TagOf => Op.TagOf(readVal())
     case Tag.Op.Unpack => Op.Unpack(readVal(), readInt())
+    case Tag.Op.Phi => Op.Phi(readSeq(() => (readName(), readRegister())).toMap)
   }
 
   def readInfixOp(): InfixOp = readTag() match {
