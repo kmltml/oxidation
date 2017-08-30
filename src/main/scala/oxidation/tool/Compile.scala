@@ -93,6 +93,7 @@ object Compile {
       passes: List[Pass] = List(
         pass.ArrInit,
         pass.ExplicitBlocks,
+        pass.DeadBlockRemoval,
         pass.ValInterpretPass,
         pass.ConstantInlining,
         pass.EnumLoweringPass,

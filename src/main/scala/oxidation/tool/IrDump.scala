@@ -35,6 +35,7 @@ object IrDump extends App {
   val AllPasses: List[Pass] = List(
     pass.ArrInit,
     pass.ExplicitBlocks,
+    pass.DeadBlockRemoval,
     pass.ValInterpretPass,
     pass.ConstantInlining,
     pass.EnumLoweringPass,
