@@ -34,6 +34,15 @@ sealed trait Op {
     case Op.Phi(s) => s.values.map(Val.R).toSet
   }
 
+  def isPure: Boolean = this match {
+    case Op.Binary(_, _, _) | Op.Copy(_) | Op.Unary(_, _) | Op.Garbled | Op.Load(_, _) |
+         Op.Widen(_) | Op.Trim(_) | Op.Convert(_, _) | Op.Reinterpret(_, _) |
+         Op.Member(_, _) | Op.Elem(_, _) | Op.Stackalloc(_) | Op.StructCopy(_, _) |
+         Op.Sqrt(_) | Op.TagOf(_) | Op.Unpack(_, _) | Op.Phi(_) => true
+
+    case Op.Store(_, _, _) | Op.ArrStore(_, _, _) | Op.Call(_, _) => false
+  }
+
 }
 
 object Op {
