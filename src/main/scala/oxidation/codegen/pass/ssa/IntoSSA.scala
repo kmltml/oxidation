@@ -51,6 +51,9 @@ object IntoSSA extends Pass {
 
       val doms = dominators(flowGraph)
       val dominanceOrder = preorder(doms)
+      assert(doms.keySet == blocks.map(_.name).toSet)
+      assert(dominanceOrder.toSet == blocks.map(_.name).toSet,
+        (blocks.map(_.name).toSet diff dominanceOrder.toSet).show)
       val fronts = frontiers(flowGraph, doms)
       val definedRegs = fronts.keys.map(n => n -> flowGraph.blocks(n).writes).toMap
 
@@ -58,17 +61,21 @@ object IntoSSA extends Pass {
       val M = implicitly[MonadState[M, (S, Map[Name, Map[Register, Register]])]]
       implicit val slens: Lens[(S, Map[Name, Map[Register, Register]]), S] = monocle.function.fields.first
 
-      val ((_, finalBindings), newBlocks) = blocks.traverse { b =>
+      val ((_, finalBindings), newBlocks) = dominanceOrder.traverse { name =>
+        val b = flowGraph.blocks(name)
         for {
-          binds <- M.inspect(_._2.get(doms(b.name)))
+          binds <- M.inspect(_._2.get(doms(name)))
           res <- transformBlock[M](b, fronts, definedRegs, binds getOrElse Map.empty)
-          _ <- M.modify(t => t.copy(_2 = t._2 + (b.name -> res._2)))
+          _ <- M.modify(t => t.copy(_2 = t._2 + (name -> res._2)))
         } yield res._1
       }.run((S(), Map.empty)).value
 
       val correctedPhis = newBlocks.map(correctPhis(_, finalBindings, flowGraph))
+        .map(b => b.name -> b).toMap
 
-      F.pure(Vector(d.copy(body = correctedPhis)))
+      val reordered = blocks.map(b => correctedPhis(b.name))
+
+      F.pure(Vector(d.copy(body = reordered)))
   }
 
   private def transformBlock[M[_]](b: Block, fronts: Multimap[Name, Name], defs: Map[Name, Set[Register]], binds: Map[Register, Register])
@@ -159,15 +166,17 @@ object IntoSSA extends Pass {
   private[ssa] def preorder(doms: Map[Name, Name]): Vector[Name] = {
     def follow(from: Name, acc: List[Name], visited: Set[Name]): List[Name] = {
       val idom = doms(from)
-      if(visited(idom)) acc
-      else if(idom == from) idom :: acc
-      else follow(idom, idom :: acc, visited)
+      if(visited(idom)) from :: acc
+      else if(idom == from) from :: acc
+      else follow(idom, from :: acc, visited)
     }
-    def go(keys: Vector[Name], acc: Vector[Name]): Vector[Name] = keys match {
-      case first +: rest =>
-        val path = follow(first, Nil, acc.toSet).toVector
-        go(rest diff path, acc ++ path)
-      case _ => acc
+    def go(keys: Vector[Name], acc: Vector[Name]): Vector[Name] = {
+      keys match {
+        case first +: rest =>
+          val path = follow(first, Nil, acc.toSet).toVector
+          go(rest diff path, acc ++ path)
+        case _ => acc
+      }
     }
     go(doms.keys.toVector, Vector.empty)
   }

@@ -115,13 +115,13 @@ object IntoSSATests extends TestSuite with IrValSyntax {
             r(0, U1) := u1(true)
           ), Branch(r(0, U1), % `if` 0, % `else` 0)),
           Block(% `if` 0, Vector(
-            r(1, I32) := i32(10)
+            ssa(0, I32) := i32(10)
           ), Goto(% ifafter 0)),
           Block(% `else` 0, Vector(
-            ssa(0, I32) := i32(20)
+            r(1, I32) := i32(20)
           ), Goto(% ifafter 0)),
           Block(% ifafter 0, Vector(
-            ssa(1, I32) := Phi(Map((% `if` 0) -> r(1, I32), (% `else` 0) -> ssa(0, I32)))
+            ssa(1, I32) := Phi(Map((% `else` 0) -> r(1, I32), (% `if` 0) -> ssa(0, I32)))
           ), Return(ssa(1, I32)))
         )
       }
