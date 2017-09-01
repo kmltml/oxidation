@@ -67,6 +67,7 @@ object Tag {
     final val Goto   = 0
     final val Return = 1 + Goto
     final val Branch = 1 + Return
+    final val Unreachable = 1 + Branch
   }
 
   object Type {

@@ -16,14 +16,7 @@ object RegisterLifetime {
     (block.instructions :+ ir.Inst.Flow(block.flow)).foldLeft(Res(Set.empty, Set.empty)) {
       case (r, ir.Inst.Label(_)) => r
       case (r, ir.Inst.Flow(flow)) =>
-        val vals = flow match {
-          case ir.FlowControl.Return(v) => Set(v)
-          case ir.FlowControl.Branch(c, _, _) => Set(c)
-          case ir.FlowControl.Goto(_) => Set.empty
-        }
-        val read = vals.collect {
-          case ir.Val.R(r) => r
-        }
+        val read = flow.reads
         val input = read diff r.written
         r.copy(input = r.input ++ input)
       case (r, ir.Inst.Move(dest, op)) =>

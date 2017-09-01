@@ -75,8 +75,8 @@ trait Pass {
       case (pre, ir.FlowControl.Return(v)) =>
         txValW(v).map(ir.FlowControl.Return).run
           .map { case (is, f) => (pre ++ is, f) }
-      case (pre, goto: ir.FlowControl.Goto) =>
-        F.pure((pre, goto))
+      case (pre, flow @ (_: ir.FlowControl.Goto | ir.FlowControl.Unreachable)) =>
+        F.pure((pre, flow))
       case (pre, ir.FlowControl.Branch(cond, ifTrue, ifFalse)) =>
         txValW(cond).map(ir.FlowControl.Branch(_, ifTrue, ifFalse)).run
           .map { case (is, f) => (pre ++ is, f) }

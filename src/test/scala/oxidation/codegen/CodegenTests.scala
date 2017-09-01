@@ -316,6 +316,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
 
               Inst.Label(Name.Local("casenext", 4)),
+              Inst.Flow(FlowControl.Unreachable),
               Inst.Label(Name.Local("matchafter", 0))
 
             ), Val.R(r(1, _.I32)))
@@ -366,6 +367,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
 
               Inst.Label(Name.Local("casenext", 3)),
+              Inst.Flow(FlowControl.Unreachable),
               Inst.Label(Name.Local("matchafter", 0))
 
             ), Val.R(r(1, _.I32)))
@@ -417,6 +419,8 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
 
               Inst.Label(Name.Local("casenext", 3)),
+              Inst.Flow(FlowControl.Unreachable),
+
               Inst.Label(Name.Local("matchafter", 0))
             ), Val.R(r(1, _.I32)))
         }
@@ -453,6 +457,8 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
                 Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
 
                 Inst.Label(Name.Local("casenext", 3)),
+                Inst.Flow(FlowControl.Unreachable),
+
                 Inst.Label(Name.Local("matchafter", 0))
 
               ), Val.R(r(1, _.I32)))
@@ -501,6 +507,8 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
                 Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
 
                 Inst.Label(Name.Local("casenext", 1)),
+                Inst.Flow(FlowControl.Unreachable),
+
                 Inst.Label(Name.Local("matchafter", 0))
 
               ), Val.R(r(1, _.I32)))
@@ -531,6 +539,8 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
 
               Inst.Label(Name.Local("casenext", 2)),
+              Inst.Flow(FlowControl.Unreachable),
+
               Inst.Label(Name.Local("matchafter", 0))
 
             ), Val.R(r(1, _.I32)))
@@ -564,6 +574,8 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
 
               Inst.Label(Name.Local("casenext", 2)),
+              Inst.Flow(FlowControl.Unreachable),
+
               Inst.Label(Name.Local("matchafter", 0))
             ), Val.R(r(1, _.I32)))
         }
@@ -590,6 +602,8 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
               Inst.Flow(FlowControl.Goto(Name.Local("matchafter", 0))),
 
               Inst.Label(Name.Local("casenext", 2)),
+              Inst.Flow(FlowControl.Unreachable),
+
               Inst.Label(Name.Local("matchafter", 0))
 
             ), Val.R(r(2, _.I32)))

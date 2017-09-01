@@ -12,7 +12,7 @@ class FlowGraph(val blocks: Map[Name, ir.Block]) {
 
   lazy val children: Memo[Name, Set[Name]] = Memo { n =>
     blocks(n).flow match {
-      case ir.FlowControl.Return(_) => Set.empty
+      case ir.FlowControl.Return(_) | ir.FlowControl.Unreachable => Set.empty
       case ir.FlowControl.Branch(_, t, f) => Set(t, f)
       case ir.FlowControl.Goto(l) => Set(l)
     }

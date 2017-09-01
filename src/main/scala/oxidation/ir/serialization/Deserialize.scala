@@ -52,6 +52,7 @@ class Deserialize(val in: DataInputStream) {
     case Tag.FlowControl.Goto => FlowControl.Goto(readName())
     case Tag.FlowControl.Return => FlowControl.Return(readVal())
     case Tag.FlowControl.Branch => FlowControl.Branch(readVal(), readName(), readName())
+    case Tag.FlowControl.Unreachable => FlowControl.Unreachable
   }
 
   def readRegister(): Register = Register(readRegisterNS(), readInt(), readType())

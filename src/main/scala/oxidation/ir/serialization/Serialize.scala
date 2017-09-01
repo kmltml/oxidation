@@ -71,6 +71,7 @@ class Serialize(val out: DataOutputStream) {
     case FlowControl.Goto(l) => writeTag(Tag.FlowControl.Goto); writeName(l)
     case FlowControl.Return(v) => writeTag(Tag.FlowControl.Return); writeVal(v)
     case FlowControl.Branch(c, t, f) => writeTag(Tag.FlowControl.Branch); writeVal(c); writeName(t); writeName(f)
+    case FlowControl.Unreachable => writeTag(Tag.FlowControl.Unreachable)
   }
 
   def writeRegister(reg: Register): Unit = {

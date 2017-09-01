@@ -282,6 +282,8 @@ object Codegen {
             } yield ()
         }
         _ <- instructions(
+           // Last case should always match, guaranteed by exhaustivity check in Typer
+          Inst.Flow(FlowControl.Unreachable),
           Inst.Label(afterlbl)
         )
       } yield Val.R(r)

@@ -561,6 +561,8 @@ class Amd64Target { this: Output =>
         cmp(toVal(cond), 0) |+|
         jnz(ifTrue) |+|
         jmp(ifFalse)
+
+    case ir.FlowControl.Unreachable => M.empty // TODO error out somehow?
   }
 
   def prologue(implicit ctxt: FunCtxt): M = {
