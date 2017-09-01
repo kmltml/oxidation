@@ -35,6 +35,14 @@ sealed trait Val extends Product with Serializable {
       elems.foldMap(_.representation)
   }
 
+  def reads: Set[Register] = this match {
+    case R(r) => Set(r)
+    case Struct(members) => members.flatMap(_.reads).toSet
+    case Array(elems) => elems.flatMap(_.reads).toSet
+    case Enum(_, members, _) => members.flatMap(_.reads).toSet
+    case _ => Set.empty
+  }
+
 }
 
 object Val {

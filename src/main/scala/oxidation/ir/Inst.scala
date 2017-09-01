@@ -25,6 +25,8 @@ sealed trait Inst {
     case Flow(f) => f.vals
   }
 
+  def reads: Set[Register] = vals.flatMap(_.reads)
+
 }
 
 object Inst {

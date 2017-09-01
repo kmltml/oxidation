@@ -9,7 +9,7 @@ import codegen.Name
 
 sealed trait Op {
 
-  def reads: Set[Register] = vals.collect { case Val.R(r) => r }
+  def reads: Set[Register] = vals.flatMap(_.reads)
 
   def vals: Set[Val] = this match {
     case Op.Binary(_, l, r) => Set(l, r)

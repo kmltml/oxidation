@@ -12,9 +12,7 @@ sealed trait FlowControl {
   import FlowControl._
 
   def reads: Set[Register] =
-    vals.collect {
-      case Val.R(r) => r
-    }
+    vals.flatMap(_.reads)
 
   def vals: Set[Val] = this match {
     case Branch(v, _, _) => Set(v)
