@@ -45,7 +45,10 @@ case class InterferenceGraph[Var, Reg] private (colours: Map[Var, Reg],
 
   def moveNeighbors(v: Var): Set[Var] = preferenceNeighbors.get(v).orEmpty
 
-  def degree(node: Var): Int = neighbors(node).size
+  def degree(node: Var): Int = neighbors(node).groupBy(colours.get).toVector.foldMap {
+    case (Some(_), _) => 1
+    case (None, l) => l.size
+  }
 
   def mapVar[A](f: Var => A): InterferenceGraph[A, Reg] =
     InterferenceGraph(
