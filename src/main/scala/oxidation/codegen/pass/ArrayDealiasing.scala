@@ -23,10 +23,13 @@ object ArrayDealiasing extends Pass {
     }
 
   override val onInstruction = {
-    case Inst.Move(dest, Op.Copy(Val(Val.R(src), _: Type.Arr))) =>
+    case Inst.Move(dest, Op.Copy(Val(Val.R(src), _: Type.Arr))) if src == dest =>
+      F.pure(Vector.empty)
+    case inst @ Inst.Move(dest, Op.Copy(Val(Val.R(src), _: Type.Arr))) =>
       for {
         bindings <- F.get
-        _ = if(bindings.contains(dest)) throw new NotImplementedError("Array moving is not yet implemented")
+        _ = if(bindings.contains(dest))
+          throw new NotImplementedError(show"Array moving is not yet implemented in instruction: ${inst: Inst}")
         alias <- solveAlias(src)
         _ <- F.set(bindings + (dest -> alias))
       } yield Vector.empty

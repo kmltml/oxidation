@@ -41,9 +41,12 @@ object IrDump extends App {
     pass.EnumLoweringPass,
     pass.StructLowering,
     pass.UnitRemoval,
-    pass.ArrayDealiasing,
     pass.ConstantRemoval,
     pass.ExprWeaken,
+    pass.ssa.IntoSSA,
+    pass.ssa.UnusedRegRemoval,
+    pass.ssa.FromSSA,
+    pass.ArrayDealiasing,
     Amd64BackendPass,
     BlockLinearizationPass
   )

@@ -242,6 +242,14 @@ object Validator {
         case e: Type.Enum => ES.pure(Some(e.variants(tag)))
         case t => ES.raiseError(ValidationError.NotAnEnum(loc, t))
       }
+
+    case Op.Phi(srcs) => 
+      srcs.values.toVector.traverse(r => valType(loc, Val.R(r))).flatMap { srcTypes =>
+        val expected = srcTypes.head
+        val uniformTypes = srcTypes.traverse_(expect(loc, expected, _))
+        uniformTypes as Some(expected)
+      }
+
   }
 
   private def valType(loc: Location, v: Val): EitherT[State[Set[Register], ?], ValidationError, Type] = v match {
@@ -249,10 +257,7 @@ object Validator {
     case Val.Struct(members) => members.traverse_(valType(loc, _)) as v.typ
     case Val.Enum(_, members, _) => members.traverse_(valType(loc, _)) as v.typ
     case Val.Array(elems) => elems.traverse_(valType(loc, _)) as v.typ
-    case Val.R(reg) => for {
-      defined <- S.inspect(_(reg))
-      _ <- cond(defined, ValidationError.UseBeforeDefine(loc, reg): ValidationError)
-    } yield reg.typ
+    case Val.R(reg) => reg.typ.pure[ES] // TODO better define-before-use checking
   }
 
   private def cond(test: Boolean, error: => ValidationError): ES[Unit] =

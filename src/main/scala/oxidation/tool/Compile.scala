@@ -99,9 +99,12 @@ object Compile {
         pass.EnumLoweringPass,
         pass.StructLowering,
         pass.UnitRemoval,
-        pass.ArrayDealiasing,
         pass.ConstantRemoval,
-        pass.ExprWeaken
+        pass.ExprWeaken,
+        pass.ssa.IntoSSA,
+        pass.ssa.UnusedRegRemoval,
+        pass.ssa.FromSSA,
+        pass.ArrayDealiasing
       )
       passed <- passes.foldLeft(Right(irDefs.toVector): Either[CompileError, Vector[ir.Def]]) { (defs, pass) =>
         defs.flatMap { defs =>
