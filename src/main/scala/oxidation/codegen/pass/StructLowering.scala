@@ -51,6 +51,13 @@ object StructLowering extends Pass {
     case Val.R(r) => Nested(binding(r)).map(Val.R(_) : Val).value
   }
 
+  def flatten(v: Val): F[Vector[Val]] = v match {
+    case Val.Struct(members) => members.traverse(flatten).map(_.flatten)
+    case Val.R(r) => flatten(r).map(_.map(Val.R))
+    case Val(v, _: Type.Struct) => throw new AssertionError(show"I don't know what to do with $v")
+    case v => F.pure(Vector(v))
+  }
+
   def flatten(r: Register): F[Vector[Register]] = r match {
     case Register(_, _, _: Type.Struct) => binding(r).flatMap(_.traverse(flatten).map(_.flatten))
     case r => F.pure(Vector(r))
@@ -92,7 +99,7 @@ object StructLowering extends Pass {
   override def onInstruction: Inst =?> F[Vector[Inst]] = {
     case Inst.Eval(dest, Op.Call(fn, params)) =>
       for {
-        newParams <- params.traverse{ case Val.R(r) => flatten(r) }.map(_.flatten.map(Val.R))
+        newParams <- params.traverse(flatten).map(_.flatten)
         res <- dest match {
           case Some(destReg @ Register(_, _, retType: Type.Struct)) if fitsInRegisters(retType) =>
             def rebuild(reg: Register, t: Type.Struct, regs: List[Register]): F[(List[Register], Register)] = {

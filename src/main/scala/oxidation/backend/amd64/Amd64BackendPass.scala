@@ -18,7 +18,7 @@ object Amd64BackendPass extends Pass {
     val prefix = "br"
   }
 
-  final case class St(nextReg: Int = 0, returnedStructs: Map[Register, Vector[AnyReg]] = Map.empty)
+  final case class St(nextReg: Int = 0, returnedStructs: Map[Register, Vector[Register]] = Map.empty)
   final case class Colours(int: Set[(Register, RegLoc)] = Set.empty,
                            float: Set[(Register, Xmm)] = Set.empty)
   implicit object Colours extends Monoid[Colours] {
@@ -49,15 +49,13 @@ object Amd64BackendPass extends Pass {
     s => (s.copy(nextReg = s.nextReg + 1), Register(BackendReg, s.nextReg, typ))
   })
 
-  private def saveReturnedStruct(reg: Register): F[Unit] = {
-    val Type.Struct(members) = reg.typ
+  private def returnedStructColors(members: Vector[Type]): Vector[AnyReg] = {
     val intColours = List(RegLoc.A, RegLoc.D, RegLoc.C, RegLoc.R8, RegLoc.R9)
     val floatColours = List(Xmm0, Xmm1, Xmm2, Xmm3)
-    val memberColours = members.foldLeft((Vector.empty[AnyReg], intColours, floatColours)) {
+    members.foldLeft((Vector.empty[AnyReg], intColours, floatColours)) {
       case ((acc, ics, c :: fcs), _: Type.F) => (acc :+ c, ics, fcs)
       case ((acc, c :: ics, fcs), _) => (acc :+ c, ics, fcs)
     }._1
-    S.modify(s => s.copy(returnedStructs = s.returnedStructs + (reg -> memberColours)))
   }
 
   private def tellIntColour(cs: Set[(Register, RegLoc)]): F[Unit] = F.tell(Colours(int = cs))
@@ -125,44 +123,64 @@ object Amd64BackendPass extends Pass {
       )
 
     case Inst.Eval(dest, call @ Op.Call(_, params)) =>
-      val paramColours = params.zipWithIndex.collect {
-        case (ir.Val.R(r @ Register(_, _, _: Type.Integral | Type.U1 | Type.Ptr)), i) => (r, i)
-      }.collect {
-        case (r, 0) => r -> RegLoc.C
-        case (r, 1) => r -> RegLoc.D
-        case (r, 2) => r -> RegLoc.R8
-        case (r, 3) => r -> RegLoc.R9
-      }
-      val floatParamColours = params.zipWithIndex.collect {
-        case (ir.Val.R(r @ Register(_, _, _: Type.F)), i) => (r, i)
-      }.collect {
-        case (r, 0) => r -> Xmm0
-        case (r, 1) => r -> Xmm1
-        case (r, 2) => r -> Xmm2
-        case (r, 3) => r -> Xmm3
-      }
       for {
+        regParams <- params.take(4).toVector.traverse { v =>
+          nextReg(v.typ).map(d => (Inst.Move(d, Op.Copy(v)), d))
+        }
+        paramColours = regParams.zipWithIndex.collect {
+          case ((_, r @ Register(_, _, _: Type.Integral | Type.U1 | Type.Ptr)), i) => (r, i)
+        }.map {
+          case (r, 0) => r -> RegLoc.C
+          case (r, 1) => r -> RegLoc.D
+          case (r, 2) => r -> RegLoc.R8
+          case (r, 3) => r -> RegLoc.R9
+        }
+        floatParamColours = regParams.zipWithIndex.collect {
+          case ((_, r @ Register(_, _, _: Type.F)), i) => (r, i)
+        }.map {
+          case (r, 0) => r -> Xmm0
+          case (r, 1) => r -> Xmm1
+          case (r, 2) => r -> Xmm2
+          case (r, 3) => r -> Xmm3
+        }
         _ <- F.tell(Colours(paramColours.toSet, floatParamColours.toSet))
-        destInsts <- dest match {
-          case Some(r @ Register(_, _, Type.Struct(_))) => saveReturnedStruct(r).as(Vector.empty)
-          case Some(r @ Register(_, _, _: Type.F)) => tellFloatColour(Set(r -> Xmm0)).as(Vector())
-          case Some(r) => tellIntColour(Set(r -> RegLoc.A)).as(Vector())
-          case None => F.pure(Vector.empty)
+        newDest <- dest match {
+          case Some(r @ Register(_, _, Type.Struct(members))) =>
+            for {
+              regs <- members.traverse(nextReg)
+              colors = returnedStructColors(members)
+              _ <- (regs zip colors).traverse {
+                case (r, x: Xmm) => tellFloatColour(Set(r -> x))
+                case (r, l: RegLoc) => tellIntColour(Set(r -> l))
+              }
+              copies = regs.map(r => Inst.Move(r, Op.Garbled))
+              _ <- S.modify(s => s.copy(returnedStructs = s.returnedStructs + (r -> regs)))
+            } yield (copies, None)
+          case Some(r) =>
+            for {
+              d <- nextReg(r.typ)
+              _ <- r.typ match {
+                case _: Type.Integral | Type.U1 | Type.Ptr =>
+                  tellIntColour(Set(d -> RegLoc.A))
+                case _: Type.F =>
+                  tellFloatColour(Set(d -> Xmm0))
+              }
+            } yield (Vector(Inst.Move(r, Op.Copy(ir.Val.R(d)))), Some(d))
+            
+          case None => F.pure((Vector.empty, None))
         }
-        newDest = dest match {
-          case Some(Register(_, _, Type.Struct(_))) => None
-          case x => x
+        stackParams <- params.drop(4).traverse {
+          case d: ir.Val.F64 => // You can't just have a 64-bit immediate, that would be too easy!
+            nextReg(Type.F64).map(r => (Vector(Inst.Move(r, Op.Copy(d)): Inst), ir.Val.R(r): ir.Val))
+          case v => F.pure((Vector.empty[Inst], v))
         }
-      } yield Inst.Eval(newDest, call) +: destInsts
+        newCall = call.copy(params = regParams.map(t => ir.Val.R(t._2)).toList ++ stackParams.map(_._2))
+      } yield regParams.map(_._1) ++ stackParams.flatMap(_._1) ++ Vector(Inst.Eval(newDest._2, newCall)) ++ newDest._1
 
     case Inst.Move(dest, Op.Member(ir.Val.R(src), member)) =>
       for {
-        members <- S.inspect(_.returnedStructs(src))
-        _ <- members(member) match {
-          case x: Xmm => tellFloatColour(Set(dest -> x))
-          case r: RegLoc => tellIntColour(Set(dest -> r))
-        }
-      } yield Vector(Inst.Move(dest, Op.Garbled))
+        r <- S.inspect(_.returnedStructs(src)(member))
+      } yield Vector(Inst.Move(dest, Op.Copy(ir.Val.R(r))))
 
     case inst @ Inst.Move(dest, Op.Binary(InfixOp.Add | InfixOp.Sub | InfixOp.BitAnd | InfixOp.BitOr | InfixOp.Xor | InfixOp.Shl | InfixOp.Shr, l, r)) =>
       F.pure(Vector(
@@ -189,44 +207,71 @@ object Amd64BackendPass extends Pass {
 
   override def onFlow = {
     case flow @ FlowControl.Return(ir.Val.Struct(members)) =>
-      val regs = members.map { case ir.Val.R(r) => r }
-      val (ints, floats) = regs.partition {
-        case r @ ir.Register(_, _, _: ir.Type.F) => false
-        case r => true
-      }
-      val intColours = List(RegLoc.A, RegLoc.D, RegLoc.C, RegLoc.R8, RegLoc.R9)
-      assert(ints.size <= intColours.size)
-      val intAllocs = (ints zip intColours).toSet
-      val floatColours = List(Xmm0, Xmm1, Xmm2, Xmm3)
-      assert(floats.size <= floatColours.size)
-      val floatAllocs = (floats zip floatColours).toSet
-      F.tell(Colours(intAllocs, floatAllocs)) as (Vector.empty, flow)
-    case flow @ FlowControl.Return(ir.Val.R(r)) =>
-      val c = r.typ match {
-        case _: Type.F => tellFloatColour(Set(r -> Xmm0))
-        case _ => tellIntColour(Set(r -> RegLoc.A))
-      }
-      c as (Vector.empty, flow)
+      for {
+        regs <- members.traverse(v => nextReg(v.typ).map(d => (Inst.Move(d, Op.Copy(v)), d)))
+        (ints, floats) = regs.map(_._2).partition {
+          case r @ ir.Register(_, _, _: ir.Type.F) => false
+          case r => true
+        }
+        intColours = List(RegLoc.A, RegLoc.D, RegLoc.C, RegLoc.R8, RegLoc.R9)
+        _ = assert(ints.size <= intColours.size)
+        intAllocs = (ints zip intColours).toSet
+        floatColours = List(Xmm0, Xmm1, Xmm2, Xmm3)
+        _ = assert(floats.size <= floatColours.size)
+        floatAllocs = (floats zip floatColours).toSet
+        _ <- F.tell(Colours(intAllocs, floatAllocs))
+      } yield (regs.map(_._1), FlowControl.Return(ir.Val.Struct(regs.map(t => ir.Val.R(t._2)))))
+    case flow @ FlowControl.Return(ir.Val.I(_, Type.U0)) =>
+      F.pure((Vector.empty, flow))
+    case flow @ FlowControl.Return(v) =>
+      for {
+        d <- nextReg(v.typ)
+        _ <- v.typ match {
+          case _: Type.F => tellFloatColour(Set(d -> Xmm0))
+          case _ => tellIntColour(Set(d -> RegLoc.A))
+        }
+      } yield (Vector(Inst.Move(d, Op.Copy(v))), FlowControl.Return(ir.Val.R(d)))
   }
 
   override def onDef: Def =?> F[Vector[Def]] = {
-    case fun @ Def.Fun(_, params, _, _, _) =>
-      val paramColours = params.zipWithIndex.collect {
-        case t @ (Register(_, _, _: Type.Integral | Type.U1 | Type.Ptr), _) => t
-      }.collect {
-        case (r, 0) => r -> RegLoc.C
-        case (r, 1) => r -> RegLoc.D
-        case (r, 2) => r -> RegLoc.R8
-        case (r, 3) => r -> RegLoc.R9
-      }
-      val floatParamColours = params.zipWithIndex.collect {
-        case t @ (Register(_, _, _: Type.F), _) => t
-      }.collect {
-        case (r, 0) => r -> Xmm0
-        case (r, 1) => r -> Xmm1
-        case (r, 2) => r -> Xmm2
-        case (r, 3) => r -> Xmm3
-      }
-      F.tell(Colours(paramColours.toSet, floatParamColours.toSet)).as(Vector(fun))
+    case fun @ Def.Fun(_, params, _, blocks, _) =>
+      for {
+        newParams <- params.traverse(p => nextReg(p.typ))
+        paramColours = newParams.zipWithIndex.collect {
+          case t @ (Register(_, _, _: Type.Integral | Type.U1 | Type.Ptr), _) => t
+        }.collect {
+          case (r, 0) => r -> RegLoc.C
+          case (r, 1) => r -> RegLoc.D
+          case (r, 2) => r -> RegLoc.R8
+          case (r, 3) => r -> RegLoc.R9
+        }
+        floatParamColours = newParams.zipWithIndex.collect {
+          case t @ (Register(_, _, _: Type.F), _) => t
+        }.collect {
+          case (r, 0) => r -> Xmm0
+          case (r, 1) => r -> Xmm1
+          case (r, 2) => r -> Xmm2
+          case (r, 3) => r -> Xmm3
+        }
+        _ <- F.tell(Colours(paramColours.toSet, floatParamColours.toSet))
+        paramCopies = (params zip newParams).map {
+          case (d, s) => Inst.Move(d, Op.Copy(ir.Val.R(s)))
+        }.toVector
+        firstBlock = blocks.head
+        newFirstBlock = firstBlock.copy(instructions = paramCopies ++ firstBlock.instructions)
+      } yield Vector(fun.copy(body = newFirstBlock +: blocks.tail, params = newParams))
   }
+
+  override def onVal = {
+    case v @ ir.Val.I(l, t) if l > Int.MaxValue && l < Int.MinValue =>
+      for {
+        r <- nextReg(t)
+        s <- nextReg(t)
+        _ <- tellIntColour(Set(r -> RegLoc.A))
+      } yield (Vector(
+        Inst.Move(r, Op.Copy(v)),
+        Inst.Move(s, Op.Copy(ir.Val.R(r))) // make r's lifetime as short as possible
+      ), ir.Val.R(s))
+  }
+
 }

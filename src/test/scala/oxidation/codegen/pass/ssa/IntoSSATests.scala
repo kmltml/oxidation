@@ -12,7 +12,7 @@ import FlowControl._
 import Op._
 import InfixOp._
 
-object IntoSSATests extends TestSuite with IrValSyntax {
+object IntoSSATests extends TestSuite with IrValSyntax with NameSyntax {
 
   val pass = IntoSSA
 
@@ -26,19 +26,7 @@ object IntoSSATests extends TestSuite with IrValSyntax {
     pass.extract(pass.txDef(Def.Fun(Name.Global(List("foo")), Nil, ret, blocks.toVector, Set.empty))) match {
       case Vector(Def.Fun(_, _, _, blocks, _)) => blocks
     }
-  }
-
-  object % extends Dynamic {
-    def applyDynamic(name: String)(idx: Int): Name = Name.Local(name, idx)
-  }
-  case class GlobalBuilder(prefix: List[String]) extends Dynamic {
-    def selectDynamic(name: String): GlobalBuilder = GlobalBuilder(name :: prefix)
-    def toName: Name = Name.Global(prefix.reverse)
-  }
-  object GlobalBuilder {
-    implicit def toName(b: GlobalBuilder): Name = b.toName
-  }
-  object $ extends GlobalBuilder(Nil)
+  }  
 
   implicit class RegisterDSL(private val r: Register) extends AnyVal {
 

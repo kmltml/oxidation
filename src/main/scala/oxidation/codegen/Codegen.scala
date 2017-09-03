@@ -304,19 +304,9 @@ object Codegen {
           case _ => compileExpr(Typed(fn, fnType))
         }
         paramVals <- params.traverse(compileExpr)
-        paramRegs <- paramVals.traverse { p =>
-          for {
-            r <- genReg(p.typ)
-            _ <- instructions(
-              Inst.Move(r, Op.Copy(p))
-            )
-          } yield Val.R(r)
-        }
-        temp <- genReg(translateType(t))
         r <- genReg(translateType(t))
         _ <- instructions(
-          Inst.Move(temp, Op.Call(fnVal, paramRegs)),
-          Inst.Move(r, Op.Copy(Val.R(temp)))
+          Inst.Move(r, Op.Call(fnVal, paramVals))
         )
       } yield Val.R(r)
 
@@ -476,15 +466,7 @@ object Codegen {
       val s: Res[(List[Register], ir.Register)] = for {
         paramRegs <- params.getOrElse(Seq.empty).toList
           .traverse(p => genReg(translateType(p.typ)).map(Symbol.Local(p.name) -> _))
-        paramTemps <- paramRegs.traverse {
-          case (name, r) => for {
-            temp <- genReg(r.typ)
-            _ <- instructions(
-              Inst.Move(temp, Op.Copy(Val.R(r)))
-            )
-          } yield name -> temp
-        }
-        _ <- withBindings(paramTemps: _*)
+        _ <- withBindings(paramRegs: _*)
         v <- compileExpr(body)
         vtemp <- genReg(translateType(body.typ))
         _ <- instructions(

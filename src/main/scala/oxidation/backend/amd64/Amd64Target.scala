@@ -376,8 +376,16 @@ class Amd64Target { this: Output =>
           case (r, i) =>
             val dest = Val.m(Some(regSize(r.typ)), RSP, 8 * (4 + i))
             r.typ match {
-              case ir.Type.F32 => movss(dest, toVal(r))
-              case ir.Type.F64 => movsd(dest, toVal(r))
+              case ir.Type.F32 =>
+                r match {
+                  case ir.Val.F32(f) => mov(dest, Val.i(java.lang.Float.floatToRawIntBits(f)))
+                  case _ => movss(dest, toVal(r))
+                }
+              case ir.Type.F64 =>
+                r match {
+                  case ir.Val.F64(f) => mov(dest, Val.i(java.lang.Double.doubleToRawLongBits(f)))
+                  case _ => movsd(dest, toVal(r))
+                }
               case _ => mov(dest, toVal(r))
             }
         },
