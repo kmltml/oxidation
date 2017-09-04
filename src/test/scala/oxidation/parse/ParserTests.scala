@@ -198,6 +198,20 @@ object ParserTests extends TestSuite with MatchCaseSyntax {
             ), 0 +> 38)
         }
       }
+      "MethodApp" - {
+        "without params" - {
+          expr.parse("obj..meth").get.value ==> Method(Var("obj", 0 +> 3), Var("meth", 5 +> 4), 0 +> 9)
+        }
+        "with params" - {
+          expr.parse("obj..meth(arg)").get.value ==>
+            App(Method(Var("obj", 0 +> 3), Var("meth", 5 +> 4), 0 +> 9), List(Var("arg", 10 +> 3)), 0 +> 14)
+        }
+        "path in method name" - {
+          expr.parse("obj..a.b(arg)").get.value ==>
+            App(Method(Var("obj", 0 +> 3), Select(Var("a", 5 +> 1), "b", 5 +> 3), 0 +> 8),
+              List(Var("arg", 9 +> 3)), 0 +> 13)
+        }
+      }
       "a function call" - {
         expr.parse("foo()").get.value ==> App(Var("foo", 0 +> 3), Nil, 0 +> 5)
         expr.parse("foo(1, 2)").get.value ==> App(Var("foo", 0 +> 3), List(IntLit(1, 4 +> 1), IntLit(2, 7 +> 1)), 0 +> 9)

@@ -144,13 +144,21 @@ class Parser(file: Option[String]) {
 
   type Postfix = Expression => Expression
   private val postfix: P[Postfix] =
-    P(typeApply | apply | select)
+    P(typeApply | apply | method | select)
   private val apply: P[Expression => App] =
     P(WSNoNL ~~ "(" ~/ expression.rep(sep = ",").map(_.toList) ~ ")" ~~ Index).map { case (params, end) => prefix => App(prefix, params, prefix.loc.copy(end = end)) }
   private val typeApply: P[Expression => TypeApp] =
     P(WSNoNL ~~ typeParams ~~ Index).map { case (params, end) => prefix => TypeApp(prefix, params, prefix.loc.copy(end = end)) }
   private val select: P[Expression => Select] =
     P(WS ~~ "." ~/ id.! ~~ Index).map { case (id, end) => prefix => Select(prefix, id, prefix.loc.copy(end = end)) }
+  private val method: P[Expression => Method] =
+    P(WS ~~ ".." ~/ located(sym).rep(min = 1, sep = ".") ~~ Index).map {
+      case ((head, headLoc) +: tail, end) =>
+        val meth = tail.foldLeft(Var(head, headLoc): Expression) {
+          case (l, (sym, loc)) => Select(l, sym.name, l.loc.copy(end = loc.end))
+        }
+        prefix => Method(prefix, meth, prefix.loc.copy(end = end))
+    }
 
   private val semi: P0 =
     P(WSNoNL ~~ (";" | NL) ~~ WS)

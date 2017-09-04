@@ -113,8 +113,12 @@ object SymbolResolver {
         .map2(parse.ast.InfixAp(op, _, _, loc))
 
     case parse.ast.PrefixAp(op, exp, loc) =>
-      SymbolResolver.solveExpr(exp, scope, global)
+      solveExpr(exp, scope, global)
         .map(parse.ast.PrefixAp.apply(op, _, loc))
+
+    case parse.ast.Method(target, meth, loc) =>
+      (solveExpr(target, scope, global), solveExpr(meth, scope, global))
+        .map2(parse.ast.Method(_, _, loc))
 
     case parse.ast.App(expr, params, loc) =>
       (solveExpr(expr, scope, global), params.traverse(solveExpr(_, scope, global)))

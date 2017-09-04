@@ -32,6 +32,7 @@ trait Ast {
       case x: PrefixAp => x.copy(loc = loc)
       case x: Var => x.copy(loc = loc)
       case x: Block => x.copy(loc = loc)
+      case x: Method => x.copy(loc = loc)
       case x: App => x.copy(loc = loc)
       case x: TypeApp => x.copy(loc = loc)
       case x: Select => x.copy(loc = loc)
@@ -73,6 +74,7 @@ trait Ast {
     def pattern = Pattern.Var(name, loc)
   }
   final case class Block(body: Vector[Typed[BlockStatement]], loc: Span) extends Expression
+  final case class Method(target: Typed[Expression], method: Typed[Expression], loc: Span) extends Expression
   final case class App(expr: Typed[Expression], params: List[Typed[Expression]], loc: Span) extends Expression
   final case class TypeApp(expr: Typed[Expression], params: List[TypeName], loc: Span) extends Expression
   final case class Select(expr: Typed[Expression], member: String, loc: Span) extends Expression
@@ -179,6 +181,7 @@ trait Ast {
       case InfixAp(_, left, right, _) => traverse(left)(f) ++ traverse(right)(f)
       case PrefixAp(_, e, _) => traverse(e)(f)
       case Block(stmnts, _) => stmnts.foldMap(traverse(_)(f))
+      case Method(t, m, _) => traverse(t)(f) ++ traverse(m)(f)
       case App(e, params, _) => traverse(e)(f) ++ params.foldMap(traverse(_)(f))
       case TypeApp(e, _, _) => traverse(e)(f)
       case Select(e, _, _) => traverse(e)(f)
