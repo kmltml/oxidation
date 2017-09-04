@@ -310,6 +310,12 @@ class Amd64Target { this: Output =>
 
   def outputInstructions(is: Vector[ir.Inst])(implicit ctxt: FunCtxt): (M, Vector[ir.Inst]) = is match {
 
+    case ir.Inst.Flow(ir.FlowControl.Branch(ir.Val.I(cond, ir.Type.U1), ifTrue, ifFalse)) +:
+         rest =>
+      val target = if(cond == 0) ifFalse else ifTrue
+      outputInstructions(ir.Inst.Flow(ir.FlowControl.Goto(target)) +: rest)
+
+
     case ir.Inst.Flow(ir.FlowControl.Branch(cond, ifTrue, ifFalse)) +:
          ir.Inst.Label(lbl) +: rest =>
 

@@ -34,6 +34,9 @@ object Type {
   sealed trait Integral extends Num {
     def w: Int
   }
+  object Integral {
+    def unapply(i: Integral): Some[Int] = Some(i.w)
+  }
 
   sealed abstract class I(val w: Int) extends Integral
   object I {

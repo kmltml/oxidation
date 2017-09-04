@@ -9,12 +9,18 @@ import scala.sys.process.{Process, ProcessLogger}
 
 object CompiledTestSuite extends TestSuite {
 
-  val tests = apply {
+  def exec(noConstProp: Boolean): Unit = {
     val files = new File("compiled-test").listFiles(_.getName.endsWith(".ox"))
     assert(files.nonEmpty)
+    val outName = "compiledtests" ++ (if(noConstProp) "-ncp" else "") ++ ".exe"
+    val buildDir = new File(new File("compiled-test"), "build")
+    buildDir.mkdirs()
+    val outFile = new File(buildDir, outName)
     val Right((exeFile, stats)) = Compile.compile(Compile.Options(
       infiles = files,
-      validate = true
+      output = Some(outFile),
+      validate = true,
+      withoutConstPropagation = noConstProp
     ))
     val builder = new StringBuilder
     val log = new ProcessLogger {
@@ -29,6 +35,15 @@ object CompiledTestSuite extends TestSuite {
     val res = Process(exeFile.getAbsolutePath) ! log
     if(res != 0) throw AssertionError(s"Compiled test failed: ${builder.toString} with error code $res", Seq.empty)
     println(s" ---------- spills = ${stats.spillCount}")
+  }
+
+  val tests = apply {
+    "full" - {
+      exec(noConstProp = false)
+    }
+    "without constant propagation" - {
+      exec(noConstProp = true)
+    }
   }
 
 }

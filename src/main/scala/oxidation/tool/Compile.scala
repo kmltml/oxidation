@@ -24,7 +24,8 @@ object Compile {
                      output: Option[File] = None,
                      validate: Boolean = false,
                      timing: Boolean = false,
-                     passthrough: Vector[String] = Vector.empty) extends LogOptions
+                     passthrough: Vector[String] = Vector.empty,
+                     withoutConstPropagation: Boolean = false) extends LogOptions
 
   val optParser = new scopt.OptionParser[Options]("oxc") {
 
@@ -41,6 +42,10 @@ object Compile {
 
     opt[File]('o', "output")
       .action((f, o) => o.copy(output = Some(f)))
+
+
+    opt[Unit]("no-constant-propagation")
+      .action((_, o) => o.copy(withoutConstPropagation = true))
 
     arg[File]("infiles")
       .required().unbounded()
@@ -102,6 +107,7 @@ object Compile {
         pass.ConstantRemoval,
         pass.ExprWeaken,
         pass.ssa.IntoSSA,
+        if(options.withoutConstPropagation) pass.NullPass else pass.ssa.ConstantPropagation,
         pass.ssa.UnusedRegRemoval,
         pass.ssa.FromSSA,
         pass.ArrayDealiasing
@@ -123,9 +129,9 @@ object Compile {
       }.toMap
 
       target = new Amd64Target with Amd64NasmOutput
-      baseInFile = options.infiles.head
-      baseName = baseInFile.getName.split("\\.").head
-      targetFolder = new File(baseInFile.getParentFile, "target")
+      baseFile = options.output getOrElse options.infiles.head
+      baseName = baseFile.getName.split("\\.").head
+      targetFolder = new File(baseFile.getParentFile, "target")
       _ = targetFolder.mkdir()
       asmFile = new File(targetFolder, baseName + ".asm")
       objFile = new File(targetFolder, baseName + ".obj")

@@ -44,6 +44,7 @@ object IrDump extends App {
     pass.ConstantRemoval,
     pass.ExprWeaken,
     pass.ssa.IntoSSA,
+    pass.ssa.ConstantPropagation,
     pass.ssa.UnusedRegRemoval,
     pass.ssa.FromSSA,
     pass.ArrayDealiasing,

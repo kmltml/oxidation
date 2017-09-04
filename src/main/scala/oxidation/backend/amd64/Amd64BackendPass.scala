@@ -122,6 +122,16 @@ object Amd64BackendPass extends Pass {
         Inst.Do(Op.Copy(ir.Val.R(r)))
       )
 
+    case Inst.Move(dest, Op.Binary(InfixOp.Comp(op), l @ (_: ir.Val.I | _: ir.Val.F32 | _: ir.Val.F64), r)) =>
+      val flippedOp = op match {
+        case InfixOp.Eq | InfixOp.Neq => op
+        case InfixOp.Lt => InfixOp.Gt
+        case InfixOp.Gt => InfixOp.Lt
+        case InfixOp.Leq => InfixOp.Geq
+        case InfixOp.Geq => InfixOp.Leq
+      }
+      F.pure(Vector(Inst.Move(dest, Op.Binary(flippedOp, r, l))))
+
     case Inst.Eval(dest, call @ Op.Call(_, params)) =>
       for {
         regParams <- params.take(4).toVector.traverse { v =>
@@ -263,7 +273,7 @@ object Amd64BackendPass extends Pass {
   }
 
   override def onVal = {
-    case v @ ir.Val.I(l, t) if l > Int.MaxValue && l < Int.MinValue =>
+    case v @ ir.Val.I(l, t) if l > Int.MaxValue || l < Int.MinValue =>
       for {
         r <- nextReg(t)
         s <- nextReg(t)
