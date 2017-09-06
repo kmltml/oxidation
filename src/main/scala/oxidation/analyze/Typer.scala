@@ -175,6 +175,15 @@ object Typer {
           } yield t)
       }
 
+    case P.Method(obj, meth, loc) =>
+      solveType(P.App(meth, List(obj), loc), expected, ctxt)
+
+    case P.App(P.Method(target, method, methLoc), params, appLoc) =>
+      solveType(P.App(method, target :: params, appLoc), expected, ctxt)
+
+    case P.TypeApp(P.Method(target, method, methLoc), params, appLoc) =>
+      solveType(P.App(P.TypeApp(method, params, appLoc), List(target), appLoc), expected, ctxt)
+
     case P.App(fn, pars, loc) =>
       solveType(fn, ExpectedType.Appliable, ctxt) andThen {
         case typedFun @ Typed(_, Fun(paramTypes, retType)) =>

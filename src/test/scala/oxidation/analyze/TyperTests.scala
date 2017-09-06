@@ -182,6 +182,26 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with Matc
             ), loc) :: I32)
         }
       }
+      "Method" - {
+        "without args" - {
+          solveType(P.Method(P.Var(l('foo), loc), P.Var(g('bar), loc), loc), ExpectedType.Undefined,
+            Ctxt.default.withTerms(Map(l('foo) -> imm(I32), g('bar) -> imm(Fun(List(I32), U1))))) ==>
+              valid(ast.App(ast.Var(g('bar), loc) :: Fun(List(I32), U1),
+                List(ast.Var(l('foo), loc) :: I32), loc) :: U1)
+        }
+        "with args" - {
+          solveType(P.App(P.Method(P.Var(l('foo), loc), P.Var(g('bar), loc), loc),
+            List(P.IntLit(10, loc)), loc), ExpectedType.Undefined,
+            Ctxt.default.withTerms(Map(l('foo) -> imm(I32), g('bar) -> imm(Fun(List(I32, I64), U1))))) ==>
+              valid(ast.App(ast.Var(g('bar), loc) :: Fun(List(I32, I64), U1),
+                List(ast.Var(l('foo), loc) :: I32, ast.IntLit(10, loc) :: I64), loc) :: U1)
+        }
+        "cast" - {
+          solveType(P.TypeApp(P.Method(P.Var(l('foo), loc), P.Var(g('cast), loc), loc), List(TypeName.Named(g('i16))), loc),
+            ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('foo) -> imm(I32)))) ==>
+              valid(ast.Trim(ast.Var(l('foo), loc) :: I32, loc) :: I16)
+        }
+      }
       "App" - {
         "Fun" - {
           findType(P.App(P.Var(g('foo), loc), List(P.IntLit(32, loc)), loc), ExpectedType.Undefined,

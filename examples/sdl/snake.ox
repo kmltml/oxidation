@@ -30,23 +30,23 @@ def drawTail(tail: ptr[Tail], renderer: ptr[SDL_Renderer]): u0 = {
     val rect = stackalloc[SDL_Rect]
     rect() = SDL_Rect{ x = 0, y = 0, w = 16, h = 16 }
     var i = 0
-    SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0xff, 0xff)
+    renderer..SDL_SetRenderDrawColor(0xff, 0xff, 0xff, 0xff)
     while(i < tail.length()) {
         val p = tail.buffer()((tail.head() - i + tail.bufferSize()) % tail.bufferSize())
         rect.x() = p.x * 16
         rect.y() = p.y * 16
-        SDL_RenderFillRect(renderer, rect)
+        renderer..SDL_RenderFillRect(rect)
         i += 1
     }
 }
 
 def drawFood(food: Point, renderer: ptr[SDL_Renderer]): u0 = {
-    SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0x00, 0xff)
+    renderer..SDL_SetRenderDrawColor(0xff, 0xff, 0x00, 0xff)
     val rect = stackalloc[SDL_Rect]
     rect() = SDL_Rect{ x = 0, y = 0, w = 8, h = 8 }
     rect.x() = food.x * 16 + 4
     rect.y() = food.y * 16 + 4
-    SDL_RenderFillRect(renderer, rect)
+    renderer..SDL_RenderFillRect(rect)
 }
 
 def advance(tail: ptr[Tail], dest: Point): u0 = {
@@ -86,10 +86,31 @@ def occupied(point: Point, tail: ptr[Tail]): u1 = {
     ret
 }
 
+def putchar(c: u8): u0 = extern
+
+def printInt(i: u32): u0 = {
+    val buff = stackalloc[arr[u8, 64]]
+    var x = 0
+    var j = i
+    while(j > 0) {
+        val digit = cast[u8](j % 10)
+        j /= 10
+        buff()(x) = '0' + digit
+        x += 1
+    }
+    if(x == 0) {
+        putchar('0')
+    }
+    while(x > 0) {
+        x -= 1
+        putchar(buff()(x))
+    }
+}
+
 def main(): i32 = {
     SDL_Init(0x20) // SDL_INIT_VIDEO
     val window = SDL_CreateWindow("Rusty Snake!\0".data, 100, 100, 800, 600, 4) // SDL_WINDOW_SHOWN
-    val renderer = SDL_CreateRenderer(window, -1, 6) // SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
+    val renderer = window..SDL_CreateRenderer(-1, 6) // SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
     val event = stackalloc[SDL_Event]
     var running = true
     var dir: Dir = Dir.Stop
@@ -105,7 +126,7 @@ def main(): i32 = {
                 case ^SDL_QUIT => 
                     running = false
                 case ^SDL_KEYDOWN => {
-                    val ke = cast[ptr[SDL_KeyboardEvent]](event)()
+                    val ke = event..cast[ptr[SDL_KeyboardEvent]]()
                     nextDir = match(ke.keySym.scancode) {
                         case 79 => if(dir == Dir.Left) nextDir else Dir.Right
                         case 80 => if(dir == Dir.Right) nextDir else Dir.Left
@@ -117,8 +138,8 @@ def main(): i32 = {
                 case _ => ()
             }
         }
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0xff)
-        SDL_RenderClear(renderer)
+        renderer..SDL_SetRenderDrawColor(0, 0, 0, 0xff)
+        renderer..SDL_RenderClear()
 
         drawTail(tail, renderer)
         drawFood(food, renderer)
@@ -139,11 +160,13 @@ def main(): i32 = {
             timer = 5
         } else timer -= 1
 
-        SDL_RenderPresent(renderer)
+        putchar('f')
+        putchar('\n')
+        renderer..SDL_RenderPresent()
         SDL_Delay(16)
     }
-    SDL_DestroyRenderer(renderer)
-    SDL_DestroyWindow(window)
+    renderer..SDL_DestroyRenderer()
+    window..SDL_DestroyWindow()
     SDL_Quit()
     0
 }
