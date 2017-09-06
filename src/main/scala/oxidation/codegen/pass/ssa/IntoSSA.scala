@@ -37,11 +37,11 @@ object IntoSSA extends Pass {
 
   case class S(nextReg: Int = 0, writtenRegs: Set[Register] = Set.empty)
 
-  def rename[M[_]](register: Register)(implicit M: MonadState[M, S]): M[Register] =
+  def rename[M[_]](register: Register, forceFresh: Boolean = false)(implicit M: MonadState[M, S]): M[Register] =
     for {
-      used <- M.inspect(_.writtenRegs(register))
+      fresh <- M.inspect(_.writtenRegs(register)).map(_ | forceFresh)
       r <-
-        if(used) genReg(register.typ)
+        if(fresh) genReg(register.typ)
         else M.modify(s => s.copy(writtenRegs = s.writtenRegs + register)).as(register)
     } yield r
 
@@ -84,15 +84,25 @@ object IntoSSA extends Pass {
     val MM = implicitly[MonadState[MM, (S, Map[Register, Register])]]
     implicit val slens: Lens[(S, Map[Register, Register]), S] = monocle.function.fields.first
 
-    val frontierBlocks = fronts.collect {
+    val directFrontierBlocks = fronts.collect {
       case (n, set) if set(b.name) => n
     }
 
+    def searchFrontiers(list: List[Name], visited: Set[Name]): Set[Name] = list match {
+      case Nil => visited
+      case n :: rest if visited(n) => searchFrontiers(rest, visited)
+      case n :: rest =>
+        val nsFrontiers = fronts.collect {
+          case (name, set) if set(n) => name
+        }.toList
+        searchFrontiers(nsFrontiers ++: rest, visited + n)
+    }
+    val frontierBlocks = searchFrontiers(directFrontierBlocks.toList, Set.empty)
     val res = for {
       phis <- frontierBlocks.flatMap(defs).toVector.distinct
       .traverse { r =>
         for {
-          renamed <- rename[MM](r)
+          renamed <- rename[MM](r, forceFresh = true)
           _ <- MM.modify(t => t.copy(_2 = t._2 + (r -> renamed)))
         } yield Inst.Move(renamed, Op.Phi(Map(b.name -> r)))
       }
@@ -185,10 +195,11 @@ object IntoSSA extends Pass {
     var ret: Multimap[Name, Name] = Map.empty
     for(b <- graph.blocks.values) {
       val parents = graph.parents(b.name)
+      val idom = doms(b.name)
       if(parents.size >= 2) {
         for(p <- parents) {
           var runner = p
-          while(runner != doms(p)) {
+          while(runner != idom && runner != b.name) {
             ret |+|= Map(runner -> Set(b.name))
             runner = doms(runner)
           }

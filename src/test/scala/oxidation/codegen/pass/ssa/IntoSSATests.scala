@@ -141,6 +141,50 @@ object IntoSSATests extends TestSuite with IrValSyntax with NameSyntax {
           Block(%whileafter 0, Vector.empty, Return(u0))
         )
       }
+      "An if within a while" - {
+        txBlocks(
+          Block(%body 0, Vector(
+            r(0, U1) := u1(true)
+          ), Goto(%whilecond 0)),
+          Block(%whilecond 0, Vector(
+            r(1, U1) := r(0, U1)
+          ), Branch(r(1, U1), %whil 0, %whileafter 0)),
+          Block(%whil 0, Vector(
+            r(2, I32) := Op.Call(Val.G($.foo, Fun(Nil, I32)), Nil),
+            r(3, U1) := Op.Binary(Geq, r(2, I32), i32(0))
+          ), Branch(r(3, U1), %iff 1, %els 1)),
+          Block(%iff 1, Vector(
+            Inst.Do(Op.Call(Val.G($.bar, Fun(Nil, U0)), Nil))
+          ), Goto(%ifafter 1)),
+          Block(%els 1, Vector(
+            r(0, U1) := u1(false)
+          ), Goto(%ifafter 1)),
+          Block(%ifafter 1, Vector.empty, Goto(%whilecond 0)),
+          Block(%whileafter 0, Vector.empty, Return(u0))
+        ) ==> Vector(
+          Block(%body 0, Vector(
+            r(0, U1) := u1(true)
+          ), Goto(%whilecond 0)),
+          Block(%whilecond 0, Vector(
+            ssa(0, U1) := Op.Phi(Map((%body 0) -> r(0, U1), (%ifafter 1) -> ssa(3, U1))),
+            r(1, U1) := ssa(0, U1)
+          ), Branch(r(1, U1), %whil 0, %whileafter 0)),
+          Block(%whil 0, Vector(
+            r(2, I32) := Op.Call(Val.G($.foo, Fun(Nil, I32)), Nil),
+            r(3, U1) := Op.Binary(Geq, r(2, I32), i32(0))
+          ), Branch(r(3, U1), %iff 1, %els 1)),
+          Block(%iff 1, Vector(
+            Inst.Do(Op.Call(Val.G($.bar, Fun(Nil, U0)), Nil))
+          ), Goto(%ifafter 1)),
+          Block(%els 1, Vector(
+            ssa(4, U1) := u1(false)
+          ), Goto(%ifafter 1)),
+          Block(%ifafter 1, Vector(
+            ssa(3, U1) := Op.Phi(Map((%iff 1) -> ssa(0, U1), (%els 1) -> ssa(4, U1)))
+          ), Goto(%whilecond 0)),
+          Block(%whileafter 0, Vector.empty, Return(u0))
+        )
+      }
     }
     "dominators" - {
       implicit def lbl(i: Int): Name = % a i

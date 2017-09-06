@@ -92,7 +92,7 @@ class RegisterSpillPass extends Pass {
         stackParams <- params.drop(4).traverse(r => fill(r))
         fillInsts = stackParams.flatMap(_._1).toVector
         newStackParams = stackParams.map {
-          case (_, ir.Val.R(reg)) => ir.Val.R(reg)
+          case (_, v) => v
         }
       } yield fillInsts :+ Inst.Eval(dest, Op.Call(fn, params.take(4) ++ newStackParams))
 
