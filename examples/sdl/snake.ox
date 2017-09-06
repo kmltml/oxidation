@@ -86,27 +86,6 @@ def occupied(point: Point, tail: ptr[Tail]): u1 = {
     ret
 }
 
-def putchar(c: u8): u0 = extern
-
-def printInt(i: u32): u0 = {
-    val buff = stackalloc[arr[u8, 64]]
-    var x = 0
-    var j = i
-    while(j > 0) {
-        val digit = cast[u8](j % 10)
-        j /= 10
-        buff()(x) = '0' + digit
-        x += 1
-    }
-    if(x == 0) {
-        putchar('0')
-    }
-    while(x > 0) {
-        x -= 1
-        putchar(buff()(x))
-    }
-}
-
 def main(): i32 = {
     SDL_Init(0x20) // SDL_INIT_VIDEO
     val window = SDL_CreateWindow("Rusty Snake!\0".data, 100, 100, 800, 600, 4) // SDL_WINDOW_SHOWN
@@ -159,9 +138,7 @@ def main(): i32 = {
             advance(tail, dest)
             timer = 5
         } else timer -= 1
-
-        putchar('f')
-        putchar('\n')
+        
         renderer..SDL_RenderPresent()
         SDL_Delay(16)
     }
