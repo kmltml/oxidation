@@ -603,6 +603,13 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
         }
       }
       "Assign" - {
+        "global variable" - {
+          compileExpr(ast.Assign(ast.Var(g('x), loc) :: I32, None, ast.IntLit(20, loc) :: I32, loc) :: U0)
+            .run.runA(CodegenState()).value ==>
+            (insts(
+              Inst.Do(Op.Store(Val.GlobalAddr(Name.Global(List("x"))), i64(0), i32(20)))
+            ), u0)
+        }
         "variable" - {
           compileExpr(ast.Assign(ast.Var(l('x), loc) :: I32, None, ast.IntLit(20, loc) :: I32, loc) :: U0)
             .run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.I32)), nextReg = 1)).value ==>
@@ -624,10 +631,12 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
             StructMember("y", I32)
           )
           val r0 = r(0, _.Struct(Vector(ir.Type.I64, ir.Type.I32)))
+          val r1 = r(1, _.Struct(Vector(ir.Type.I64, ir.Type.I32)))
           compileExpr(ast.Assign(ast.Select(ast.Var(l('x), loc) :: struct, "x", loc) :: I64, None, ast.IntLit(20, loc) :: I64, loc) :: U0)
             .run.runA(CodegenState(registerBindings = Map(l('x) -> r0), nextReg = 1)).value ==>
             (insts(
-              Inst.Move(r0, Op.StructCopy(r0, Map(0 -> Val.I(20, ir.Type.I64))))
+              Inst.Move(r1, Op.StructCopy(r0, Map(0 -> Val.I(20, ir.Type.I64)))),
+              Inst.Move(r0, Op.Copy(r1))
             ), u0)
         }
         "arr ptr" - {
@@ -773,14 +782,20 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
         "trivial" - {
           "int" - {
             compileDef(ast.ValDef(g('foo), None, ast.IntLit(42, loc) :: I32)) ==>
-              Def.TrivialVal(Name.Global(List("foo")), Val.I(42, ir.Type.I32))
+              Def.TrivialVal(Name.Global(List("foo")), Val.I(42, ir.Type.I32), Def.Immutable)
           }
           "struct" - {
             val struct = Struct(g('foo), StructMember("a", I64))
             compileDef(ast.ValDef(g('foo), None, ast.StructLit(g('foo), List("a" -> (ast.IntLit(20, loc) :: I64)), loc) :: struct)) ==>
-              Def.TrivialVal(Name.Global(List("foo")), Val.Struct(Vector(Val.I(20, ir.Type.I64))))
+              Def.TrivialVal(Name.Global(List("foo")), Val.Struct(Vector(Val.I(20, ir.Type.I64))), Def.Immutable)
 
           }
+        }
+      }
+      "VarDef" - {
+        "trivial" - {
+          compileDef(ast.VarDef(g('foo), None, ast.IntLit(42, loc) :: I32)) ==>
+            Def.TrivialVal(Name.Global(List("foo")), i32(42), Def.Mutable)
         }
       }
     }

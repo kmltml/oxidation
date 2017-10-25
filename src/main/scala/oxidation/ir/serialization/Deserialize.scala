@@ -29,7 +29,7 @@ class Deserialize(val in: DataInputStream) {
     case Tag.Def.ExternFun =>
       Def.ExternFun(readName(), readSeq(readType).toList, readType())
     case Tag.Def.TrivialVal =>
-      Def.TrivialVal(readName(), readVal())
+      Def.TrivialVal(readName(), readVal(), if(readBoolean()) Def.Mutable else Def.Immutable)
     case Tag.Def.ComputedVal =>
       Def.ComputedVal(readName(), readSeq(readBlock).toVector, readType(), readSeq(readConstantPoolEntry).toSet)
   }

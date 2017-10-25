@@ -2,6 +2,8 @@ module basic
 
 val GlobalInt: i32 = 42
 
+var GlobalVar: i32 = 0
+
 val NonTrivialInt: i32 = {
     var i = 0
     var s = 0
@@ -41,6 +43,14 @@ def tests() = {
     assert(sum(1, 2, 3, 4, 5, 6) == 21, "Function taking more than four integer arguments")
 
     assert(NonTrivialInt == 55, "Non-trivial global val")
+
+    assert({
+        val res1 = GlobalVar == 0
+        GlobalVar = 10
+        val res2 = GlobalVar == 10
+        GlobalVar = 0
+        res1 && res2
+    }, "Global variable access")
 
     assert({
         val s = "Hello\0"

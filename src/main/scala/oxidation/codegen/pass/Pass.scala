@@ -104,8 +104,8 @@ trait Pass {
         val newBody = body.traverse(txBlock).map(_.flatten)
         newBody.map(body => ir.Def.ComputedVal(name, body, typ, constantPool))
       case efun: ir.Def.ExternFun => F.pure(efun)
-      case ir.Def.TrivialVal(n, v) => txVal(v).map {
-        case (Vector(), v) => ir.Def.TrivialVal(n, v)
+      case ir.Def.TrivialVal(n, v, m) => txVal(v).map {
+        case (Vector(), v) => ir.Def.TrivialVal(n, v, m)
 
         //TODO maybe some constant search should be done below?
         case (is, v) => ir.Def.ComputedVal(n, Vector(

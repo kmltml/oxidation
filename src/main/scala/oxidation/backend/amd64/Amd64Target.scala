@@ -246,7 +246,7 @@ class Amd64Target { this: Output =>
   }
 
   def outputValDef(d: ir.Def)(implicit constants: Map[ir.ConstantPoolEntry, Name]): M = d match {
-    case ir.Def.TrivialVal(n, v) => v match {
+    case ir.Def.TrivialVal(n, v, _) => v match {
       case ir.Val.I(i, t: ir.Type.Num) =>
         t.size match {
           case 1 => db(n, i.toByte)

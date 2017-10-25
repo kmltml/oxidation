@@ -27,7 +27,7 @@ object ConstantInlining extends Pass {
     case inst @ Inst.Move(dest, Op.Load(Val.GlobalAddr(name), Val.I(0, Type.I64))) =>
       F.reader { defsByName =>
         Vector(defsByName.get(name).collect {
-          case Def.TrivialVal(_, v) => Inst.Move(dest, Op.Copy(v))
+          case Def.TrivialVal(_, v, Def.Immutable) => Inst.Move(dest, Op.Copy(v))
         }.getOrElse(inst))
       }
   }

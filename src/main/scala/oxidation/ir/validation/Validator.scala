@@ -27,7 +27,7 @@ object Validator {
       }.toSet).toMap
       blocks.traverse_(validateBlock(name, _, written, Set.empty, graph))
     case Def.ExternFun(_, _, _) => Right(())
-    case Def.TrivialVal(n, v) => valType(Location(n, n, 0), v).value.runEmptyA.value as ()
+    case Def.TrivialVal(n, v, _) => valType(Location(n, n, 0), v).value.runEmptyA.value as ()
   }
 
   def validateBlock(defName: Name, block: Block, writes: Map[Name, Set[Register]], params: Set[Register], graph: FlowGraph): Either[ValidationError, Unit] = {

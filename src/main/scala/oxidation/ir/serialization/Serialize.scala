@@ -38,10 +38,14 @@ class Serialize(val out: DataOutputStream) {
       writeName(name)
       writeSeq(params)(writeType)
       writeType(ret)
-    case Def.TrivialVal(name, v) =>
+    case Def.TrivialVal(name, v, mutability) =>
       writeTag(Tag.Def.TrivialVal)
       writeName(name)
       writeVal(v)
+      writeBoolean(mutability match {
+        case Def.Mutable => true
+        case Def.Immutable => false
+      })
     case Def.ComputedVal(name, body, typ, constantPool) =>
       writeTag(Tag.Def.ComputedVal)
       writeName(name)

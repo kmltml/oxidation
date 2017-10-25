@@ -30,7 +30,7 @@ object ValInterpretPass extends IdPass {
     case d @ Def.ComputedVal(name, body, typ, _) =>
       try {
         val value = toVal(Interpreter.interpret(body), typ)
-        Vector(Def.TrivialVal(name, value))
+        Vector(Def.TrivialVal(name, value, Def.Immutable))
       } catch {
         case NonFatal(_) => Vector(d)
       }
