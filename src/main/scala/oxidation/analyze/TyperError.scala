@@ -22,5 +22,7 @@ object TyperError {
   final case class AlternativePatternBindingsMismatch(leftBindings: Set[(Symbol, Ctxt.Term)], rightBindings: Set[(Symbol, Ctxt.Term)], loc: Span) extends TyperError
   final case class NoVariantSpecified(loc: Span) extends TyperError
   final case class VariantNotFound(enum: Type.Enum, name: Symbol, loc: Span) extends TyperError
+  final case class DoesNotAcceptParams(typ: Type, loc: Span) extends TyperError
+  final case class WrongNumberOfTypeParams(typ: Type, supplied: Int, loc: Span) extends TyperError
 
 }

@@ -99,14 +99,15 @@ object SymbolResolver {
     case parse.ast.Var(Symbol.Unresolved(n :: Nil), loc) =>
       getOnlyOneSymbol(n, scope.terms).map(parse.ast.Var(_, loc))
 
-    case parse.ast.StructLit(Symbol.Unresolved(name), members, loc) =>
+    case parse.ast.StructLit(Symbol.Unresolved(name), typeParams, members, loc) =>
       val solvedType = name match {
         case n :: Nil => getOnlyOneSymbol(n, scope.types |+| scope.terms)
         case p => getPathSymbol(name, global.types |+| global.terms, scope, global)
       }
-      (solvedType, members.traverse {
+      val solvedParams = Nested(typeParams).traverse(solveType(_, scope, global)).map(_.value)
+      (solvedType, solvedParams, members.traverse {
         case (n, e) => solveExpr(e, scope, global).map(n -> _)
-      }).map2(parse.ast.StructLit(_, _, loc))
+      }).map3(parse.ast.StructLit(_, _, _, loc))
 
     case parse.ast.InfixAp(op, left, right, loc) =>
       (solveExpr(left, scope, global), solveExpr(right, scope, global))

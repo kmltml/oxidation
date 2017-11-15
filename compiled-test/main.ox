@@ -10,5 +10,6 @@ def main(): i32 = {
     patmat.tests()
     enums.tests()
     fun.tests()
+    generics.tests()
     0
 }

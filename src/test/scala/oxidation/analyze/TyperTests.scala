@@ -44,15 +44,34 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with Matc
         solveType(P.CharLit('a', loc), ExpectedType.Undefined, Ctxt.default) ==> valid(ast.CharLit('a', loc) :: U8)
       }
       "struct literals" - {
-        val Vec2 = Struct(g('Vec2),
-          StructMember("x", I32), StructMember("y", I64)
-        )
-        solveType(P.StructLit(g('Vec2), List(
-          "x" -> P.IntLit(10, loc), "y" -> P.IntLit(20, loc)
-        ), loc), ExpectedType.Undefined, Ctxt.default.withTypes(Map(g('Vec2) -> Vec2))) ==>
-          valid(ast.StructLit(g('Vec2), List(
-            "x" -> (ast.IntLit(10, loc) :: I32), "y" -> (ast.IntLit(20, loc) :: I64)
-          ), loc) :: Vec2)
+        "monomorphic" - {
+          val Vec2 = Struct(g('Vec2),
+            StructMember("x", I32), StructMember("y", I64)
+          )
+          solveType(P.StructLit(g('Vec2), None, List(
+            "x" -> P.IntLit(10, loc), "y" -> P.IntLit(20, loc)
+          ), loc), ExpectedType.Undefined, Ctxt.default.withTypes(Map(g('Vec2) -> Vec2))) ==>
+            valid(ast.StructLit(g('Vec2), None, List(
+              "x" -> (ast.IntLit(10, loc) :: I32), "y" -> (ast.IntLit(20, loc) :: I64)
+            ), loc) :: Vec2)
+        }
+        "explicit polymorphic" - {
+          val Pair = TypeLambda(g('Pair), 1, {
+            case List(a) => Struct(Symbol.Specialized(List(a.symbol), g('Pair)),
+              StructMember("fst", a),
+              StructMember("snd", a)
+            )
+          })
+          solveType(P.StructLit(g('Pair), Some(List(TypeName.Named(g('i64)))), List(
+            "fst" -> P.IntLit(10, loc), "snd" -> P.IntLit(20, loc)
+          ), loc), ExpectedType.Undefined, Ctxt.default.withTypes(Map(g('Pair) -> Pair))) ==>
+            valid(ast.StructLit(Symbol.Specialized(List(g('i64)), g('Pair)), None, List(
+              "fst" -> (ast.IntLit(10, loc) :: I64),
+              "snd" -> (ast.IntLit(20, loc) :: I64)
+            ), loc) :: Type.Struct(Symbol.Specialized(List(g('i64)), g('Pair)),
+              StructMember("fst", I64),
+              StructMember("snd", I64)))
+        }
       }
       "enum literals" - {
         val some = EnumVariant(g('option, 'some), List(
@@ -69,7 +88,7 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with Matc
             valid(ast.EnumLit("none", Nil, loc) :: option)
         }
         "StructLit" - {
-          solveType(P.StructLit(g('option, 'some), List(
+          solveType(P.StructLit(g('option, 'some), None, List(
             "value" -> P.IntLit(20, loc)
           ), loc), ExpectedType.Value, ctxt) ==>
             valid(ast.EnumLit("some", List(

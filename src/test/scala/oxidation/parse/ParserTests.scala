@@ -12,6 +12,7 @@ object ParserTests extends TestSuite with MatchCaseSyntax {
   }
 
   implicit def unresolvedSymbol(n: String): Symbol = Symbol.Unresolved(List(n))
+  def u(ns: scala.Symbol*): Symbol = Symbol.Unresolved(ns.map(_.name).toList)
 
   implicit def span(s: (Int, Int)): Span = Span(None, s._1, s._2)
 
@@ -62,20 +63,30 @@ object ParserTests extends TestSuite with MatchCaseSyntax {
             |  x = 10
             |  y = 20
             |}
-          """.stripMargin.normalize).get.value ==> StructLit("Vector", List(
+          """.stripMargin.normalize).get.value ==> StructLit(u('Vector), None, List(
             "x" -> IntLit(10, 15 +> 2),
             "y" -> IntLit(20, 24 +> 2)
           ), 0 +> 28)
         expr.parse(
-          "Vector { x = 10, y = 20 }").get.value ==> StructLit("Vector", List(
+          "Vector { x = 10, y = 20 }").get.value ==> StructLit(u('Vector), None, List(
             "x" -> IntLit(10, 13 +> 2),
             "y" -> IntLit(20, 21 +> 2)
           ), 0 +> 25)
         "with path name" - {
           expr.parse("Option.Some { value = 10 }").get.value ==>
-            StructLit(Symbol.Unresolved(List("Option", "Some")), List(
+            StructLit(u('Option, 'Some), None, List(
               "value" -> IntLit(10, 22 +> 2)
             ), 0 +> 26)
+        }
+        "with type params" - {
+          expr.parse("Pair[i32, u1] { _1 = 10, _2 = false }").get.value ==>
+            StructLit(u('Pair),
+              Some(List(TypeName.Named(u('i32)),
+                TypeName.Named(u('u1)))),
+              List(
+                "_1" -> IntLit(10, 21 +> 2),
+                "_2" -> BoolLit(false, 30 +> 5)
+              ), 0 +> 37)
         }
       }
       "unit literal" - {

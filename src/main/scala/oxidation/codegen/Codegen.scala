@@ -43,7 +43,7 @@ object Codegen {
       }
       Res.pure(Val.I(i, translateType(typ)))
     case Typed(ast.CharLit(c, _), typ) => Res.pure(Val.I(c.toInt, translateType(typ)))
-    case Typed(ast.StructLit(_, members, _), analyze.Type.Struct(_, memberTypes)) =>
+    case Typed(ast.StructLit(_, None, members, _), analyze.Type.Struct(_, memberTypes)) =>
       for {
         memberVals <- members.toVector.traverse {
           case (name, value) => for {

@@ -141,12 +141,16 @@ trait AstPrettyprint {
       case c => c.toString
     } + "\"" + show"{$loc}"
 
-    case ast.StructLit(name, members, loc) =>
+    case ast.StructLit(name, params, members, loc) =>
       val memberpp = members.map {
         case (name, exp) => s"($name, ".nl + (prettyprintTypedExp(exp) + ")").indent
       }.sep(",".nl)
+      val paramspp = params match {
+        case None => "".p
+        case Some(ps) => "TypeParams(".p + ps.map(prettyprintTypeName).mkString(", ") + ")".nl
+      }
       show"StructLit{$loc}$typeInfo(".p + prettyprintSymbol(name) + ",".nl +
-        ("Members(".nl + memberpp.indent + "))").indent
+        (paramspp + "Members(".nl + memberpp.indent + "))").indent
 
     case ast.EnumLit(name, members, loc) =>
       val memberpp = members.map {

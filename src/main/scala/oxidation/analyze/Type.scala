@@ -1,7 +1,11 @@
 package oxidation
 package analyze
 
-sealed trait Type
+sealed trait Type {
+
+  def symbol: Symbol
+
+}
 
 object Type {
 
@@ -11,7 +15,9 @@ object Type {
 
   sealed trait Integral extends Num
 
-  sealed abstract class I(val bits: Int) extends Integral
+  sealed abstract class I(val bits: Int) extends Integral {
+    def symbol = Symbol.Global(s"i$bits" :: Nil)
+  }
   object I {
     def unapply(arg: I): Option[Int] = Some(arg.bits)
   }
@@ -21,7 +27,9 @@ object Type {
   case object I32 extends I(32)
   case object I64 extends I(64)
 
-  sealed abstract class U(val bits: Int) extends Integral
+  sealed abstract class U(val bits: Int) extends Integral {
+    def symbol = Symbol.Global(s"u$bits" :: Nil)
+  }
   object U {
     def unapply(arg: U): Option[Int] = Some(arg.bits)
   }
@@ -31,7 +39,9 @@ object Type {
   case object U32 extends U(32)
   case object U64 extends U(64)
 
-  sealed abstract class F(val bits: Int) extends Num
+  sealed abstract class F(val bits: Int) extends Num {
+    def symbol = Symbol.Global(s"f$bits" :: Nil)
+  }
   object F {
     def unapply(arg: F): Option[Int] = Some(arg.bits)
   }
@@ -39,24 +49,36 @@ object Type {
   case object F32 extends F(32)
   case object F64 extends F(64)
 
-  case object U1 extends ValueType
-  case object U0 extends ValueType
+  case object U1 extends ValueType {
+    def symbol = Symbol.Global("u1" :: Nil)
+  }
+  case object U0 extends ValueType {
+    def symbol = Symbol.Global("u0" :: Nil)
+  }
 
-  final case class Ptr(pointee: Type) extends ValueType
+  final case class Ptr(pointee: Type) extends ValueType {
+    def symbol = Symbol.Specialized(List(pointee.symbol), Symbol.Global("ptr" :: Nil))
+  }
 
-  final case class Arr(member: Type, size: Int) extends ValueType
+  final case class Arr(member: Type, size: Int) extends ValueType {
+    def symbol = Symbol.Specialized(List(member.symbol, Symbol.Global(size.toString :: Nil)), Symbol.Global("arr" :: Nil))
+  }
 
   final case class Fun(params: List[Type], ret: Type) extends Type {
 
     def ptr: FunPtr = FunPtr(params, ret)
+    def symbol = Symbol.Specialized(params.map(_.symbol) :+ ret.symbol, Symbol.Global("fun" :: Nil))
 
   }
 
-  final case class FunPtr(params: List[Type], ret: Type) extends ValueType
+  final case class FunPtr(params: List[Type], ret: Type) extends ValueType {
+    def symbol = Symbol.Specialized(params.map(_.symbol) :+ ret.symbol, Symbol.Global("funptr" :: Nil))
+  }
 
   final class Struct(val name: Symbol, membersF: Struct => List[StructMember]) extends ValueType {
 
     val members = membersF(this)
+    def symbol = name
 
     def indexOf(memberName: String): Int =
       members.indexWhere(_.name == memberName)
@@ -85,6 +107,7 @@ object Type {
   final class Enum(val name: Symbol, variantsF: Enum => List[EnumVariant]) extends ValueType {
 
     val variants = variantsF(this)
+    def symbol = name
 
     override def equals(obj: Any): Boolean = obj match {
       case e: Enum => (this eq e) || (e.name == name)
@@ -105,8 +128,16 @@ object Type {
 
   }
 
-  final case class EnumVariant(name: Symbol, members: List[StructMember])
+  final case class EnumVariant(name: Symbol, members: List[StructMember]) {
+    def symbol = name
+  }
 
-  final case class EnumConstructor(enumType: Enum, variant: EnumVariant) extends Type
+  final case class EnumConstructor(enumType: Enum, variant: EnumVariant) extends Type {
+    def symbol = variant.name
+  }
+
+  final case class TypeLambda(name: Symbol, paramCount: Int, apply: List[Type] => Type) extends Type {
+    def symbol = name
+  }
 
 }

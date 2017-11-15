@@ -73,7 +73,7 @@ object Typer {
         _ <- Either.cond(pt.isInstanceOf[Type.F], (), NonEmptyList.of(TyperError.CantMatch(ExpectedType.Specific(Type.F64), pt, param.loc)))
       } yield Typed(ast.App(Typed(ast.Var(sqrt, sqrtloc), Type.Fun(List(pt), pt)), List(typedParam), loc), pt))
 
-    case P.StructLit(name, members, loc) =>
+    case P.StructLit(name, typeParams, members, loc) =>
       def solveMembers(expectedType: String => ExpectedType): TyperResult[List[(String, Typed[ast.Expression])]] =
         members.traverse {
           case (name, expr) =>
@@ -83,17 +83,34 @@ object Typer {
       def checkMemberSet(expected: Set[String], found: Set[String]): TyperResult[Unit] =
         if(expected == found) valid(()) else invalidNel(TyperError.WrongStructMembers(expected, found, loc))
 
-      ctxt.types.get(name).map {
+      def solveStruct(typ: Type): TyperResult[Typed[ast.Expression]] = typ match {
         case struct: Type.Struct =>
           val correctMemberSet = checkMemberSet(members.map(_._1).toSet, struct.members.map(_.name).toSet)
-
           val expectedTypeFun = struct.members.map(m => m.name -> m.typ).toMap
             .andThen(ExpectedType.Specific)
             .lift.andThen(_ getOrElse ExpectedType.Undefined)
 
           correctMemberSet *>
-            solveMembers(expectedTypeFun).map(typedMembers => Typed(ast.StructLit(name, typedMembers, loc), struct))
+            solveMembers(expectedTypeFun).map(typedMembers => Typed(ast.StructLit(struct.symbol, None, typedMembers, loc), struct))
         case t => invalidNel(TyperError.NotAStruct(t, loc))
+      }
+
+      ctxt.types.get(name).map {
+        case struct: Type.Struct =>
+          val noParams = typeParams match {
+            case None => valid(())
+            case Some(_) => invalidNel(TyperError.DoesNotAcceptParams(struct, loc): TyperError)
+          }
+          noParams *> solveStruct(struct)
+
+        case cons: Type.TypeLambda =>
+          typeParams.toValidNel(TyperError.NotAStruct(cons, loc)).andThen { tps =>
+            val paramCountMatch =
+              if(tps.size == cons.paramCount) valid(())
+              else invalidNel(TyperError.WrongNumberOfTypeParams(cons, tps.size, loc))
+              paramCountMatch.andThen(_ => solveStruct(cons.apply(tps.map(lookupType(_, ctxt)))))
+          }          
+        
       }.getOrElse {
         ctxt.terms(name).typ match {
           case Type.EnumConstructor(enum, variant) =>
@@ -501,6 +518,9 @@ object Typer {
       Type.Arr(lookupType(member, ctxt), size.toInt)
     case TypeName.App(TypeName.Named(Symbol.Global(List("funptr"))), List(TypeName.Fun(params, ret))) =>
       Type.FunPtr(params.map(lookupType(_, ctxt)), lookupType(ret, ctxt))
+    case TypeName.App(l, ps) => lookupType(l, ctxt) match {
+      case Type.TypeLambda(_, _, apply) => apply(ps.map(lookupType(_, ctxt)))
+    }
     case TypeName.Named(s) => ctxt.types(s)
   }
 

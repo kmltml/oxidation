@@ -47,6 +47,14 @@ object TypeInterpreter {
             _ <- solved(d.name, s)
           } yield s
 
+        case untyped.StructDef(name, Some(params), members) =>
+          val t = Type.TypeLambda(name, params.size, ps => {
+            val substs = (params.map(Symbol.Local(_): Symbol) zip ps).toMap
+            solveTypeDef(untyped.StructDef(Symbol.Specialized(ps.map(_.symbol), name), None, members), defs)
+              .run(ctxt.withTypes(substs)).toOption.get._2
+          })
+          solved(name, t) as t
+
         case untyped.EnumDef(_, None, variants) =>
           case class Err(err: AnalysisError) extends Throwable
 

@@ -20,6 +20,9 @@ object Symbol {
     def name: String = path.last
   }
   final case class Local(name: String) extends Symbol
+  final case class Specialized(params: List[Symbol], underlying: Symbol) extends Symbol {
+    def name = underlying.name ++ "?a" ++ params.mkString("?a")
+  }
 
   implicit val show: Show[Symbol] = {
     case Unresolved(path) => s"?${path mkString ","}"

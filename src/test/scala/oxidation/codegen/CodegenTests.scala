@@ -45,7 +45,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
           (insts(), Val.I(97, ir.Type.U8))
       }
       "StructLit" - {
-        compileExpr(ast.StructLit(g('str), List(
+        compileExpr(ast.StructLit(g('str), None, List(
           "data" -> (ast.Var(l('x), loc) :: Ptr(U8)),
           "length" -> (ast.IntLit(10, loc) :: U32)
         ), loc) :: BuiltinSymbols.StrType).run.runA(CodegenState(registerBindings = Map(l('x) -> r(0, _.Ptr)), nextReg = 1)).value ==>
@@ -786,7 +786,7 @@ object CodegenTests extends TestSuite with TypedSyntax with SymbolSyntax with Ir
           }
           "struct" - {
             val struct = Struct(g('foo), StructMember("a", I64))
-            compileDef(ast.ValDef(g('foo), None, ast.StructLit(g('foo), List("a" -> (ast.IntLit(20, loc) :: I64)), loc) :: struct)) ==>
+            compileDef(ast.ValDef(g('foo), None, ast.StructLit(g('foo), None, List("a" -> (ast.IntLit(20, loc) :: I64)), loc) :: struct)) ==>
               Def.TrivialVal(Name.Global(List("foo")), Val.Struct(Vector(Val.I(20, ir.Type.I64))), Def.Immutable)
 
           }

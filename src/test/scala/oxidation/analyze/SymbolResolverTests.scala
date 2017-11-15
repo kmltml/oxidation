@@ -123,12 +123,12 @@ object SymbolResolverTests extends TestSuite with SymbolSyntax with MatchCaseSyn
         "StructLit" - {
           resolveSymbols(Vector(
             importAB_,
-            ValDef(u('a), None, StructLit(u('Vec2), List(
+            ValDef(u('a), None, StructLit(u('Vec2), None, List(
               "x" -> Var(u('foo), loc), "y" -> Var(u('bar), loc)
             ), loc))
           ), scope.withTypes(g('a, 'b, 'Vec2))) ==> Right(Vector(
             importAB_,
-            ValDef(g('a), None, StructLit(g('a, 'b, 'Vec2), List(
+            ValDef(g('a), None, StructLit(g('a, 'b, 'Vec2), None, List(
               "x" -> Var(foo, loc), "y" -> Var(bar, loc)
             ), loc))
           ))

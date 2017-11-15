@@ -65,7 +65,7 @@ trait Ast {
     def pattern = Pattern.CharLit(value, loc)
   }
   final case class StringLit(value: String, loc: Span) extends Expression
-  final case class StructLit(name: Symbol, members: List[(String, Typed[Expression])], loc: Span) extends Expression
+  final case class StructLit(name: Symbol, typeParams: Option[List[TypeName]], members: List[(String, Typed[Expression])], loc: Span) extends Expression
   final case class EnumLit(variantName: String, members: List[(String, Typed[Expression])], loc: Span) extends Expression
   final case class UnitLit(loc: Span) extends Expression
   final case class InfixAp(operator: InfixOp, left: Typed[Expression], right: Typed[Expression], loc: Span) extends Expression
@@ -195,7 +195,7 @@ trait Ast {
         }
         traverse(m)(f) ++ c.foldMap { case MatchCase(p, _, e) => traversePattern(p) ++ traverse(m)(f)}
       case Assign(l, _, r, _) => traverse(l)(f) ++ traverse(r)(f)
-      case StructLit(_, members, _) => members.map(_._2).foldMap(traverse(_)(f))
+      case StructLit(_, _, members, _) => members.map(_._2).foldMap(traverse(_)(f))
       case EnumLit(_, members, _) => members.map(_._2).foldMap(traverse(_)(f))
 
       case DefDef(_, _, _, b) => traverse(b)(f)
