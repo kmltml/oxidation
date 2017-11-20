@@ -27,33 +27,31 @@ object TypeInterpreter {
             t <- findType(body, defs)
             _ <- solved(d.name, t)
           } yield t
-        case untyped.StructDef(_, None, members) =>
+        case untyped.StructDef(name, params, members) =>
 
           case class Err(err: AnalysisError) extends Throwable
+
+          val paramBinds = params.orEmpty.map(n => Symbol.Local(n) -> Type.Var(n)).toMap
 
           val struct = Try(Type.Struct(d.name) { self =>
             val m: S[List[Type.StructMember]] = members.traverse {
               case StructMemberDef(name, tpe) => findType(tpe, defs).map(Type.StructMember(name, _))
             }
-            m.runA(ctxt.withTypes(Map(d.name -> self))) match {
+            m.runA(ctxt.withTypes(Map(d.name -> self) ++ paramBinds)) match {
               case Left(err) => throw Err(err)
               case Right(l) => l
             }
           }).toEither.left.map {
             case Err(e) => e
-          }
+          }          
           for {
             s <- StateT.lift(struct)
-            _ <- solved(d.name, s)
-          } yield s
-
-        case untyped.StructDef(name, Some(params), members) =>
-          val t = Type.TypeLambda(name, params.size, ps => {
-            val substs = (params.map(Symbol.Local(_): Symbol) zip ps).toMap
-            solveTypeDef(untyped.StructDef(Symbol.Specialized(ps.map(_.symbol), name), None, members), defs)
-              .run(ctxt.withTypes(substs)).toOption.get._2
-          })
-          solved(name, t) as t
+            t = params match {
+              case None => s
+              case Some(ps) => Type.TypeLambda(name, ps, s)
+            }
+            _ <- solved(d.name, t)
+          } yield t
 
         case untyped.EnumDef(_, None, variants) =>
           case class Err(err: AnalysisError) extends Throwable

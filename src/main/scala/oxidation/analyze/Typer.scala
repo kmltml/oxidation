@@ -106,7 +106,7 @@ object Typer {
         case cons: Type.TypeLambda =>
           typeParams.toValidNel(TyperError.NotAStruct(cons, loc)).andThen { tps =>
             val paramCountMatch =
-              if(tps.size == cons.paramCount) valid(())
+              if(tps.size == cons.paramNames.size) valid(())
               else invalidNel(TyperError.WrongNumberOfTypeParams(cons, tps.size, loc))
               paramCountMatch.andThen(_ => solveStruct(cons.apply(tps.map(lookupType(_, ctxt)))))
           }          
@@ -519,7 +519,7 @@ object Typer {
     case TypeName.App(TypeName.Named(Symbol.Global(List("funptr"))), List(TypeName.Fun(params, ret))) =>
       Type.FunPtr(params.map(lookupType(_, ctxt)), lookupType(ret, ctxt))
     case TypeName.App(l, ps) => lookupType(l, ctxt) match {
-      case Type.TypeLambda(_, _, apply) => apply(ps.map(lookupType(_, ctxt)))
+      case cons: Type.TypeLambda => cons.apply(ps.map(lookupType(_, ctxt)))
     }
     case TypeName.Named(s) => ctxt.types(s)
   }

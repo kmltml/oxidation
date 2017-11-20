@@ -3,11 +3,41 @@ package analyze
 
 sealed trait Type {
 
+  import Type._
+
   def symbol: Symbol
+
+  def subst(s: Map[String, Type]): Type = this match {
+    case Var(n) => s.get(n) match {
+      case None => Var(n)
+      case Some(t) => t
+    }
+    case (_: Num | U1 | U0) => this
+    case Ptr(pointee) => Ptr(pointee.subst(s))
+    case Arr(member, size) => Arr(member.subst(s), size)
+    case Fun(params, ret) => Fun(params.map(_.subst(s)), ret.subst(s))
+    case FunPtr(params, ret) => FunPtr(params.map(_.subst(s)), ret.subst(s))
+    case Struct(name, members) => Struct(name, members.map(_.subst(s)): _*) // TODO handle recursive struct definitions somehow
+    case Enum(name, variants) => Enum(name, variants.map(_.subst(s)))
+    case EnumConstructor(enum, variant) => ???
+    case TypeLambda(name, paramNames, body) =>
+      body.subst(s -- paramNames)
+  }
+
+  def rename(s: Symbol): Type = this match {
+    case Struct(_, ms) => Struct(s, ms:_*)
+    case TypeLambda(_, ps, b) => TypeLambda(s, ps, b)
+    case Enum(_, vs) => Enum(s, vs) // TODO rename the variants too?
+    case _ => this // TODO is it safe?
+  }
 
 }
 
 object Type {
+
+  final case class Var(name: String) extends Type {
+    def symbol = Symbol.Local(name)
+  }
 
   sealed trait ValueType extends Type
 
@@ -102,7 +132,12 @@ object Type {
 
   }
 
-  final case class StructMember(name: String, typ: Type)
+  final case class StructMember(name: String, typ: Type) {
+
+    def subst(s: Map[String, Type]): StructMember =
+      StructMember(name, typ.subst(s))
+
+  }
 
   final class Enum(val name: Symbol, variantsF: Enum => List[EnumVariant]) extends ValueType {
 
@@ -130,14 +165,20 @@ object Type {
 
   final case class EnumVariant(name: Symbol, members: List[StructMember]) {
     def symbol = name
+
+    def subst(s: Map[String, Type]): EnumVariant =
+      EnumVariant(name, members.map(_.subst(s)))
   }
 
   final case class EnumConstructor(enumType: Enum, variant: EnumVariant) extends Type {
     def symbol = variant.name
   }
 
-  final case class TypeLambda(name: Symbol, paramCount: Int, apply: List[Type] => Type) extends Type {
+  final case class TypeLambda(name: Symbol, paramNames: List[String], body: Type) extends Type {
     def symbol = name
+    def apply(params: List[Type]): Type =
+      body.subst((paramNames zip params).toMap)
+        .rename(Symbol.Specialized(params.map(_.symbol), name))
   }
 
 }

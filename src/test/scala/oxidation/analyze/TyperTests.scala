@@ -56,12 +56,10 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with Matc
             ), loc) :: Vec2)
         }
         "explicit polymorphic" - {
-          val Pair = TypeLambda(g('Pair), 1, {
-            case List(a) => Struct(Symbol.Specialized(List(a.symbol), g('Pair)),
-              StructMember("fst", a),
-              StructMember("snd", a)
-            )
-          })
+          val Pair = TypeLambda(g('Pair), List("a"), Struct(g('Pair),
+              StructMember("fst", Type.Var("a")),
+              StructMember("snd", Type.Var("a"))
+            ))
           solveType(P.StructLit(g('Pair), Some(List(TypeName.Named(g('i64)))), List(
             "fst" -> P.IntLit(10, loc), "snd" -> P.IntLit(20, loc)
           ), loc), ExpectedType.Undefined, Ctxt.default.withTypes(Map(g('Pair) -> Pair))) ==>
