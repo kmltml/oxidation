@@ -55,21 +55,32 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with Matc
               "x" -> (ast.IntLit(10, loc) :: I32), "y" -> (ast.IntLit(20, loc) :: I64)
             ), loc) :: Vec2)
         }
-        "explicit polymorphic" - {
+        "polymorphic" - {
           val Pair = TypeLambda(g('Pair), List("a"), Struct(g('Pair),
-              StructMember("fst", Type.Var("a")),
-              StructMember("snd", Type.Var("a"))
-            ))
-          solveType(P.StructLit(g('Pair), Some(List(TypeName.Named(g('i64)))), List(
-            "fst" -> P.IntLit(10, loc), "snd" -> P.IntLit(20, loc)
-          ), loc), ExpectedType.Undefined, Ctxt.default.withTypes(Map(g('Pair) -> Pair))) ==>
+            StructMember("fst", Type.Var("a")),
+            StructMember("snd", Type.Var("a"))
+          ))
+          "explicit" - {            
+            solveType(P.StructLit(g('Pair), Some(List(TypeName.Named(g('i64)))), List(
+              "fst" -> P.IntLit(10, loc), "snd" -> P.IntLit(20, loc)
+            ), loc), ExpectedType.Undefined, Ctxt.default.withTypes(Map(g('Pair) -> Pair))) ==>
             valid(ast.StructLit(Symbol.Specialized(List(g('i64)), g('Pair)), None, List(
               "fst" -> (ast.IntLit(10, loc) :: I64),
               "snd" -> (ast.IntLit(20, loc) :: I64)
-            ), loc) :: Type.Struct(Symbol.Specialized(List(g('i64)), g('Pair)),
-              StructMember("fst", I64),
-              StructMember("snd", I64)))
+            ), loc) :: App(Pair, List(I64)))
+          }
+          "inferred" - {
+            "no expected type" - {
+              solveType(P.StructLit(g('Pair), None, List(
+                "fst" -> P.IntLit(10, loc), "snd" -> P.IntLit(20, loc)
+              ), loc), ExpectedType.Undefined, Ctxt.default.withTypes(Map(g('Pair) -> Pair))) ==>
+                valid(ast.StructLit(Symbol.Specialized(List(g('i32)), g('Pair)), None, List(
+                  "fst" -> (ast.IntLit(10, loc) :: I32), "snd" -> (ast.IntLit(20, loc) :: I32)
+                ), loc) :: App(Pair, List(I32)))
+            }
+          }
         }
+        
       }
       "enum literals" - {
         val some = EnumVariant(g('option, 'some), List(

@@ -83,7 +83,7 @@ object Typer {
       def checkMemberSet(expected: Set[String], found: Set[String]): TyperResult[Unit] =
         if(expected == found) valid(()) else invalidNel(TyperError.WrongStructMembers(expected, found, loc))
 
-      def solveStruct(typ: Type): TyperResult[Typed[ast.Expression]] = typ match {
+      def solveStruct(typ: Type): TyperResult[Typed[ast.Expression]] = typ.repr match {
         case struct: Type.Struct =>
           val correctMemberSet = checkMemberSet(members.map(_._1).toSet, struct.members.map(_.name).toSet)
           val expectedTypeFun = struct.members.map(m => m.name -> m.typ).toMap
@@ -103,13 +103,36 @@ object Typer {
           }
           noParams *> solveStruct(struct)
 
-        case cons: Type.TypeLambda =>
-          typeParams.toValidNel(TyperError.NotAStruct(cons, loc)).andThen { tps =>
-            val paramCountMatch =
-              if(tps.size == cons.paramNames.size) valid(())
-              else invalidNel(TyperError.WrongNumberOfTypeParams(cons, tps.size, loc))
-              paramCountMatch.andThen(_ => solveStruct(cons.apply(tps.map(lookupType(_, ctxt)))))
-          }          
+        case cons @ Type.TypeLambda(_, _, struct: Type.Struct) =>
+          typeParams match {
+            case Some(tps) =>
+              val paramCountMatch =
+                if(tps.size == cons.paramNames.size) valid(())
+                else invalidNel(TyperError.WrongNumberOfTypeParams(cons, tps.size, loc))
+              paramCountMatch.andThen(_ => solveStruct(Type.App(cons, (tps.map(lookupType(_, ctxt))))))
+            case None =>
+              val expectedTypeFun = struct.members.map(m => m.name -> m.typ.implyVars(cons.paramNames.toSet)).toMap
+                .andThen(ExpectedType.Specific)
+                .lift.andThen(_ getOrElse ExpectedType.Undefined)
+              solveMembers(expectedTypeFun).andThen { typedMembers =>
+                typedMembers.traverse {
+                  case (n, v) => unifyShape(struct.members.find(_.name == n).get.typ, v.typ, loc)
+                }.andThen { constrs =>
+                  val flat = constrs.flatten
+                  // TODO error messages here are abysmal
+                  flat.groupBy(_._1).mapValues(_.map(_._2)).toVector.traverse {
+                    case (n, t :: ts) =>
+                      ts.traverse_(x => if(x.repr == t.repr) valid(())
+                        else invalidNel(TyperError.CantMatch(ExpectedType.Specific(t), x, loc))) as (n -> t)
+                  }.map { substs =>
+                    val substMap = substs.toMap
+                    val typ = Type.App(cons, cons.paramNames.map(substMap))
+                    Typed(ast.StructLit(typ.symbol, None, typedMembers, loc), typ)
+                  }
+                }
+              }
+              
+          }
         
       }.getOrElse {
         ctxt.terms(name).typ match {
@@ -251,7 +274,7 @@ object Typer {
     case P.Select(expr, member, loc) =>
       Validated.fromEither(for {
         exprTyped <- solveType(expr, ExpectedType.Value, ctxt).toEither
-        memberType <- exprTyped.typ match {
+        memberType <- exprTyped.typ.repr match {
           case t @ Struct(_, ms) =>
             ms.find(_.name == member).map(_.typ).toRight(NonEmptyList.of(TyperError.MemberNotFound(member, t, loc)))
           case Ptr(s @ Struct(_, ms)) =>
@@ -370,6 +393,12 @@ object Typer {
         rtyped <- solveType(rval, ExpectedType.Specific(ltyped.typ), ctxt).toEither
         t <- unifyType(Typed(ast.Assign(ltyped, None, rtyped, loc), U0), expected).toEither
       } yield t)
+  }
+
+  private def unifyShape(left: Type, right: Type, loc: Span): TyperResult[List[(String, Type)]] = (left, right) match {
+    case (Type.Var(a), r) => valid(List((a, r)))
+    case (a, b) if a.repr == b.repr => valid(Nil)
+    case _ => invalidNel(TyperError.CantMatch(ExpectedType.Specific(left), right, loc))
   }
 
   private def solveMatchCase(matcheeType: Type, expectedType: ExpectedType, ctxt: Ctxt)

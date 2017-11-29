@@ -31,12 +31,38 @@ sealed trait Type {
     case _ => this // TODO is it safe?
   }
 
+  def implyVars(vars: Set[String]): Type =
+    subst(vars.map(_ -> Implicit)(collection.breakOut))
+
+  def repr: Type = this match {
+    case p: ProxyType => p.underlying.repr
+    case _ => this
+  }
+
 }
 
 object Type {
 
   final case class Var(name: String) extends Type {
     def symbol = Symbol.Local(name)
+  }
+
+  final case object Implicit extends Type {
+    def symbol = Symbol.Global(List("_"))
+  }
+
+  sealed trait ProxyType extends Type {
+
+    def underlying: Type
+
+  }
+
+  final case class App(cons: Type, params: List[Type]) extends ProxyType {
+    lazy val symbol = Symbol.Specialized(params.map(_.symbol), cons.symbol)
+    lazy val underlying = cons match {
+      case tl: TypeLambda =>
+        tl.apply(params).rename(symbol)
+    }
   }
 
   sealed trait ValueType extends Type
@@ -178,7 +204,6 @@ object Type {
     def symbol = name
     def apply(params: List[Type]): Type =
       body.subst((paramNames zip params).toMap)
-        .rename(Symbol.Specialized(params.map(_.symbol), name))
   }
 
 }
