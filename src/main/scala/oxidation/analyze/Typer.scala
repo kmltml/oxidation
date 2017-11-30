@@ -16,7 +16,7 @@ object Typer {
   def solveType(expression: P.Expression, expected: ExpectedType, ctxt: Ctxt): TyperResult[Typed[ast.Expression]] = expression match {
     case P.IntLit(i, loc) =>
       expected match {
-        case ExpectedType.Numeric(None) | ExpectedType.Undefined | ExpectedType.Value =>
+        case ExpectedType.Numeric(None) | ExpectedType.Undefined | ExpectedType.Value | ExpectedType.Specific(Type.Implicit) =>
           valid(Typed(ast.IntLit(i, loc), I32))
         case ExpectedType.Numeric(Some(t: Integral)) => valid(Typed(ast.IntLit(i, loc), t))
         case ExpectedType.Specific(t: Integral) => valid(Typed(ast.IntLit(i, loc), t))
@@ -25,7 +25,7 @@ object Typer {
 
     case P.FloatLit(f, loc) =>
       expected match {
-        case ExpectedType.Numeric(None) | ExpectedType.Undefined | ExpectedType.Value =>
+        case ExpectedType.Numeric(None) | ExpectedType.Undefined | ExpectedType.Value | ExpectedType.Specific(Type.Implicit) =>
           valid(Typed(ast.FloatLit(f, loc), F64))
         case ExpectedType.Numeric(Some(t: F)) => valid(Typed(ast.FloatLit(f, loc), t))
         case ExpectedType.Specific(t: F) => valid(Typed(ast.FloatLit(f, loc), t))
@@ -91,7 +91,7 @@ object Typer {
             .lift.andThen(_ getOrElse ExpectedType.Undefined)
 
           correctMemberSet *>
-            solveMembers(expectedTypeFun).map(typedMembers => Typed(ast.StructLit(struct.symbol, None, typedMembers, loc), struct))
+            solveMembers(expectedTypeFun).map(typedMembers => Typed(ast.StructLit(struct.symbol, None, typedMembers, loc), typ))
         case t => invalidNel(TyperError.NotAStruct(t, loc))
       }
 
@@ -301,7 +301,7 @@ object Typer {
           case (ExpectedType.Specific(t), _) => expected
           case (ExpectedType.Numeric(t), _) => ExpectedType.Numeric(t)
           case (ExpectedType.Appliable, t) => ExpectedType.Specific(t)
-          case (ExpectedType.Undefined | ExpectedType.Value, t) => ExpectedType.Specific(t)
+          case (ExpectedType.Undefined | ExpectedType.Value | ExpectedType.Specific(Type.Implicit), t) => ExpectedType.Specific(t)
         }
         negTyped <- solveType(neg, negExpected, ctxt).toEither
       } yield (posTyped, negTyped))
@@ -358,7 +358,10 @@ object Typer {
             c <- S.get
             declaredType = tpe.map(lookupType(_, c))
             expectedType = declaredType.map(ExpectedType.Specific).getOrElse(ExpectedType.Value)
-            expectedMatch = if(Set(ExpectedType.Value, ExpectedType.Undefined, ExpectedType.Specific(U0)) contains ex) valid(()) else invalidNel(TyperError.CantMatch(ex, U0, loc): TyperError)
+            expectedMatch =
+              if(Set(ExpectedType.Value, ExpectedType.Undefined, ExpectedType.Specific(U0), ExpectedType.Specific(Type.Implicit)) contains ex)
+                valid(())
+              else invalidNel(TyperError.CantMatch(ex, U0, loc): TyperError)
             typedVal = solveType(value, expectedType, c) <* expectedMatch
             inferredType = declaredType.orElse(typedVal.toOption.map(_.typ))
             // When no explicit type annotation is given and typechecking fails for the right side the symbol is left undefined
@@ -372,7 +375,10 @@ object Typer {
             c <- S.get
             declaredType = tpe.map(lookupType(_, c))
             expectedType = declaredType.map(ExpectedType.Specific).getOrElse(ExpectedType.Value)
-            expectedMatch = if(Set(ExpectedType.Value, ExpectedType.Undefined, ExpectedType.Specific(U0)) contains ex) valid(()) else invalidNel(TyperError.CantMatch(ex, U0, loc): TyperError)
+            expectedMatch =
+              if(Set(ExpectedType.Value, ExpectedType.Undefined, ExpectedType.Specific(U0), ExpectedType.Specific(Type.Implicit)) contains ex)
+                valid(())
+              else invalidNel(TyperError.CantMatch(ex, U0, loc): TyperError)
             typedVal = solveType(value, expectedType, c) <* expectedMatch
             inferredType = declaredType.orElse(typedVal.toOption.map(_.typ))
             _ <- inferredType.traverse(t => S.modify(_.withTerms(Map(name -> Ctxt.Mutable(t)))))
@@ -548,7 +554,7 @@ object Typer {
     case TypeName.App(TypeName.Named(Symbol.Global(List("funptr"))), List(TypeName.Fun(params, ret))) =>
       Type.FunPtr(params.map(lookupType(_, ctxt)), lookupType(ret, ctxt))
     case TypeName.App(l, ps) => lookupType(l, ctxt) match {
-      case cons: Type.TypeLambda => cons.apply(ps.map(lookupType(_, ctxt)))
+      case cons: Type.TypeLambda => Type.App(cons, ps.map(lookupType(_, ctxt)))
     }
     case TypeName.Named(s) => ctxt.types(s)
   }
@@ -578,7 +584,7 @@ object Typer {
     }
   }
 
-  private def unifyType(t: Typed[ast.Expression], expected: ExpectedType): TyperResult[Typed[ast.Expression]] = (t.typ, expected) match {
+  private def unifyType(t: Typed[ast.Expression], expected: ExpectedType): TyperResult[Typed[ast.Expression]] = (t.typ.repr, expected) match {
     case (_: Num, ExpectedType.Numeric(None)) => valid(t)
     case (_: Num, ExpectedType.Numeric(Some(lb))) =>
       val w = wider(t.typ, lb)
@@ -605,8 +611,8 @@ object Typer {
     case (_: ValueType, ExpectedType.Value) => valid(t)
 
     case (typ, ExpectedType.Specific(u)) =>
-      if(typ == u) valid(t) else invalidNel(TyperError.CantMatch(expected, typ, t.expr.loc))
-    case (_, ExpectedType.Undefined) => valid(t)
+      if(typ.repr == u.repr) valid(t) else invalidNel(TyperError.CantMatch(expected, typ, t.expr.loc))
+    case (_, ExpectedType.Undefined | ExpectedType.Specific(Type.Implicit)) => valid(t)
   }
 
   private[analyze] def commonType(a: Type, b: Type): Type = (a, b) match {
