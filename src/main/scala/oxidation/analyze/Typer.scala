@@ -226,7 +226,7 @@ object Typer {
 
     case P.App(fn, pars, loc) =>
       solveType(fn, ExpectedType.Appliable, ctxt) andThen {
-        case typedFun @ Typed(_, Fun(paramTypes, retType)) =>
+        case typedFun @ ReprTyped(_, Fun(paramTypes, retType)) =>
           val typedParams = (pars zip paramTypes).traverse {
             case (e, t) => solveType(e, ExpectedType.Specific(t), ctxt)
           }
@@ -236,7 +236,7 @@ object Typer {
           (typedParams <* paramCount)
             .andThen(ps => unifyType(Typed(ast.App(typedFun, ps, loc), retType), expected))
 
-        case typedFun @ Typed(_, FunPtr(paramTypes, retType)) =>
+        case typedFun @ ReprTyped(_, FunPtr(paramTypes, retType)) =>
           val typedParams = (pars zip paramTypes).traverse {
             case (e, t) => solveType(e, ExpectedType.Specific(t), ctxt)
           }
@@ -247,7 +247,7 @@ object Typer {
             .andThen(ps => unifyType(Typed(ast.App(typedFun, ps, loc), retType), expected))
 
 
-        case typedPtr @ Typed(_, Ptr(pointee)) =>
+        case typedPtr @ ReprTyped(_, Ptr(pointee)) =>
           val typedParams = pars match {
             case Nil => valid(Nil)
             case off :: Nil => solveType(off, ExpectedType.Specific(I64), ctxt).map(List(_))
@@ -255,7 +255,7 @@ object Typer {
           }
           typedParams.andThen(ps => unifyType(Typed(ast.App(typedPtr, ps, loc), pointee), expected))
 
-        case typedArr @ Typed(_, Arr(memberType, _)) =>
+        case typedArr @ ReprTyped(_, Arr(memberType, _)) =>
           val typedParams = pars match {
             case index :: Nil => solveType(index, ExpectedType.Specific(I64), ctxt).map(List(_))
             case _ => invalidNel(TyperError.WrongNumberOfArguments(1, pars.size, loc))
@@ -403,6 +403,13 @@ object Typer {
 
   private def unifyShape(left: Type, right: Type, loc: Span): TyperResult[List[(String, Type)]] = (left, right) match {
     case (Type.Var(a), r) => valid(List((a, r)))
+    case (Type.App(a, ap), Type.App(b, bp)) =>
+      val paramCountMatch =
+        if(ap.size == bp.size) valid(())
+        else invalidNel(TyperError.WrongNumberOfArguments(ap.size, bp.size, loc): TyperError)
+      paramCountMatch *>
+        (unifyShape(a, b, loc), (ap zip bp).traverse { case (a, b) => unifyShape(a, b, loc) })
+        .map2(_ ++ _.flatten)
     case (a, b) if a.repr == b.repr => valid(Nil)
     case _ => invalidNel(TyperError.CantMatch(ExpectedType.Specific(left), right, loc))
   }
@@ -533,8 +540,9 @@ object Typer {
     }
   }
 
-  private def cast(target: TypeName, src: Typed[ast.Expression], loc: Span, ctxt: Ctxt): Typed[ast.Expression] =
-    (lookupType(target, ctxt), src.typ) match {
+  private def cast(target: TypeName, src: Typed[ast.Expression], loc: Span, ctxt: Ctxt): Typed[ast.Expression] = {
+    val tarType = lookupType(target, ctxt)
+    (tarType.repr, src.typ.repr) match {
       case (a, b) if a == b => src
       case (t: Integral, s: Integral) =>
         val w = wider(t, s)
@@ -544,11 +552,11 @@ object Typer {
         Typed(ast.Convert(src, loc), t)
       case (t: Type.F, s: Integral) =>
         Typed(ast.Convert(src, loc), t)
-      case (t @ Ptr(_), Ptr(_) | U64) => Typed(ast.Reinterpret(src, loc), t)
+      case (Ptr(_), Ptr(_) | U64) => Typed(ast.Reinterpret(src, loc), tarType)
     }
+  }
 
   def lookupType(t: TypeName, ctxt: Ctxt): Type = t match {
-    case TypeName.App(TypeName.Named(Symbol.Global(List("ptr"))), List(pointee)) => Type.Ptr(lookupType(pointee, ctxt))
     case TypeName.App(TypeName.Named(Symbol.Global(List("arr"))), List(member, TypeName.IntLiteral(size))) =>
       Type.Arr(lookupType(member, ctxt), size.toInt)
     case TypeName.App(TypeName.Named(Symbol.Global(List("funptr"))), List(TypeName.Fun(params, ret))) =>
@@ -611,7 +619,7 @@ object Typer {
     case (_: ValueType, ExpectedType.Value) => valid(t)
 
     case (typ, ExpectedType.Specific(u)) =>
-      if(typ.repr == u.repr) valid(t) else invalidNel(TyperError.CantMatch(expected, typ, t.expr.loc))
+      if(u moreGeneralThan typ) valid(t) else invalidNel(TyperError.CantMatch(expected, typ, t.expr.loc))
     case (_, ExpectedType.Undefined | ExpectedType.Specific(Type.Implicit)) => valid(t)
   }
 

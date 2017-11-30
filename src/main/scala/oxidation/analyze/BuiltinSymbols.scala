@@ -10,11 +10,14 @@ object BuiltinSymbols {
     StructMember("length", U32)
   )
 
+  val PtrCons: Type = TypeLambda(Symbol.Global(List("ptr")), List("A"), Ptr(Var("A")))
+
   val typeNames: Map[String, Type] = Map(
     "i8" -> I8, "i16" -> I16, "i32" -> I32, "i64" -> I64,
     "u0" -> U0, "u1" -> U1, "u8" -> U8, "u16" -> U16, "u32" -> U32, "u64" -> U64,
     "f32" -> F32, "f64" -> F64,
-    "ptr" -> U64, "arr" -> U64, "funptr" -> U64,
+    "ptr" -> PtrCons,
+    "arr" -> U64, "funptr" -> U64,
     "str" -> StrType)
   val types: Map[Symbol, Type] = typeNames.map { case (s, v) => Symbol.Global(List(s)) -> v }
 

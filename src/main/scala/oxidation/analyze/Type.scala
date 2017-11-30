@@ -8,10 +8,7 @@ sealed trait Type {
   def symbol: Symbol
 
   def subst(s: Map[String, Type]): Type = this match {
-    case Var(n) => s.get(n) match {
-      case None => Var(n)
-      case Some(t) => t
-    }
+    case Var(n) => s.getOrElse(n, Var(n))
     case (_: Num | U1 | U0) => this
     case Ptr(pointee) => Ptr(pointee.subst(s))
     case Arr(member, size) => Arr(member.subst(s), size)
@@ -21,7 +18,8 @@ sealed trait Type {
     case Enum(name, variants) => Enum(name, variants.map(_.subst(s)))
     case EnumConstructor(enum, variant) => ???
     case TypeLambda(name, paramNames, body) =>
-      body.subst(s -- paramNames)
+      TypeLambda(name, paramNames, body.subst(s -- paramNames))
+    case App(cons, params) => App(cons.subst(s), params.map(_.subst(s)))
   }
 
   def rename(s: Symbol): Type = this match {
@@ -37,6 +35,24 @@ sealed trait Type {
   def repr: Type = this match {
     case p: ProxyType => p.underlying.repr
     case _ => this
+  }
+
+  def moreGeneralThan(t: Type): Boolean = (this, t) match {
+    case (Implicit, _) => true
+    case (Ptr(a), Ptr(b)) => a moreGeneralThan b
+    case (Arr(a, as), Arr(b, bs)) => (as == bs) && (a moreGeneralThan b)
+    case (Fun(ap, ar), Fun(bp, br)) =>
+      (ap.size == bp.size) &&
+        (ap zip bp).forall { case (a, b) => a moreGeneralThan b } &&
+      (ar moreGeneralThan br)
+    case (FunPtr(ap, ar), FunPtr(bp, br)) =>
+      (ap.size == bp.size) &&
+        (ap zip bp).forall { case (a, b) => a moreGeneralThan b } &&
+        (ar moreGeneralThan br)
+    case (App(a, ap), App(b, bp)) =>
+      (ap.size == bp.size) && (a moreGeneralThan b) && (ap zip bp).forall { case (a, b) => a moreGeneralThan b }
+
+    case _ => this.repr == t.repr
   }
 
 }
@@ -63,6 +79,9 @@ object Type {
       case tl: TypeLambda =>
         tl.apply(params).rename(symbol)
     }
+  }
+  object App extends ((Type, List[Type]) => App) {
+    def ptr(pointee: Type): Type = App(BuiltinSymbols.PtrCons, List(pointee))
   }
 
   sealed trait ValueType extends Type

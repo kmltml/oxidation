@@ -1,7 +1,7 @@
 package oxidation
 package codegen
 
-import analyze.{BuiltinSymbols, Typed, ast}
+import analyze.{BuiltinSymbols, Typed, ReprTyped, ast}
 import ir._
 import cats._
 import cats.data._
@@ -25,12 +25,6 @@ object Codegen {
 
   object CodegenReg extends RegisterNamespace {
     override def prefix: String = "r"
-  }
-
-  object ReprTyped {
-
-    def unapply[A](t: Typed[A]): Some[(A, analyze.Type)] = Some(t.expr, t.typ.repr)
-
   }
 
   def register(index: Int, typ: ir.Type): ir.Register = ir.Register(CodegenReg, index, typ)
