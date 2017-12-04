@@ -46,7 +46,7 @@ object TypeInterpreterTests extends TestSuite with SymbolSyntax {
         val list = c.types(g('List)).asInstanceOf[Struct]
         list.members(0) ==> StructMember("head", I32)
         list.members(1) match {
-          case StructMember(name, Ptr(pointee)) =>
+          case StructMember(name, Type.App(BuiltinSymbols.PtrCons, List(pointee))) =>
             name ==> "tail"
             assert(pointee eq list)
         }
@@ -84,7 +84,7 @@ object TypeInterpreterTests extends TestSuite with SymbolSyntax {
         ), ctxt)
         val list = c.types(g('List)).asInstanceOf[Enum]
         list.variants(0) ==> EnumVariant(g('List, 'Cons), List(
-          StructMember("head", I32), StructMember("tail", Ptr(list))))
+          StructMember("head", I32), StructMember("tail", Type.App.ptr(list))))
         list.variants(1) ==> EnumVariant(g('List, 'Nil), Nil)
       }
     }

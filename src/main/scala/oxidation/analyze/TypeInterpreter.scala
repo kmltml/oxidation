@@ -43,6 +43,7 @@ object TypeInterpreter {
             }
           }).toEither.left.map {
             case Err(e) => e
+            case e => throw e
           }          
           for {
             s <- StateT.lift(struct)
@@ -85,7 +86,9 @@ object TypeInterpreter {
         ctxt <- S.get
         t <- if(ctxt.types.contains(s)) S.pure(ctxt.types(s)) else solveTypeDef(defs(s), defs)
       } yield t
-    case TypeName.App(TypeName.Named(Symbol.Global(Seq("ptr"))), Seq(pointee)) => findType(pointee, defs).map(Type.Ptr)
+    case TypeName.App(const, params) =>
+      (findType(const, defs), params.traverse(findType(_, defs)))
+        .map2(Type.App(_, _))
   }
 
   private def solved(name: Symbol, t: Type): S[Unit] = S.modify { ctxt =>

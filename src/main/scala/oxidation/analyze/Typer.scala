@@ -49,7 +49,7 @@ object Typer {
       solveType(src, ExpectedType.Value, ctxt).map(cast(target, _, loc, ctxt))
 
     case P.TypeApp(P.Var(Symbol.Global(List("stackalloc")), _), List(pointee), loc) =>
-      unifyType(Typed(ast.Stackalloc(lookupType(pointee, ctxt), loc), Ptr(lookupType(pointee, ctxt))), expected)
+      unifyType(Typed(ast.Stackalloc(lookupType(pointee, ctxt), loc), Type.App.ptr(lookupType(pointee, ctxt))), expected)
 
     case P.App(P.TypeApp(P.Var(Symbol.Global(List("arr")), _), membertn :: typeTail, _), termParams, loc) =>
       Validated.fromEither(for {
@@ -123,7 +123,7 @@ object Typer {
                   flat.groupBy(_._1).mapValues(_.map(_._2)).toVector.traverse {
                     case (n, t :: ts) =>
                       ts.traverse_(x => if(x.repr == t.repr) valid(())
-                        else invalidNel(TyperError.CantMatch(ExpectedType.Specific(t), x, loc))) as (n -> t)
+                        else invalidNel(TyperError.CantUnifyTypeParam(n, t, x, loc))) as (n -> t)
                   }.map { substs =>
                     val substMap = substs.toMap
                     val typ = Type.App(cons, cons.paramNames.map(substMap))
@@ -534,8 +534,8 @@ object Typer {
           } toValidNel TyperError.MemberNotFound(member, struct, loc)
       }
     case e => solveType(e, ExpectedType.Undefined, ctxt).andThen {
-      case lTyped @ Typed(ast.App(Typed(ptr, _: Ptr), _, _), _) => valid(lTyped)
-      case lTyped @ Typed(ast.App(Typed(_, _: Arr), _, _), _) => valid(lTyped) // TODO arr ref too has to be an lval
+      case lTyped @ Typed(ast.App(ReprTyped(ptr, _: Ptr), _, _), _) => valid(lTyped)
+      case lTyped @ Typed(ast.App(ReprTyped(_, _: Arr), _, _), _) => valid(lTyped) // TODO arr ref too has to be an lval
       case e => invalidNel(TyperError.NotAnLVal(e, e.expr.loc))
     }
   }
@@ -618,8 +618,8 @@ object Typer {
 
     case (_: ValueType, ExpectedType.Value) => valid(t)
 
-    case (typ, ExpectedType.Specific(u)) =>
-      if(u moreGeneralThan typ) valid(t) else invalidNel(TyperError.CantMatch(expected, typ, t.expr.loc))
+    case (_, ExpectedType.Specific(u)) =>
+      if(u moreGeneralThan t.typ) valid(t) else invalidNel(TyperError.CantMatch(expected, t.typ, t.expr.loc))
     case (_, ExpectedType.Undefined | ExpectedType.Specific(Type.Implicit)) => valid(t)
   }
 

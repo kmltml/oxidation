@@ -660,7 +660,7 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with Matc
             solveType(P.App(P.TypeApp(P.Var(g('cast), loc),
               List(TypeName.ptr(TypeName.Named(g('i32)))), loc), List(P.Var(l('x), loc)), loc),
               ExpectedType.Undefined, Ctxt.default.withTerms(Map(l('x) -> imm(Ptr(I8))))) ==>
-              valid(ast.Reinterpret(ast.Var(l('x), loc) :: Ptr(I8), loc) :: Ptr(I32))
+              valid(ast.Reinterpret(ast.Var(l('x), loc) :: Ptr(I8), loc) :: App.ptr(I32))
           }
         }
         "convert" - {
@@ -692,7 +692,7 @@ object TyperTests extends TestSuite with SymbolSyntax with TypedSyntax with Matc
       }
       "Stackalloc" - {
         solveType(P.TypeApp(P.Var(g('stackalloc), loc), List(TypeName.Named(g('i64))), loc), ExpectedType.Undefined, Ctxt.default) ==>
-          valid(ast.Stackalloc(I64, loc) :: Ptr(I64))
+          valid(ast.Stackalloc(I64, loc) :: App.ptr(I64))
       }
       "Array Literal" - {
         "fully explicit list" - {
