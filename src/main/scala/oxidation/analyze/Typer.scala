@@ -85,7 +85,7 @@ object Typer {
 
       ctxt.types.get(name).map {
         case struct: Type.Struct =>
-          val correctMemberSet = checkMemberSet(members.map(_._1).toSet, struct.members.map(_.name).toSet)
+          val correctMemberSet = checkMemberSet(struct.members.map(_.name).toSet, members.map(_._1).toSet)
 
           val expectedTypeFun = struct.members.map(m => m.name -> m.typ).toMap
             .andThen(ExpectedType.Specific)
@@ -97,7 +97,7 @@ object Typer {
       }.getOrElse {
         ctxt.terms(name).typ match {
           case Type.EnumConstructor(enum, variant) =>
-            val correctMemberSet = checkMemberSet(members.map(_._1).toSet, variant.members.map(_.name).toSet)
+            val correctMemberSet = checkMemberSet(variant.members.map(_.name).toSet, members.map(_._1).toSet)
 
             val expectedTypeFun = variant.members.map(m => m.name -> m.typ).toMap
               .andThen(ExpectedType.Specific)

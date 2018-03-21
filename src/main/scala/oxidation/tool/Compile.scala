@@ -4,7 +4,7 @@ package tool
 import java.io.{BufferedWriter, File, FileWriter, OutputStreamWriter}
 
 import oxidation.analyze._
-import oxidation.parse.Parser
+import oxidation.parse.{ Parser, Sourcefile, IndexTranslator }
 
 import scala.io.Source
 import cats._
@@ -69,7 +69,7 @@ object Compile {
   def compile(implicit options: Options): Either[CompileError, (File, Stats)] = {
     for {
       parsed <- options.infiles.toVector.traverse { f =>
-        val parser = new Parser(Some(f.getName))
+        val parser = new Parser(Some(f.getAbsolutePath))
         val res = parser.compilationUnit.parse(Source.fromFile(f).mkString)
         res.fold(
           (_, _, _) => Left(ParseError(res.toString)),
@@ -172,7 +172,17 @@ object Compile {
   }
 
   def main(args: Array[String]): Unit = {
-    optParser.parse(args, Options()).foreach(opt => get(compile(opt)))
+    optParser.parse(args, Options()).foreach { opt =>
+      compile(opt) match {
+        case Right(_) =>
+          println("Success")
+        case Left(error) =>
+          val sourcefiles = opt.infiles.map(f => f.getAbsolutePath -> Sourcefile(Source.fromFile(f)))
+          implicit val indexTranslator = new IndexTranslator(sourcefiles.toMap, None)
+          ErrorPrinter.printError(error)
+          sys.exit(-1)
+      }
+    }
   }
 
 

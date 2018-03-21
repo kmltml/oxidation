@@ -345,7 +345,7 @@ object TypedAstPrettyprint extends AstPrettyprint {
     case Typed(expr: ast.Expression, typ) => prettyprintTypedExp(Typed(expr, typ))
   }
 
-  private def prettyPrintType(t: Type): String = t match {
+  def prettyPrintType(t: Type): String = t match {
     case Type.Fun(params, ret) =>
       val p = params.map(prettyPrintType).mkString("(", ", ", ")")
       val r = prettyPrintType(ret)
