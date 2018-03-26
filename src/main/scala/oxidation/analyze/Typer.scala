@@ -492,7 +492,7 @@ object Typer {
         Typed(ast.Convert(src, loc), t)
       case (t: Type.F, s: Integral) =>
         Typed(ast.Convert(src, loc), t)
-      case (t @ Ptr(_), Ptr(_) | U64) => Typed(ast.Reinterpret(src, loc), t)
+      case (t @ (Ptr(_) | U64), Ptr(_) | U64) => Typed(ast.Reinterpret(src, loc), t)
     }
 
   def lookupType(t: TypeName, ctxt: Ctxt): Type = t match {

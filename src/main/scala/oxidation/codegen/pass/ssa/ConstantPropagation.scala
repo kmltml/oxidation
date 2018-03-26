@@ -30,7 +30,7 @@ object ConstantPropagation extends Pass {
         case Nil => Vector.empty
         case n :: rest if visited(n) => postorder(rest, visited)
         case n :: rest =>
-          val deps = dependencies(n).toList
+          val deps = dependencies.getOrElse(n, Set.empty).toList
           val newVisited = visited + n
           val found = postorder(deps, newVisited)
           (found :+ n) ++ postorder(rest, newVisited ++ found)
